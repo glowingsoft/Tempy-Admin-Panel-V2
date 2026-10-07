@@ -85,11 +85,18 @@ const MODULES = [
     href: paths.adminDashboard.recruitment,
   },
   {
-    title: 'Payouts',
-    description: 'Payments · History',
-    icon: 'solar:wallet-money-bold-duotone',
+    title: 'Transactions',
+    description: 'Customer payments',
+    icon: 'solar:card-transfer-bold-duotone',
     color: 'success',
     href: paths.adminDashboard.transactions,
+  },
+  {
+    title: 'Payouts',
+    description: 'Supplier bank transfers',
+    icon: 'solar:wallet-money-bold-duotone',
+    color: 'info',
+    href: paths.adminDashboard.payouts,
   },
   {
     title: 'Support',

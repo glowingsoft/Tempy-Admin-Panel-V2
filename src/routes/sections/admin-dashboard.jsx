@@ -23,6 +23,7 @@ const AdminStaffMembersPage = lazy(() => import('src/pages/admin-dashboard/staff
 const AdminOrgProfilePage = lazy(() => import('src/pages/admin-dashboard/org-profile'));
 const AdminJobTypesPage = lazy(() => import('src/pages/admin-dashboard/job-types'));
 const AdminTransactionsPage = lazy(() => import('src/pages/admin-dashboard/transactions'));
+const AdminPayoutsPage = lazy(() => import('src/pages/admin-dashboard/payouts'));
 const AdminRecruitmentPage = lazy(() => import('src/pages/admin-dashboard/recruitment'));
 const AdminAllegationsPage = lazy(() => import('src/pages/admin-dashboard/allegations'));
 const IndexPage = lazy(() => import('src/pages/dashboard'));
@@ -119,6 +120,7 @@ export const adminDashboardRoutes = [
       { path: 'staff-members/:id', element: <AdminOrgProfilePage /> },
       { path: 'job-types', element: <AdminJobTypesPage /> },
       { path: 'transactions', element: <AdminTransactionsPage /> },
+      { path: 'payouts', element: <AdminPayoutsPage /> },
       { path: 'recruitment', element: <AdminRecruitmentPage /> },
       { path: 'allegations', element: <AdminAllegationsPage /> },
       { path: 'ecommerce', element: <OverviewEcommercePage /> },

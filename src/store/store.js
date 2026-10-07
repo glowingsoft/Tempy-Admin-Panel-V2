@@ -55,6 +55,8 @@ import { hospitalDashboardApi } from './Reducer/hospital-dashboard-api';
 import { userDashboardApi } from './Reducer/user-dashboard-api';
 import { agencyDashboardApi } from './Reducer/agency-dashboard-api';
 import { earningsApi } from './Reducer/earnings-api';
+import { bookingPaymentsApi } from './Reducer/booking-payments-api';
+import { adminTransactionsApi } from './Reducer/admin-transactions-api';
 import { sidebarCountsApi } from './Reducer/sidebar-counts-api';
 import { homeCareCompanyDashboardApi } from './Reducer/home-care-company-dashboard-api';
 import { nurseDashboardApi } from './Reducer/nurse-dashboard-api';
@@ -122,6 +124,8 @@ export const store = configureStore({
     [userDashboardApi.reducerPath]: userDashboardApi.reducer,
     [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
     [earningsApi.reducerPath]: earningsApi.reducer,
+    [bookingPaymentsApi.reducerPath]: bookingPaymentsApi.reducer,
+    [adminTransactionsApi.reducerPath]: adminTransactionsApi.reducer,
     [sidebarCountsApi.reducerPath]: sidebarCountsApi.reducer,
     [homeCareCompanyDashboardApi.reducerPath]: homeCareCompanyDashboardApi.reducer,
     [nurseDashboardApi.reducerPath]: nurseDashboardApi.reducer,
@@ -188,6 +192,8 @@ export const store = configureStore({
       userDashboardApi.middleware,
       agencyDashboardApi.middleware,
       earningsApi.middleware,
+      bookingPaymentsApi.middleware,
+      adminTransactionsApi.middleware,
       sidebarCountsApi.middleware,
       homeCareCompanyDashboardApi.middleware,
       nurseDashboardApi.middleware,
@@ -200,5 +206,3 @@ export const store = configureStore({
 export const persistor = persistStore(store);
 
 setupListeners(store.dispatch);
-
-

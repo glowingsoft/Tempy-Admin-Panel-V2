@@ -5,9 +5,7 @@ import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
 
-const svgIcon = (name) => (
-  <SvgColor src={`${CONFIG.site.basePath}/assets/icons/navbar/${name}.svg`} />
-);
+const svgIcon = (name) => <SvgColor src={`${CONFIG.site.basePath}/assets/icons/navbar/${name}.svg`} />;
 
 const ify = (name) => <Iconify icon={name} width={24} />;
 
@@ -48,6 +46,7 @@ export const NAV_ICONS = {
   helpCenter: ify('solar:question-circle-bold'),
   star: ify('solar:star-bold'),
   transactions: svgIcon('ic-banking'),
+  payouts: ify('solar:wallet-money-bold'),
   recruitment: ify('solar:user-check-rounded-bold'),
   allegations: ify('solar:danger-triangle-bold'),
 };

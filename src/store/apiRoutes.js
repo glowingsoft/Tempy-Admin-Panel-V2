@@ -61,7 +61,6 @@ export const API_ROUTES = {
   NOTIFICATIONS: '/notifications',
   NOTIFICATIONS_READ_BY_ID: (id) => `/notifications/${id}/read`,
 
-  /** Conversation / messaging (1-1 and group) */
   CONVERSATIONS: '/conversations',
   CONVERSATIONS_BY_ID: (id) => `/conversations/${id}`,
   CONVERSATIONS_ACTION: (id) => `/conversations/${id}/action`,
@@ -104,7 +103,6 @@ export const API_ROUTES = {
   CARE_HOME_BOOKING_CALENDAR: '/web/care-home/booking/calender',
   CARE_HOME_DASHBOARD: '/web/care-home/dashboard',
 
-  /** Supplier job types — prefix is `/web/agency`, `/web/home-care-company` or `/web/nurse`. */
   SUPPLIER_JOB_ROLES: (prefix) => `${prefix}/job-roles`,
   SUPPLIER_JOB_ROLES_MINE: (prefix) => `${prefix}/job-roles/mine`,
 
@@ -118,14 +116,14 @@ export const API_ROUTES = {
   ADMIN_ALLEGATIONS: '/admin/allegations',
   ADMIN_ALLEGATION_BY_ID: (id) => `/admin/allegations/${id}`,
   ADMIN_ALLEGATION_STATUS: (id) => `/admin/allegations/${id}/status`,
-  ADMIN_ALLEGATION_REPLACEMENTS: (id, shiftId) =>
-    `/admin/allegations/${id}/shifts/${shiftId}/replacements`,
-  ADMIN_ALLEGATION_REPUBLISH: (id, shiftId) =>
-    `/admin/allegations/${id}/shifts/${shiftId}/republish`,
-  ADMIN_ALLEGATION_REALLOCATE: (id, shiftId) =>
-    `/admin/allegations/${id}/shifts/${shiftId}/reallocate`,
+  ADMIN_ALLEGATION_REPLACEMENTS: (id, shiftId) => `/admin/allegations/${id}/shifts/${shiftId}/replacements`,
+  ADMIN_ALLEGATION_REPUBLISH: (id, shiftId) => `/admin/allegations/${id}/shifts/${shiftId}/republish`,
+  ADMIN_ALLEGATION_REALLOCATE: (id, shiftId) => `/admin/allegations/${id}/shifts/${shiftId}/reallocate`,
 
   GOCARDLESS_MANDATE: '/gocardless/mandate',
+  ADMIN_TRANSACTIONS: '/admin/transactions',
+  ADMIN_TRANSACTION_BY_ID: (id) => `/admin/transactions/${id}`,
+  ADMIN_TRANSACTION_PLATFORM_FEE: '/admin/transactions/platform-fee',
   ADMIN_PAYOUTS: '/admin/gocardless/payouts',
   ADMIN_PAYOUTS_SETTLE: '/admin/payouts/settle',
   ADMIN_BOOKING_REFUND: (bookingId) => `/admin/gocardless/bookings/${bookingId}/refund`,
@@ -217,9 +215,8 @@ export const API_ROUTES = {
   NURSE_BOOKING: '/web/nurse/booking',
   NURSE_BOOKING_CALENDAR: '/web/nurse/booking/calender',
   NURSE_DASHBOARD: '/web/nurse/dashboard',
-  /** Earnings (suppliers) / spend (customers) — role is agency | home-care-company | nurse | care-home | hospital | local-authority | user. */
   BOOKING_EARNINGS: (role) => `/web/${role}/booking/earnings`,
-  /** Sidebar unseen counts — prefix is `/web/<role>`. */
+  BOOKING_PAYMENTS: (role) => `/web/${role}/booking/payments`,
   SIDEBAR_COUNTS: (prefix) => `${prefix}/sidebar/counts`,
   SIDEBAR_SEEN: (prefix) => `${prefix}/sidebar/seen`,
   NURSE_STAFF_REQUESTS: '/web/nurse/staff/requests',
@@ -227,7 +224,6 @@ export const API_ROUTES = {
 
   AGENCY_BIDS: '/web/agency/bids',
   AGENCY_BIDS_BY_ID: (id) => `/web/agency/bids/${id}`,
-  // Supplier ↔ customer: `base` is the role prefix, e.g. /web/agency (see getRoleApiBase)
   CONTRACTS: (base) => `${base}/contracts`,
   CONTRACT_ACTION: (base, id, action) => `${base}/contracts/${id}/${action}`,
   AGREED_RATES: (base) => `${base}/agreed-rates`,
@@ -239,7 +235,6 @@ export const API_ROUTES = {
   PERMANENT_HIRE_ELIGIBLE: (base) => `${base}/permanent-hires/eligible`,
   PERMANENT_HIRE_ACTION: (base, id, action) => `${base}/permanent-hires/${id}/${action}`,
 
-  /** Care Tutor integration (backend to implement) */
   CARE_TUTOR_CONNECT: '/integrations/caretutor/connect',
   CARE_TUTOR_ORG_TRAINING: '/app/compliance/caretutor',
   CARE_TUTOR_STAFF_TRAINING: (staffId) => `/staff/${staffId}/training`,

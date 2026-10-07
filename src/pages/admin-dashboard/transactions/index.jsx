@@ -2,11 +2,11 @@ import { Helmet } from 'react-helmet-async';
 
 import { CONFIG } from 'src/config-global';
 
-import { AdminTransactionsView } from 'src/sections/admin/transactions/view/admin-transactions-view';
+import { AdminBookingTransactionsView } from 'src/sections/admin/transactions/view/admin-booking-transactions-view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `Payouts | Admin - ${CONFIG.site.name}` };
+const metadata = { title: `Transactions | Admin - ${CONFIG.site.name}` };
 
 export default function AdminTransactionsPage() {
   return (
@@ -15,7 +15,7 @@ export default function AdminTransactionsPage() {
         <title>{metadata.title}</title>
       </Helmet>
 
-      <AdminTransactionsView />
+      <AdminBookingTransactionsView />
     </>
   );
 }
