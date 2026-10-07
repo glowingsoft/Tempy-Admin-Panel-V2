@@ -1,0 +1,485 @@
+import { _mock } from './_mock';
+
+// ----------------------------------------------------------------------
+
+export const STAFF_GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+
+export const STAFF_STATUS_TABS = [
+  { value: 'all', label: 'All', color: 'info' },
+  { value: 'active', label: 'Active', color: 'success' },
+  { value: 'inactive', label: 'Inactive', color: 'error' },
+  { value: 'deleted', label: 'Deleted', color: 'default' },
+];
+
+export const STAFF_STATUS_COLOR = {
+  active: 'success',
+  accepted: 'info',
+  inactive: 'error',
+  suspended: 'error',
+  pending: 'warning',
+  left: 'info',
+  deleted: 'error',
+};
+
+export const STAFF_STATUS_LABEL = {
+  active: 'Active',
+  accepted: 'Accepted',
+  inactive: 'Inactive',
+  suspended: 'Suspended',
+  pending: 'Pending',
+  left: 'Left',
+  deleted: 'Deleted',
+};
+
+export function getStaffStatusLabel(status) {
+  const key = String(status || 'pending').toLowerCase();
+  return STAFF_STATUS_LABEL[key] || status || 'Pending';
+}
+
+export const AGENCY_STAFF_STATUS_TABS = [
+  { value: 'all', label: 'All', color: 'default' },
+  { value: 'pending', label: 'Pending', color: 'warning' },
+  { value: 'inactive', label: 'Inactive', color: 'error' },
+  { value: 'active', label: 'Active', color: 'info' },
+  { value: 'deleted', label: 'Deleted', color: 'default' },
+  { value: 'left', label: 'Left', color: 'secondary' },
+];
+
+/** Backend-accepted specialty values for all specialty dropdowns */
+export const STAFF_SPECIALTY_API_OPTIONS = [
+  { value: 'generalNurse', label: 'General Nurse' },
+  { value: 'mentalHealth', label: 'Mental Health' },
+  { value: 'elderlyCare', label: 'Elderly Care' },
+  { value: 'learningDisability', label: 'Learning Disability' },
+  { value: 'pediatric', label: 'Pediatric' },
+  { value: 'healthcareAssistant', label: 'Healthcare Assistant' },
+  { value: 'supportWorker', label: 'Support Worker' },
+];
+
+const LEGACY_SPECIALTY_MAP = {
+  'ICU Nurse': 'icuNurse',
+  Pediatrics: 'pediatrics',
+  'Senior Care': 'seniorCare',
+  'General Care': 'generalNurse',
+  'Mental Health': 'mentalHealth',
+  Emergency: 'emergency',
+  Surgical: 'surgical',
+  'Child Care': 'childCare',
+};
+
+export function normalizeStaffSpecialty(value = '') {
+  return LEGACY_SPECIALTY_MAP[value] || value;
+}
+
+export function getStaffSpecialtyLabel(value = '') {
+  const normalized = normalizeStaffSpecialty(value);
+  return STAFF_SPECIALTY_API_OPTIONS.find((option) => option.value === normalized)?.label || value;
+}
+
+/** @deprecated Use STAFF_SPECIALTY_API_OPTIONS */
+export const STAFF_SPECIALTY_OPTIONS = STAFF_SPECIALTY_API_OPTIONS.map((option) => option.label);
+
+const DEFAULT_REVIEWS = [
+  {
+    id: '1',
+    name: 'Mark John',
+    avatarUrl: _mock.image.avatar(8),
+    comment: 'Excellent care and very professional throughout the shift.',
+    rating: 5,
+    postedAt: '2 days ago',
+  },
+  {
+    id: '2',
+    name: 'William James',
+    avatarUrl: _mock.image.avatar(9),
+    comment: 'Always punctual and great with residents.',
+    rating: 5,
+    postedAt: '5 days ago',
+  },
+  {
+    id: '3',
+    name: 'Lisa Anderson',
+    avatarUrl: _mock.image.avatar(10),
+    comment: 'Highly skilled and compassionate nurse.',
+    rating: 4,
+    postedAt: '1 week ago',
+  },
+  {
+    id: '4',
+    name: 'Robert Taylor',
+    avatarUrl: _mock.image.avatar(11),
+    comment: 'Great communication with the care team and families.',
+    rating: 5,
+    postedAt: '2 weeks ago',
+  },
+  {
+    id: '5',
+    name: 'Emma Wilson',
+    avatarUrl: _mock.image.avatar(12),
+    comment: 'Reliable and attentive during night shifts.',
+    rating: 4,
+    postedAt: '3 weeks ago',
+  },
+  {
+    id: '6',
+    name: 'David Clark',
+    avatarUrl: _mock.image.avatar(13),
+    comment: 'Would gladly work with this staff member again.',
+    rating: 5,
+    postedAt: '1 month ago',
+  },
+];
+
+const DEFAULT_JOBS = {
+  active: [
+    {
+      id: 'J001',
+      serviceType: 'Senior Care',
+      location: 'Austin, Texas, United States',
+      schedule: 'Wed May 6, 08:00 AM - 02 PM',
+      totalPay: 150,
+      hourlyRate: 25,
+    },
+    {
+      id: 'J002',
+      serviceType: 'Child Care',
+      location: 'Dallas, Texas, United States',
+      schedule: 'Fri May 8, 09:00 AM - 05 PM',
+      totalPay: 200,
+      hourlyRate: 25,
+    },
+    {
+      id: 'J003',
+      serviceType: 'Senior Care',
+      location: 'Houston, Texas, United States',
+      schedule: 'Mon May 11, 07:00 AM - 03 PM',
+      totalPay: 175,
+      hourlyRate: 22,
+    },
+  ],
+  completed: [
+    {
+      id: 'J004',
+      serviceType: 'Senior Care',
+      location: 'San Antonio, Texas, United States',
+      schedule: 'Mon Apr 28, 08:00 AM - 04 PM',
+      totalPay: 180,
+      hourlyRate: 23,
+    },
+    {
+      id: 'J005',
+      serviceType: 'Child Care',
+      location: 'Fort Worth, Texas, United States',
+      schedule: 'Wed Apr 23, 10:00 AM - 06 PM',
+      totalPay: 160,
+      hourlyRate: 20,
+    },
+  ],
+};
+
+const DEFAULT_LOCATIONS = [
+  { id: '1', label: 'Home', address: '742 Evergreen, Springfield, IL 62704' },
+  { id: '2', label: 'Work', address: '350 Fifth Avenue, New York, NY 10118' },
+  { id: '3', label: 'Cupertino', address: '1 Infinite Loop, Cupertino, CA 95014' },
+];
+
+const DEFAULT_DOCUMENTS = {
+  governmentId: [
+    { name: 'id-front.pdf', preview: _mock.image.cover(1) },
+    { name: 'id-back.pdf', preview: _mock.image.cover(2) },
+  ],
+  nursingDegree: [{ name: 'nursing-degree.pdf', preview: _mock.image.cover(3) }],
+  certifications: [
+    { name: 'bls-cert.pdf', preview: _mock.image.cover(4) },
+    { name: 'acls-cert.pdf', preview: _mock.image.cover(5) },
+  ],
+};
+
+const DEFAULT_METRICS = {
+  monthEarning: 12450,
+  pendingInvoices: 6,
+  averageRating: 5,
+  noShows: 5,
+  lateCheckins: 3,
+};
+
+// ----------------------------------------------------------------------
+
+export function createStaffRecord(overrides = {}) {
+  return {
+    id: overrides.id || 'N000',
+    name: overrides.name || '',
+    email: overrides.email || '',
+    phone: overrides.phone || '',
+    phoneVerified: overrides.phoneVerified ?? false,
+    gender: overrides.gender || '',
+    location: overrides.location || '',
+    taxNumber: overrides.taxNumber || '',
+    specialty: overrides.specialty || 'generalNurse',
+    ratePerHour: overrides.ratePerHour ?? 12,
+    platformPercent: overrides.platformPercent ?? 10,
+    addedOn: overrides.addedOn || new Date().toISOString().slice(0, 10),
+    joinedOn: overrides.joinedOn || overrides.addedOn || new Date().toISOString().slice(0, 10),
+    status: overrides.status || 'active',
+    isFavorite: overrides.isFavorite ?? false,
+    avatarUrl: overrides.avatarUrl || _mock.image.avatar(1),
+    weeklyEarning: overrides.weeklyEarning || 0,
+    rating: overrides.rating ?? 0,
+    reviewCount: overrides.reviewCount ?? 0,
+    documents: overrides.documents || {
+      governmentId: [],
+      nursingDegree: [],
+      certifications: [],
+    },
+    locations: overrides.locations || [],
+    selectedLocationId:
+      overrides.selectedLocationId || overrides.locations?.[0]?.id || null,
+    metrics: overrides.metrics || {
+      monthEarning: 0,
+      pendingInvoices: 0,
+      averageRating: 0,
+      noShows: 0,
+      lateCheckins: 0,
+    },
+    reviews: overrides.reviews || [],
+    jobs: overrides.jobs || { active: [], completed: [] },
+    ...overrides,
+  };
+}
+
+// ----------------------------------------------------------------------
+
+export const _staffList = [
+  createStaffRecord({
+    id: 'N001',
+    name: 'Ayesha Khan',
+    email: 'ayesha.khan@email.com',
+    phone: '+447911123456',
+    phoneVerified: true,
+    gender: 'Female',
+    location: 'London, United Kingdom',
+    taxNumber: 'AB123456C',
+    addedOn: '2024-03-15',
+    joinedOn: '2024-03-15',
+    specialty: 'icuNurse',
+    ratePerHour: 20,
+    platformPercent: 10,
+    weeklyEarning: 400,
+    rating: 4.2,
+    reviewCount: 45,
+    avatarUrl: _mock.image.avatar(1),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: DEFAULT_METRICS,
+    reviews: DEFAULT_REVIEWS,
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N002',
+    name: 'John Smith',
+    email: 'johnsmith@gmail.com',
+    phone: '+447922234567',
+    phoneVerified: true,
+    gender: 'Male',
+    location: 'Manchester, United Kingdom',
+    taxNumber: 'CD789012E',
+    addedOn: '2024-02-20',
+    joinedOn: '2024-02-20',
+    specialty: 'pediatrics',
+    ratePerHour: 18,
+    platformPercent: 10,
+    weeklyEarning: 530,
+    rating: 4.5,
+    reviewCount: 32,
+    avatarUrl: _mock.image.avatar(2),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS.slice(0, 2),
+    metrics: { ...DEFAULT_METRICS, monthEarning: 9800 },
+    reviews: DEFAULT_REVIEWS.slice(0, 2),
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N003',
+    name: 'John Doe',
+    email: 'johndoe1@gmail.com',
+    phone: '+9753920345',
+    phoneVerified: false,
+    gender: 'Male',
+    location: 'Springfield, IL, United States',
+    taxNumber: '457-55-5462',
+    addedOn: '2023-04-15',
+    joinedOn: '2023-04-15',
+    specialty: 'seniorCare',
+    weeklyEarning: 480,
+    rating: 5,
+    reviewCount: 58,
+    isFavorite: true,
+    avatarUrl: _mock.image.avatar(3),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: DEFAULT_METRICS,
+    reviews: DEFAULT_REVIEWS,
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N004',
+    name: 'Michael Brown',
+    email: 'michael.brown@email.com',
+    phone: '+447933345678',
+    phoneVerified: true,
+    gender: 'Male',
+    location: 'Birmingham, United Kingdom',
+    taxNumber: 'EF345678G',
+    addedOn: '2023-12-05',
+    joinedOn: '2023-12-05',
+    specialty: 'generalNurse',
+    weeklyEarning: 350,
+    rating: 3.8,
+    reviewCount: 19,
+    status: 'inactive',
+    avatarUrl: _mock.image.avatar(4),
+    documents: DEFAULT_DOCUMENTS,
+    locations: [DEFAULT_LOCATIONS[0]],
+    metrics: { ...DEFAULT_METRICS, monthEarning: 7200 },
+    reviews: DEFAULT_REVIEWS.slice(0, 1),
+    jobs: { active: DEFAULT_JOBS.active.slice(0, 1), completed: DEFAULT_JOBS.completed },
+  }),
+  createStaffRecord({
+    id: 'N005',
+    name: 'Emily Davis',
+    email: 'emily.davis@email.com',
+    phone: '+447944456789',
+    phoneVerified: true,
+    gender: 'Female',
+    location: 'Leeds, United Kingdom',
+    taxNumber: 'GH901234I',
+    addedOn: '2023-11-18',
+    joinedOn: '2023-11-18',
+    specialty: 'mentalHealth',
+    weeklyEarning: 420,
+    rating: 4.6,
+    reviewCount: 51,
+    avatarUrl: _mock.image.avatar(5),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: { ...DEFAULT_METRICS, monthEarning: 11200 },
+    reviews: DEFAULT_REVIEWS,
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N006',
+    name: 'Sarah Johnson',
+    email: 'sarah.johnson@email.com',
+    phone: '+447955567890',
+    phoneVerified: true,
+    gender: 'Female',
+    location: 'Bristol, United Kingdom',
+    taxNumber: 'IJ567890K',
+    addedOn: '2024-01-10',
+    joinedOn: '2024-01-10',
+    specialty: 'emergency',
+    weeklyEarning: 480,
+    rating: 4.0,
+    reviewCount: 28,
+    avatarUrl: _mock.image.avatar(6),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS.slice(0, 2),
+    metrics: { ...DEFAULT_METRICS, monthEarning: 8900 },
+    reviews: DEFAULT_REVIEWS.slice(0, 3),
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N007',
+    name: 'David Wilson',
+    email: 'david.wilson@email.com',
+    phone: '+447966678901',
+    phoneVerified: true,
+    gender: 'Male',
+    location: 'Liverpool, United Kingdom',
+    taxNumber: 'KL123456M',
+    addedOn: '2024-04-22',
+    joinedOn: '2024-04-22',
+    specialty: 'surgical',
+    weeklyEarning: 550,
+    rating: 4.8,
+    reviewCount: 62,
+    avatarUrl: _mock.image.avatar(7),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: { ...DEFAULT_METRICS, monthEarning: 13800 },
+    reviews: DEFAULT_REVIEWS,
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N008',
+    name: 'Lisa Anderson',
+    email: 'lisa.anderson@email.com',
+    phone: '+447977789012',
+    phoneVerified: false,
+    gender: 'Female',
+    location: 'Edinburgh, United Kingdom',
+    taxNumber: 'MN789012O',
+    addedOn: '2023-09-08',
+    joinedOn: '2023-09-08',
+    specialty: 'childCare',
+    weeklyEarning: 390,
+    rating: 4.3,
+    reviewCount: 37,
+    status: 'inactive',
+    avatarUrl: _mock.image.avatar(8),
+    documents: DEFAULT_DOCUMENTS,
+    locations: [DEFAULT_LOCATIONS[0]],
+    metrics: { ...DEFAULT_METRICS, monthEarning: 8100 },
+    reviews: DEFAULT_REVIEWS.slice(0, 4),
+    jobs: { active: DEFAULT_JOBS.active.slice(0, 2), completed: DEFAULT_JOBS.completed },
+  }),
+  createStaffRecord({
+    id: 'N009',
+    name: 'Robert Taylor',
+    email: 'robert.taylor@email.com',
+    phone: '+447988890123',
+    phoneVerified: true,
+    gender: 'Male',
+    location: 'Glasgow, United Kingdom',
+    taxNumber: 'OP345678Q',
+    addedOn: '2024-05-14',
+    joinedOn: '2024-05-14',
+    specialty: 'icuNurse',
+    ratePerHour: 20,
+    platformPercent: 10,
+    weeklyEarning: 460,
+    rating: 4.1,
+    reviewCount: 24,
+    avatarUrl: _mock.image.avatar(9),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: { ...DEFAULT_METRICS, monthEarning: 9500 },
+    reviews: DEFAULT_REVIEWS.slice(0, 2),
+    jobs: DEFAULT_JOBS,
+  }),
+  createStaffRecord({
+    id: 'N010',
+    name: 'Emma Wilson',
+    email: 'emma.wilson@email.com',
+    phone: '+447999901234',
+    phoneVerified: true,
+    gender: 'Female',
+    location: 'Cardiff, United Kingdom',
+    taxNumber: 'QR901234S',
+    addedOn: '2024-06-01',
+    joinedOn: '2024-06-01',
+    specialty: 'pediatrics',
+    ratePerHour: 18,
+    platformPercent: 10,
+    weeklyEarning: 510,
+    rating: 4.7,
+    reviewCount: 41,
+    status: 'inactive',
+    avatarUrl: _mock.image.avatar(10),
+    documents: DEFAULT_DOCUMENTS,
+    locations: DEFAULT_LOCATIONS,
+    metrics: { ...DEFAULT_METRICS, monthEarning: 10500 },
+    reviews: DEFAULT_REVIEWS,
+    jobs: DEFAULT_JOBS,
+  }),
+];

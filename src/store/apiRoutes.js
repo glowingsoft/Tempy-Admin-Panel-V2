@@ -1,0 +1,327 @@
+const AUTH_ROUTES = {
+  LOGIN: '/auth/login',
+  REGISTER: '/auth/register',
+  CHECK_EMAIL_EXISTS: '/auth/check-email-exists',
+  VERIFY_OTP_EMAIL: '/auth/verify-otp/email',
+  RESEND_OTP_EMAIL: '/auth/resend-otp/email',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  RESET_PASSWORD: '/auth/reset-password',
+  SOCIAL_AUTH: '/auth/social-auth',
+  LOGOUT: '/auth/logout',
+  DELETE_ACCOUNT: '/auth/delete-account',
+  CHANGE_PASSWORD: '/auth/change-password',
+};
+
+const ADMIN_AUTH_ROUTES = {
+  VERIFY_OTP_EMAIL: '/admin/auth/verify-otp/email',
+  RESEND_OTP_EMAIL: '/admin/auth/resend-otp/email',
+  CHANGE_PASSWORD: '/admin/auth/change-password',
+  RESET_PASSWORD: '/admin/auth/reset-password',
+};
+
+const createRoleAuthRoutes = () => ({ ...AUTH_ROUTES });
+
+export const API_ROUTES = {
+  AUTH: {
+    ...AUTH_ROUTES,
+    ADMIN_LOGIN: 'admin/login',
+    ADMIN: ADMIN_AUTH_ROUTES,
+    /** @deprecated use AUTH.ADMIN.RESET_PASSWORD */
+    ADMIN_RESET_PASSWORD: ADMIN_AUTH_ROUTES.RESET_PASSWORD,
+    CARE_HOME: createRoleAuthRoutes(),
+    HOSPITAL: createRoleAuthRoutes(),
+    LOCAL_AUTHORITY: createRoleAuthRoutes(),
+    USER: createRoleAuthRoutes(),
+    AGENCY: createRoleAuthRoutes(),
+    HOME_CARE_COMPANY: createRoleAuthRoutes(),
+    NURSE: createRoleAuthRoutes(),
+  },
+
+  WALLETS: '/wallets',
+  WALLETS_BY_ID: (id) => `/wallets/${id}`,
+
+  TRANSACTIONS: '/transactions',
+  TRANSACTIONS_BY_ID: (id) => `/transactions/${id}`,
+
+  USERS: '/users',
+  USERS_BY_ID: (id) => `/users/${id}`,
+
+  FAVORITES: '/favorites',
+  FAVORITES_BY_ID: (id) => `/favorites/${id}`,
+
+  UPLOAD_AWS: '/upload/aws',
+
+  REVIEWS: '/reviews',
+  REVIEWS_BY_ID: (id) => `/reviews/${id}`,
+  REVIEWS_BY_NURSE: (nurseId) => `/reviews/all/${nurseId}`,
+  REVIEWS_BY_BRANCH: (branchId) => `/reviews/branch/${branchId}`,
+
+  PUBLIC_STAFF_SEARCH: '/public/staff/search',
+
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATIONS_READ_BY_ID: (id) => `/notifications/${id}/read`,
+
+  /** Conversation / messaging (1-1 and group) */
+  CONVERSATIONS: '/conversations',
+  CONVERSATIONS_BY_ID: (id) => `/conversations/${id}`,
+  CONVERSATIONS_ACTION: (id) => `/conversations/${id}/action`,
+  CONVERSATIONS_MESSAGES: '/conversations/messages',
+  CONVERSATIONS_SEND_MESSAGE: '/conversations/message',
+  CONVERSATIONS_MESSAGE_BY_ID: (messageId) => `/conversations/messages/${messageId}`,
+
+  CATEGORIES: '/categories',
+  CATEGORIES_BY_ID: (id) => `/categories/${id}`,
+
+  CARE_HOME_STAFF: '/web/care-home/staff',
+  CARE_HOME_STAFF_BY_ID: (id) => `/web/care-home/staff/${id}`,
+  CARE_HOME_STAFF_AVAILABLE: '/web/care-home/staff/available',
+
+  HOSPITAL_STAFF: '/web/hospital/staff',
+  HOSPITAL_STAFF_BY_ID: (id) => `/web/hospital/staff/${id}`,
+  HOSPITAL_STAFF_AVAILABLE: '/web/hospital/staff/available',
+
+  LOCAL_AUTHORITY_STAFF: '/web/local-authority/staff',
+  LOCAL_AUTHORITY_STAFF_BY_ID: (id) => `/web/local-authority/staff/${id}`,
+  LOCAL_AUTHORITY_STAFF_AVAILABLE: '/web/local-authority/staff/available',
+
+  USER_STAFF: '/web/user/staff',
+  USER_STAFF_BY_ID: (id) => `/web/user/staff/${id}`,
+  USER_STAFF_AVAILABLE: '/web/user/staff/available',
+
+  CARE_HOME_BRANCHES: '/web/care-home/branches',
+  CARE_HOME_BRANCHES_BY_ID: (id) => `/web/care-home/branches/${id}`,
+
+  CARE_HOME_JOBS: '/web/care-home/job',
+  CARE_HOME_JOBS_BY_ID: (id) => `/web/care-home/job/${id}`,
+  CARE_HOME_JOB_ALERT: (id) => `/web/care-home/job/${id}/alert`,
+  CARE_HOME_JOB_TYPES: '/web/care-home/job/type',
+  CARE_HOME_JOB_TYPES_BY_ID: (id) => `/web/care-home/job/type/${id}`,
+  CARE_HOME_JOB_BIDS: '/web/care-home/job/bids',
+  CARE_HOME_JOB_BIDS_BY_ID: (id) => `/web/care-home/job/bids/${id}`,
+  CARE_HOME_BIDS_BY_ID: (id) => `/web/care-home/job/bids/${id}`,
+  CARE_HOME_BOOKING: '/web/care-home/booking',
+  CARE_HOME_BOOKING_BY_ID: (id) => `/web/care-home/booking/${id}`,
+  CARE_HOME_BOOKING_CALENDAR: '/web/care-home/booking/calender',
+  CARE_HOME_DASHBOARD: '/web/care-home/dashboard',
+
+  /** Supplier job types — prefix is `/web/agency`, `/web/home-care-company` or `/web/nurse`. */
+  SUPPLIER_JOB_ROLES: (prefix) => `${prefix}/job-roles`,
+  SUPPLIER_JOB_ROLES_MINE: (prefix) => `${prefix}/job-roles/mine`,
+
+  ADMIN_JOB_ROLES: '/admin/job-roles',
+  ADMIN_JOB_ROLES_BY_ID: (id) => `/admin/job-roles/${id}`,
+
+  ADMIN_USERS: '/admin/users',
+  ADMIN_USERS_BY_ID: (id) => `/admin/users/${id}`,
+  ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_RECRUITMENT: '/admin/recruitment',
+  ADMIN_ALLEGATIONS: '/admin/allegations',
+  ADMIN_ALLEGATION_BY_ID: (id) => `/admin/allegations/${id}`,
+  ADMIN_ALLEGATION_STATUS: (id) => `/admin/allegations/${id}/status`,
+  ADMIN_ALLEGATION_REPLACEMENTS: (id, shiftId) =>
+    `/admin/allegations/${id}/shifts/${shiftId}/replacements`,
+  ADMIN_ALLEGATION_REPUBLISH: (id, shiftId) =>
+    `/admin/allegations/${id}/shifts/${shiftId}/republish`,
+  ADMIN_ALLEGATION_REALLOCATE: (id, shiftId) =>
+    `/admin/allegations/${id}/shifts/${shiftId}/reallocate`,
+
+  GOCARDLESS_MANDATE: '/gocardless/mandate',
+  ADMIN_PAYOUTS: '/admin/gocardless/payouts',
+  ADMIN_PAYOUTS_SETTLE: '/admin/payouts/settle',
+  ADMIN_BOOKING_REFUND: (bookingId) => `/admin/gocardless/bookings/${bookingId}/refund`,
+
+  AGENCY_BRANCHES: '/web/agency/branches',
+  AGENCY_BRANCHES_BY_ID: (id) => `/web/agency/branches/${id}`,
+
+  HOSPITAL_BRANCHES: '/web/hospital/branches',
+  HOSPITAL_BRANCHES_BY_ID: (id) => `/web/hospital/branches/${id}`,
+
+  HOSPITAL_JOBS: '/web/hospital/job',
+  HOSPITAL_JOBS_BY_ID: (id) => `/web/hospital/job/${id}`,
+  HOSPITAL_JOB_ALERT: (id) => `/web/hospital/job/${id}/alert`,
+  HOSPITAL_JOB_TYPES: '/web/hospital/job/type',
+  HOSPITAL_JOB_BIDS: '/web/hospital/job/bids',
+  HOSPITAL_JOB_BIDS_BY_ID: (id) => `/web/hospital/job/bids/${id}`,
+  HOSPITAL_BOOKING: '/web/hospital/booking',
+  HOSPITAL_BOOKING_CALENDAR: '/web/hospital/booking/calender',
+  HOSPITAL_DASHBOARD: '/web/hospital/dashboard',
+
+  USER_JOBS: '/web/user/job',
+  USER_JOBS_BY_ID: (id) => `/web/user/job/${id}`,
+  USER_JOB_ALERT: (id) => `/web/user/job/${id}/alert`,
+  USER_JOB_TYPES: '/web/user/job/type',
+  USER_JOB_BIDS: '/web/user/job/bids',
+  USER_JOB_BIDS_BY_ID: (id) => `/web/user/job/bids/${id}`,
+  USER_BIDS_BY_ID: (id) => `/web/user/job/bids/${id}`,
+  USER_BOOKING: '/web/user/booking',
+  USER_BOOKING_CALENDAR: '/web/user/booking/calender',
+  USER_DASHBOARD: '/web/user/dashboard',
+
+  USER_ADDRESS: '/web/user/address',
+  USER_ADDRESS_BY_ID: (id) => `/web/user/address/${id}`,
+  USER_BRANCHES: '/web/user/address',
+  USER_BRANCHES_BY_ID: (id) => `/web/user/address/${id}`,
+
+  LOCAL_AUTHORITY_JOBS: '/web/local-authority/job',
+  LOCAL_AUTHORITY_JOBS_BY_ID: (id) => `/web/local-authority/job/${id}`,
+  LOCAL_AUTHORITY_JOB_ALERT: (id) => `/web/local-authority/job/${id}/alert`,
+  LOCAL_AUTHORITY_JOB_TYPES: '/web/local-authority/job/type',
+  LOCAL_AUTHORITY_JOB_BIDS: '/web/local-authority/job/bids',
+  LOCAL_AUTHORITY_JOB_BIDS_BY_ID: (id) => `/web/local-authority/job/bids/${id}`,
+  LOCAL_AUTHORITY_BOOKING: '/web/local-authority/booking',
+  LOCAL_AUTHORITY_BOOKING_CALENDAR: '/web/local-authority/booking/calender',
+  LOCAL_AUTHORITY_DASHBOARD: '/web/local-authority/dashboard',
+
+  LOCAL_AUTHORITY_BRANCHES: '/web/local-authority/branches',
+  LOCAL_AUTHORITY_BRANCHES_BY_ID: (id) => `/web/local-authority/branches/${id}`,
+
+  HOME_CARE_COMPANY_BRANCHES: '/web/home-care-company/branches',
+  HOME_CARE_COMPANY_BRANCHES_BY_ID: (id) => `/web/home-care-company/branches/${id}`,
+
+  AGENCY_STAFF: '/web/agency/staff',
+  AGENCY_STAFF_BY_ID: (id) => `/web/agency/staff/${id}`,
+  AGENCY_STAFF_NURSES: '/web/agency/staff/nurses',
+  AGENCY_STAFF_IMPORT: '/web/agency/staff/import',
+  AGENCY_STAFF_IMPORT_TEMPLATE: '/web/agency/staff/import/template',
+
+  HOME_CARE_COMPANY_STAFF: '/web/home-care-company/staff',
+  HOME_CARE_COMPANY_STAFF_BY_ID: (id) => `/web/home-care-company/staff/${id}`,
+  HOME_CARE_COMPANY_STAFF_NURSES: '/web/home-care-company/staff/nurses',
+  HOME_CARE_COMPANY_STAFF_IMPORT: '/web/home-care-company/staff/import',
+  HOME_CARE_COMPANY_STAFF_IMPORT_TEMPLATE: '/web/home-care-company/staff/import/template',
+
+  AGENCY_JOBS: '/web/agency/job',
+  AGENCY_JOBS_BY_ID: (id) => `/web/agency/job/${id}`,
+  AGENCY_JOB_TYPES: '/web/agency/job/type',
+
+  AGENCY_AVAILABILITY: '/web/agency/availability',
+  AGENCY_AVAILABILITY_BY_ID: (id) => `/web/agency/availability/${id}`,
+  AGENCY_BOOKING: '/web/agency/booking',
+  AGENCY_BOOKING_BY_ID: (id) => `/web/agency/booking/${id}`,
+  AGENCY_BOOKING_CALENDAR: '/web/agency/booking/calender',
+  AGENCY_DASHBOARD: '/web/agency/dashboard',
+
+  HOME_CARE_COMPANY_JOB_TYPES: '/web/home-care-company/job/type',
+  HOME_CARE_COMPANY_AVAILABILITY: '/web/home-care-company/availability',
+  HOME_CARE_COMPANY_AVAILABILITY_BY_ID: (id) => `/web/home-care-company/availability/${id}`,
+  HOME_CARE_COMPANY_BOOKING: '/web/home-care-company/booking',
+  HOME_CARE_COMPANY_BOOKING_BY_ID: (id) => `/web/home-care-company/booking/${id}`,
+  HOME_CARE_COMPANY_BOOKING_CALENDAR: '/web/home-care-company/booking/calender',
+  HOME_CARE_COMPANY_DASHBOARD: '/web/home-care-company/dashboard',
+
+  NURSE_BRANCHES: '/web/nurse/branches',
+  NURSE_BRANCHES_BY_ID: (id) => `/web/nurse/branches/${id}`,
+  NURSE_JOB_TYPES: '/web/nurse/job/type',
+  NURSE_AVAILABILITY: '/web/nurse/availability',
+  NURSE_AVAILABILITY_BY_ID: (id) => `/web/nurse/availability/${id}`,
+  NURSE_BOOKING: '/web/nurse/booking',
+  NURSE_BOOKING_CALENDAR: '/web/nurse/booking/calender',
+  NURSE_DASHBOARD: '/web/nurse/dashboard',
+  /** Earnings (suppliers) / spend (customers) — role is agency | home-care-company | nurse | care-home | hospital | local-authority | user. */
+  BOOKING_EARNINGS: (role) => `/web/${role}/booking/earnings`,
+  /** Sidebar unseen counts — prefix is `/web/<role>`. */
+  SIDEBAR_COUNTS: (prefix) => `${prefix}/sidebar/counts`,
+  SIDEBAR_SEEN: (prefix) => `${prefix}/sidebar/seen`,
+  NURSE_STAFF_REQUESTS: '/web/nurse/staff/requests',
+  NURSE_STAFF_REQUESTS_BY_ID: (id) => `/web/nurse/staff/requests/${id}`,
+
+  AGENCY_BIDS: '/web/agency/bids',
+  AGENCY_BIDS_BY_ID: (id) => `/web/agency/bids/${id}`,
+  // Supplier ↔ customer: `base` is the role prefix, e.g. /web/agency (see getRoleApiBase)
+  CONTRACTS: (base) => `${base}/contracts`,
+  CONTRACT_ACTION: (base, id, action) => `${base}/contracts/${id}/${action}`,
+  AGREED_RATES: (base) => `${base}/agreed-rates`,
+  AGREED_RATES_CURRENT: (base) => `${base}/agreed-rates/current`,
+  AGREED_RATE_BY_ID: (base, id) => `${base}/agreed-rates/${id}`,
+  AGREED_RATE_ACTION: (base, id, action) => `${base}/agreed-rates/${id}/${action}`,
+  PERMANENT_HIRES: (base) => `${base}/permanent-hires`,
+  PERMANENT_HIRE_SETTINGS: (base) => `${base}/permanent-hires/settings`,
+  PERMANENT_HIRE_ELIGIBLE: (base) => `${base}/permanent-hires/eligible`,
+  PERMANENT_HIRE_ACTION: (base, id, action) => `${base}/permanent-hires/${id}/${action}`,
+
+  /** Care Tutor integration (backend to implement) */
+  CARE_TUTOR_CONNECT: '/integrations/caretutor/connect',
+  CARE_TUTOR_ORG_TRAINING: '/app/compliance/caretutor',
+  CARE_TUTOR_STAFF_TRAINING: (staffId) => `/staff/${staffId}/training`,
+  CARE_TUTOR_STAFF_ENROL: (staffId) => `/staff/${staffId}/training/enrol`,
+  ADMIN_TRAINING_COMMISSION: '/admin/settings/training-commission',
+
+  HOME_CARE_COMPANY_JOBS: '/web/home-care-company/job',
+  HOME_CARE_COMPANY_JOBS_BY_ID: (id) => `/web/home-care-company/job/${id}`,
+
+  HOME_CARE_COMPANY_BIDS: '/web/home-care-company/bids',
+  HOME_CARE_COMPANY_BIDS_BY_ID: (id) => `/web/home-care-company/bids/${id}`,
+
+  NURSE_JOBS: '/web/nurse/job',
+  NURSE_JOBS_BY_ID: (id) => `/web/nurse/job/${id}`,
+
+  NURSE_BIDS: '/web/nurse/bids',
+  NURSE_BIDS_BY_ID: (id) => `/web/nurse/bids/${id}`,
+
+  NURSE_BOOKINGS_BY_ID: (id) => `/app/nurse/booking/${id}`,
+  NURSE_BOOKING_LOGS: (bookingId) => `/app/nurse/booking/logs/${bookingId}`,
+
+  CARE_HOME_FAQS: '/settings/faqs',
+  HOSPITAL_FAQS: '/settings/faqs',
+  LOCAL_AUTHORITY_FAQS: '/settings/faqs',
+  INDIVIDUAL_HOME_CARE_FAQS: '/settings/faqs',
+  AGENCY_FAQS: '/settings/faqs',
+  HOME_CARE_COMPANY_FAQS: '/settings/faqs',
+  STAFF_MEMBER_FAQS: '/settings/faqs',
+  ADMIN_FAQS: '/admin/faqs',
+  ADMIN_FAQS_BY_ID: (id) => `/admin/faqs/${id}`,
+
+  CARE_HOME_SUPPORT: '/settings/support',
+  CARE_HOME_SUPPORT_CREATE: '/support',
+  HOSPITAL_SUPPORT: '/settings/support',
+  HOSPITAL_SUPPORT_CREATE: '/support',
+  LOCAL_AUTHORITY_SUPPORT: '/settings/support',
+  LOCAL_AUTHORITY_SUPPORT_CREATE: '/support',
+  INDIVIDUAL_HOME_CARE_SUPPORT: '/settings/support',
+  INDIVIDUAL_HOME_CARE_SUPPORT_CREATE: '/support',
+  AGENCY_SUPPORT: '/settings/support',
+  AGENCY_SUPPORT_CREATE: '/support',
+  HOME_CARE_COMPANY_SUPPORT: '/settings/support',
+  HOME_CARE_COMPANY_SUPPORT_CREATE: '/support',
+  STAFF_MEMBER_SUPPORT: '/settings/support',
+  STAFF_MEMBER_SUPPORT_CREATE: '/support',
+  ADMIN_SUPPORT: '/admin/support',
+  ADMIN_SUPPORT_BY_ID: (id) => `/admin/support/${id}`,
+
+  ADMIN_ABOUT_US: '/settings/about-us',
+  ADMIN_PRIVACY_POLICY: '/settings/privacy-policy',
+  ADMIN_TERMS_CONDITIONS: '/settings/terms-conditions',
+  TERMS_STATUS: '/settings/terms-conditions/status',
+  TERMS_ACCEPT: '/settings/terms-conditions/accept',
+  ADMIN_SETTINGS_UPDATE: '/admin/settings/update',
+  ADMIN_SETTINGS_UPDATE_BY_ID: (id) => `/admin/settings/update/${id}`,
+
+  CARE_HOME_TERMS: '/settings/terms-conditions',
+  CARE_HOME_ABOUT: '/settings/about-us',
+  CARE_HOME_PRIVACY: '/settings/privacy-policy',
+  CARE_HOME_CONTACT_CREATE: '/contact-us',
+  HOSPITAL_TERMS: '/settings/terms-conditions',
+  HOSPITAL_ABOUT: '/settings/about-us',
+  HOSPITAL_PRIVACY: '/settings/privacy-policy',
+  HOSPITAL_CONTACT_CREATE: '/contact-us',
+  LOCAL_AUTHORITY_TERMS: '/settings/terms-conditions',
+  LOCAL_AUTHORITY_ABOUT: '/settings/about-us',
+  LOCAL_AUTHORITY_PRIVACY: '/settings/privacy-policy',
+  LOCAL_AUTHORITY_CONTACT_CREATE: '/contact-us',
+  INDIVIDUAL_HOME_CARE_TERMS: '/settings/terms-conditions',
+  INDIVIDUAL_HOME_CARE_ABOUT: '/settings/about-us',
+  INDIVIDUAL_HOME_CARE_PRIVACY: '/settings/privacy-policy',
+  INDIVIDUAL_HOME_CARE_CONTACT_CREATE: '/contact-us',
+  AGENCY_TERMS: '/settings/terms-conditions',
+  AGENCY_ABOUT: '/settings/about-us',
+  AGENCY_PRIVACY: '/settings/privacy-policy',
+  AGENCY_CONTACT_CREATE: '/contact-us',
+  HOME_CARE_COMPANY_TERMS: '/settings/terms-conditions',
+  HOME_CARE_COMPANY_ABOUT: '/settings/about-us',
+  HOME_CARE_COMPANY_PRIVACY: '/settings/privacy-policy',
+  HOME_CARE_COMPANY_CONTACT_CREATE: '/contact-us',
+  STAFF_MEMBER_TERMS: '/settings/terms-conditions',
+  STAFF_MEMBER_ABOUT: '/settings/about-us',
+  STAFF_MEMBER_PRIVACY: '/settings/privacy-policy',
+  STAFF_MEMBER_CONTACT_CREATE: '/contact-us',
+};
