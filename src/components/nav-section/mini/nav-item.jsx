@@ -145,10 +145,13 @@ const StyledNavItem = styled(ButtonBase, {
       ...baseStyles.item,
       textAlign: 'center',
       flexDirection: 'column',
+      alignItems: 'center',
       minHeight: 'var(--nav-item-root-height)',
       padding: 'var(--nav-item-root-padding)',
       [`& .${navSectionClasses.item.icon}`]: {
         ...baseStyles.icon,
+        alignSelf: 'center',
+        flexShrink: 0,
         margin: 'var(--nav-icon-root-margin)',
       },
       [`& .${navSectionClasses.item.title}`]: {

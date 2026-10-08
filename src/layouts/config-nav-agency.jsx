@@ -15,7 +15,6 @@ export const navDataAgency = [
       { title: 'Bids', countKey: 'bids', path: paths.dashboard.agency.bids, icon: NAV_ICONS.order },
       { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.agency.agreedRates, icon: NAV_ICONS.contract },
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.agency.contracts, icon: NAV_ICONS.contract },
-      { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.agency.permanentHires, icon: NAV_ICONS.user },
       { title: 'Earnings', path: paths.dashboard.agency.earnings, icon: NAV_ICONS.analytics },
       {
         title: 'Invoices',

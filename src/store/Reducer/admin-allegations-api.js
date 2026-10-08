@@ -37,12 +37,18 @@ export const adminAllegationsApi = createApi({
         } catch {
           data = [];
         }
-        const total =
+        const totalRaw =
           response?.meta?.totalRecords ??
           response?.meta?.total ??
+          response?.pagination?.totalRecords ??
+          response?.pagination?.total ??
+          response?.data?.meta?.totalRecords ??
+          response?.data?.pagination?.totalRecords ??
+          response?.data?.pagination?.total ??
           response?.total ??
-          response?.data?.total ??
-          data.length;
+          response?.data?.total;
+        const hasTotal = totalRaw !== undefined && totalRaw !== null && totalRaw !== '';
+        const totalRecords = hasTotal ? Number(totalRaw) || 0 : null;
 
         const cards = collectSummaryCards(
           response?.summary ||
@@ -54,7 +60,8 @@ export const adminAllegationsApi = createApi({
 
         return {
           data,
-          total: Number(total) || data.length,
+          total: totalRecords ?? data.length,
+          meta: { totalRecords, hasTotal },
           cards,
           cardCounts: countAllegationCards(response, data),
         };

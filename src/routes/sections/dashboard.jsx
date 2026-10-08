@@ -212,7 +212,6 @@ export const dashboardRoutes = [
           { path: 'bids', element: <AgencyBidsPage /> },
           { path: 'contracts', element: <ContractsPage /> },
           { path: 'agreed-rates', element: <AgencyAgreedRatesPage /> },
-          { path: 'permanent-hires', element: <PermanentHiresPage /> },
           { path: 'invoices', children: invoiceFlowChildren(InvoiceListPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },

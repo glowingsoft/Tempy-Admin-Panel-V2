@@ -117,7 +117,11 @@ function CustomerMandateCard({ userId }) {
         }, 2000);
         return;
       }
-      toast.success(active || isUsableCustomerMandate(result) ? 'Direct debit is already set up' : 'Direct debit mandate updated');
+      if (isUsableCustomerMandate(result)) {
+        toast.success('Direct debit is already set up');
+        return;
+      }
+      toast.error('Could not open the direct debit page. The bank setup link was missing.');
     } catch (err) {
       toast.error(handleApiError(err) || 'Could not set up the direct debit');
     }

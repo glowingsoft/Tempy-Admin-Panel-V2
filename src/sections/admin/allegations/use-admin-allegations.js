@@ -17,6 +17,35 @@ const EMPTY_SUMMARY = {
   reported_user: 0,
 };
 
+const SUMMARY_KEYS = {
+  raised: 'raised',
+  allegations: 'raised',
+  allegation: 'raised',
+  cancellation_strike: 'cancellation_strike',
+  cancellationstrike: 'cancellation_strike',
+  cancellationstrikes: 'cancellation_strike',
+  abandoned_shift: 'abandoned_shift',
+  abandonedshift: 'abandoned_shift',
+  abandonedshifts: 'abandoned_shift',
+  suspended_user: 'suspended_user',
+  suspendeduser: 'suspended_user',
+  suspendedusers: 'suspended_user',
+  suspended: 'suspended_user',
+  suspensions: 'suspended_user',
+  reported_user: 'reported_user',
+  reporteduser: 'reported_user',
+  reportedusers: 'reported_user',
+  reported: 'reported_user',
+};
+
+function summaryKey(value) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return SUMMARY_KEYS[raw] || SUMMARY_KEYS[raw.replace(/_/g, '')] || '';
+}
+
 export function useAdminAllegations({ page = 0, limit = 10, status = '', keyword = '', type = '' } = {}) {
   const listType = !type || type === 'raised' || type === 'all' ? '' : type;
   const listQuery = useGetAdminAllegationsQuery({
@@ -59,30 +88,34 @@ export function useAdminAllegations({ page = 0, limit = 10, status = '', keyword
   );
 
   const rows = listQuery.data?.data || [];
-  const allegations = listType
-    ? rows.filter((row) => row.feedType === listType)
-    : rows.filter((row) => !row.feedType);
-  const total = !listQuery.data
-    ? 0
-    : !listType
-      ? Number(listQuery.data.total) || allegations.length
-      : rows.length && rows.every((row) => row.feedType === listType)
-        ? Number(listQuery.data.total) || rows.length
-        : 0;
+  const mixedFeeds = Boolean(listType) && rows.some((row) => row.feedType && row.feedType !== listType);
+  const allegations = !listType
+    ? rows.filter((row) => !row.feedType)
+    : mixedFeeds
+      ? rows.filter((row) => row.feedType === listType)
+      : rows;
+  const hasTotal = Boolean(listQuery.data?.meta?.hasTotal);
+  const serverTotal = hasTotal ? Number(listQuery.data.meta.totalRecords) || 0 : null;
 
   const summaryRef = useRef(EMPTY_SUMMARY);
   const summary = useMemo(() => {
     if (!listQuery.data) return summaryRef.current;
     const next = { ...summaryRef.current };
-    if (!listType) next.raised = Number(listQuery.data.total) || allegations.length;
-    else next[listType] = total;
+    (listQuery.data.cards || []).forEach((card) => {
+      const key = summaryKey(card.key);
+      if (key) next[key] = Number(card.total) || 0;
+    });
+    const activeCount = serverTotal ?? allegations.length;
+    if (!listType) next.raised = activeCount;
+    else next[listType] = activeCount;
     summaryRef.current = next;
     return next;
-  }, [allegations.length, listQuery.data, listType, total]);
+  }, [allegations.length, listQuery.data, listType, serverTotal]);
 
   return {
     allegations,
-    total,
+    hasTotal,
+    serverTotal,
     isLoading: listQuery.isLoading,
     isFetching: listQuery.isFetching,
     isError: listQuery.isError,

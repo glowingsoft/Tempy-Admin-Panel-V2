@@ -73,12 +73,38 @@ function firstNumber(...values) {
   return found === undefined ? null : toNumber(found);
 }
 
+const STATUS_COUNT_KEYS = ['pending', 'processing', 'paid', 'refunded', 'failed'];
+
 function extractRows(response) {
   const data = response?.data;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.transactions)) return data.transactions;
-  if (Array.isArray(data?.rows)) return data.rows;
-  return [];
+  const candidates = [
+    data,
+    data?.transactions,
+    data?.rows,
+    data?.list,
+    data?.items,
+    data?.docs,
+    data?.records,
+    data?.results,
+    data?.payments,
+    data?.data,
+    response?.transactions,
+    response?.rows,
+  ];
+  return candidates.find(Array.isArray) || [];
+}
+
+function mapStatusCounts(response) {
+  const data = asObject(response?.data);
+  const sources = [response?.summary, response?.counts, response?.statusCounts, data.summary, data.counts, data.statusCounts, data.statuses, data];
+  const counts = {};
+
+  STATUS_COUNT_KEYS.forEach((key) => {
+    const source = sources.find((item) => item && Number.isFinite(Number(item[key])) && item[key] !== '');
+    if (source) counts[key] = Number(source[key]) || 0;
+  });
+
+  return counts;
 }
 
 export function mapAdminTransactionList(response) {
@@ -89,6 +115,7 @@ export function mapAdminTransactionList(response) {
 
   return {
     transactions: rows.map(mapAdminTransaction),
+    statusCounts: mapStatusCounts(response),
     meta: {
       page: toNumber(meta.currentPage || meta.page) || 1,
       totalRecords,
@@ -114,11 +141,20 @@ export const adminTransactionsApi = createApi({
 
   endpoints: (builder) => ({
     getAdminTransactions: builder.query({
-      query: ({ page = 1, limit = 10 } = {}) => ({
-        url: API_ROUTES.ADMIN_TRANSACTIONS,
-        method: 'GET',
-        params: { page, limit },
-      }),
+      query: ({ page = 1, limit = 10, keyword = '', status = '' } = {}) => {
+        const params = { page, limit };
+        if (keyword) params.keyword = keyword;
+        if (status) {
+          params.status = status;
+          params.paymentStatus = status;
+        }
+
+        return {
+          url: API_ROUTES.ADMIN_TRANSACTIONS,
+          method: 'GET',
+          params,
+        };
+      },
       transformResponse: (response) => mapAdminTransactionList(response),
       providesTags: [{ type: 'AdminTransaction', id: 'LIST' }],
     }),

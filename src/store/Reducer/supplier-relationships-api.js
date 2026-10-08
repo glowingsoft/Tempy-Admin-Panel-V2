@@ -14,10 +14,39 @@ import { createCustomFetchBaseQuery } from '../baseQuery';
 
 // ----------------------------------------------------------------------
 
+function extractList(response) {
+  const data = response?.data ?? response;
+  const candidates = [
+    data,
+    data?.data,
+    data?.permanentHires,
+    data?.hires,
+    data?.docs,
+    data?.items,
+    data?.list,
+    data?.rows,
+    data?.records,
+    data?.results,
+    response?.permanentHires,
+    response?.hires,
+  ];
+  return candidates.find(Array.isArray) || [];
+}
+
 function mapList(mapItem) {
   return (response) => {
-    const list = Array.isArray(response?.data) ? response.data : [];
-    return { data: list.map(mapItem).filter((item) => item.id), meta: response?.meta || {} };
+    const list = extractList(response);
+    const data = list
+      .map((item) => {
+        try {
+          return mapItem(item || {});
+        } catch {
+          return null;
+        }
+      })
+      .filter((item) => item?.id);
+    const meta = response?.meta || response?.data?.meta || {};
+    return { data, meta };
   };
 }
 
@@ -128,7 +157,11 @@ export const supplierRelationshipsApi = createApi({
     }),
 
     getPermanentHires: builder.query({
-      query: ({ base }) => ({ url: API_ROUTES.PERMANENT_HIRES(base), method: 'GET', params: { limit: 100 } }),
+      query: ({ base }) => ({
+        url: API_ROUTES.PERMANENT_HIRES(base),
+        method: 'GET',
+        params: { limit: 100 },
+      }),
       transformResponse: mapList(mapPermanentHireFromApi),
       providesTags: ['PermanentHire'],
     }),

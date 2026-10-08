@@ -8,6 +8,7 @@ import Table from '@mui/material/Table';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
@@ -20,15 +21,18 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
 
+import { useDebounce } from 'src/hooks/use-debounce';
+
 import { fCurrency } from 'src/utils/format-number';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Label } from 'src/components/label';
+import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { TableHeadCustom, TablePaginationCustom } from 'src/components/table';
+import { TableHeadCustom, TableNoData, TablePaginationCustom } from 'src/components/table';
 
 import { handleApiError } from 'src/store/handleApiError';
 import {
@@ -40,6 +44,15 @@ import {
 import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
 
 // ----------------------------------------------------------------------
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'refunded', label: 'Refunded' },
+  { value: 'failed', label: 'Failed' },
+];
 
 const TABLE_HEAD = [
   { id: 'reference', label: 'Reference' },
@@ -271,16 +284,33 @@ function PlatformFeeCard() {
 export function AdminBookingTransactionsView() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const keyword = useDebounce(search.trim(), 400);
+
+  useEffect(() => {
+    setPage(0);
+  }, [keyword, status, rowsPerPage]);
 
   const { data, isLoading, isFetching, isError, error } = useGetAdminTransactionsQuery({
-    page: page + 1,
-    limit: rowsPerPage,
+    page: status ? 1 : page + 1,
+    limit: status ? 100 : rowsPerPage,
+    keyword,
+    status,
   });
 
-  const transactions = data?.transactions || [];
-  const totalRecords = data?.meta?.hasTotal ? data.meta.totalRecords : null;
-  const count = totalRecords != null ? totalRecords : transactions.length < rowsPerPage ? page * rowsPerPage + transactions.length : page * rowsPerPage + transactions.length + 1;
+  const statusCounts = data?.statusCounts || {};
+  const matchedTransactions = (data?.transactions || []).filter((row) => !status || String(row.status || '').toLowerCase() === status);
+  const serverPaged = !status && matchedTransactions.length <= rowsPerPage;
+  const transactions = serverPaged ? matchedTransactions : matchedTransactions.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const totalRecords = !status && data?.meta?.hasTotal ? data.meta.totalRecords : status ? matchedTransactions.length : null;
+  const count =
+    totalRecords != null
+      ? totalRecords
+      : matchedTransactions.length < rowsPerPage
+        ? page * rowsPerPage + matchedTransactions.length
+        : page * rowsPerPage + matchedTransactions.length + 1;
 
   return (
     <DashboardContent maxWidth="xl">
@@ -297,15 +327,48 @@ export function AdminBookingTransactionsView() {
             </Typography>
           </Box>
 
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ px: 3, pb: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search reference, job, customer, worker..."
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              select
+              size="small"
+              label="Status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              sx={{ minWidth: { sm: 180 } }}
+            >
+              {STATUS_OPTIONS.map((option) => {
+                const optionCount = option.value ? statusCounts[option.value] : null;
+                return (
+                  <MenuItem key={option.value || 'all-status'} value={option.value}>
+                    {option.label}
+                    {optionCount != null ? ` (${optionCount})` : ''}
+                  </MenuItem>
+                );
+              })}
+            </TextField>
+          </Stack>
+
           {isFetching ? <LinearProgress sx={{ height: 2 }} /> : null}
 
           {isError && !data ? (
             <Alert severity="error" sx={{ mx: 3, mb: 3 }}>
               {handleApiError(error) || 'Could not load transactions'}
             </Alert>
-          ) : isLoading ? (
-            <DashboardEmptyState message="Loading transactions" hint="" minHeight={180} />
-          ) : transactions.length ? (
+          ) : (
             <>
               <Scrollbar>
                 <Table size="small" sx={{ minWidth: 1100 }}>
@@ -345,6 +408,8 @@ export function AdminBookingTransactionsView() {
                         <TableCell>{row.paidAt || '—'}</TableCell>
                       </TableRow>
                     ))}
+
+                    <TableNoData notFound={!isLoading && !transactions.length} />
                   </TableBody>
                 </Table>
               </Scrollbar>
@@ -359,8 +424,6 @@ export function AdminBookingTransactionsView() {
                 }}
               />
             </>
-          ) : (
-            <DashboardEmptyState message="No transactions yet" hint="Payments appear here once a booking is charged." minHeight={220} />
           )}
         </Card>
       </Stack>

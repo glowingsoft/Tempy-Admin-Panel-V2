@@ -59,23 +59,86 @@ function findUsableMandate(value, depth = 0) {
   return null;
 }
 
+const SETUP_URL_KEYS = [
+  'authorisationUrl',
+  'authorizationUrl',
+  'authorisation_url',
+  'authorization_url',
+  'hostedUrl',
+  'hosted_url',
+  'flowUrl',
+  'flow_url',
+];
+
+const FALLBACK_URL_KEYS = ['redirectUrl', 'redirect_url', 'url', 'link'];
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
+/** Backend return page after GoCardless finishes. It is not the bank-details form. */
+function isGoCardlessReturnUrl(value) {
+  try {
+    const path = new URL(String(value)).pathname.replace(/\/+$/, '').toLowerCase();
+    return path.endsWith('/gocardless/return') || path.endsWith('/gocardless/exit');
+  } catch {
+    return String(value || '').toLowerCase().includes('/gocardless/return');
+  }
+}
+
+function readUrl(source, key) {
+  const value = source?.[key];
+  const text = typeof value === 'string' ? value.trim() : '';
+  return isHttpUrl(text) ? text : '';
+}
+
+function objectsIn(value, depth = 0, list = []) {
+  if (!value || typeof value !== 'object' || depth > 5) return list;
+  if (Array.isArray(value)) {
+    value.forEach((item) => objectsIn(item, depth + 1, list));
+    return list;
+  }
+  list.push(value);
+  Object.values(value).forEach((item) => {
+    if (item && typeof item === 'object') objectsIn(item, depth + 1, list);
+  });
+  return list;
+}
+
+/**
+ * Open the GoCardless bank page, not the API return URL.
+ * `redirectUrl` is often https://…/gocardless/return (“Done”), while the form lives on authorisationUrl.
+ */
+function pickSetupUrl(source) {
+  const objects = objectsIn(source);
+
+  for (const key of SETUP_URL_KEYS) {
+    for (const object of objects) {
+      const url = readUrl(object, key);
+      if (url && !isGoCardlessReturnUrl(url)) return url;
+    }
+  }
+
+  for (const key of FALLBACK_URL_KEYS) {
+    for (const object of objects) {
+      const url = readUrl(object, key);
+      if (url && !isGoCardlessReturnUrl(url)) return url;
+    }
+  }
+
+  return '';
+}
+
 export function mapGoCardlessMandate(response) {
   const root = asObject(response);
   const payload = asObject(root.data ?? root);
   const mandate = findUsableMandate(root) || {};
-  const redirectSource = asObject(payload.mandate ? payload : root);
 
   return {
     status: isUsableMandateStatus(mandate.status) ? String(mandate.status).trim().toLowerCase() : '',
     id: pickId([mandate.mandateId, mandate.mandate_id, mandate._id, mandate.id]),
     ownerId: pickId([mandate.customer, mandate.customerId, mandate.userId, payload.customer, payload.customerId]),
-    redirectUrl: String(
-      redirectSource.redirectUrl ||
-        redirectSource.authorisationUrl ||
-        redirectSource.authorizationUrl ||
-        redirectSource.url ||
-        ''
-    ),
+    redirectUrl: pickSetupUrl(root),
   };
 }
 

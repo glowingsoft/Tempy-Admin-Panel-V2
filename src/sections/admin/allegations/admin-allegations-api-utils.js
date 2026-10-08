@@ -50,6 +50,21 @@ function accountLabel(item, worker) {
   return raw.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function normalizeFeedType(value) {
+  const raw = asText(value).toLowerCase().replace(/[\s-]+/g, '_');
+  if (!raw) return '';
+  if (isAllegationFeedType(raw)) return raw;
+  if (raw === 'suspension' || raw === 'suspended' || raw === 'suspended_users' || raw === 'suspensions') {
+    return 'suspended_user';
+  }
+  if (raw === 'cancellation' || raw === 'cancellation_strikes' || raw === 'late_cancellation') {
+    return 'cancellation_strike';
+  }
+  if (raw === 'abandoned' || raw === 'abandoned_shifts') return 'abandoned_shift';
+  if (raw === 'reported' || raw === 'reported_users' || raw === 'reports') return 'reported_user';
+  return '';
+}
+
 function isWorkerSuspended(item, worker) {
   const accountStatus = asText(
     item.workerStatus || worker?.accountState?.status || worker?.status || item.accountState?.status
@@ -186,8 +201,10 @@ export function mapAllegationFromApi(item = {}) {
 
   const worker = item.worker || item.nurse || item.staff || item.user || null;
   const shifts = collectShifts(item);
-  const rawType = asText(item.feedType || item.category || item.type).toLowerCase();
-  const feedType = isAllegationFeedType(rawType) ? rawType : '';
+  const feedType =
+    [item.feedType, item.category, item.listType, item.source, item.kind, item.type]
+      .map(normalizeFeedType)
+      .find(Boolean) || '';
 
   return {
     id: pickId(item) || pickId(item.allegationId),
