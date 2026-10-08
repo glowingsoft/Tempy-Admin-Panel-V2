@@ -39,8 +39,8 @@ export function useAdminRecruitment(status, { page = 0, limit = 10 } = {}) {
   }, [acceptedPage.data, hiredPage.data, listPage.data, status]);
 
   const summary = useMemo(() => {
-    const accepted = acceptedPage.totalRecords;
-    const hired = hiredPage.totalRecords;
+    const accepted = Number(acceptedPage.totalRecords) || 0;
+    const hired = Number(hiredPage.totalRecords) || 0;
     const total = accepted + hired;
     const conversionRate = total ? Math.round((hired / total) * 100) : 0;
     const recent = [...requests]
