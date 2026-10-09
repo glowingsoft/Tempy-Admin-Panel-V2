@@ -62,7 +62,6 @@ export function CountryListPopover({ countryCode, onClickCountry }) {
           <MenuItem
             key={country.code}
             selected={countryCode === country.code}
-            autoFocus={countryCode === country.code}
             onClick={() => {
               popover.onClose();
               setSearchCountry('');
@@ -118,6 +117,7 @@ export function CountryListPopover({ countryCode, onClickCountry }) {
             fullWidth
             value={searchCountry}
             onChange={handleSearchCountry}
+            onKeyDown={(event) => event.stopPropagation()}
             placeholder="Search..."
             InputProps={{
               startAdornment: (

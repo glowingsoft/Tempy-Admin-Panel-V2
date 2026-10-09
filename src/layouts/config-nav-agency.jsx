@@ -17,16 +17,6 @@ export const navDataAgency = [
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.agency.contracts, icon: NAV_ICONS.contract },
       { title: 'Earnings', path: paths.dashboard.agency.earnings, icon: NAV_ICONS.analytics },
       {
-        title: 'Invoices',
-        path: paths.dashboard.agency.invoices,
-        icon: NAV_ICONS.invoice,
-        deep: true,
-        children: [
-          { title: 'List', path: paths.dashboard.agency.invoices },
-          { title: 'Create', path: `${paths.dashboard.agency.invoices}/new` },
-        ],
-      },
-      {
         title: 'Help & Info',
         path: paths.dashboard.agency.faqs,
         icon: NAV_ICONS.faqs,

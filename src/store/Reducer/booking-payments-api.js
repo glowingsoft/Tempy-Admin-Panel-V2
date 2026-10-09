@@ -5,6 +5,19 @@ import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
+import { fileResponseHandler } from '../file-response';
+
+const PAYMENT_INVOICE_ROUTE = {
+  nurse: API_ROUTES.NURSE_BOOKING_PAYMENT_INVOICE,
+  agency: API_ROUTES.AGENCY_BOOKING_PAYMENT_INVOICE,
+  'home-care-company': API_ROUTES.HOME_CARE_COMPANY_BOOKING_PAYMENT_INVOICE,
+};
+
+function paymentInvoiceUrl(role, bookingId) {
+  const named = PAYMENT_INVOICE_ROUTE[role];
+  if (named) return named(bookingId);
+  return API_ROUTES.BOOKING_PAYMENT_INVOICE(role, bookingId);
+}
 
 function toNumber(value) {
   const num = Number(value);
@@ -56,6 +69,16 @@ function mapPayment(row) {
 
   return {
     id: String(source._id || source.id || source.reference || ''),
+    bookingId: String(
+      source.bookingId ||
+        source.booking_id ||
+        asObject(source.booking)._id ||
+        asObject(source.booking).id ||
+        (typeof source.booking === 'string' ? source.booking : '') ||
+        source._id ||
+        source.id ||
+        ''
+    ),
     reference: String(source.reference || '').trim(),
     transactionId: String(source.transactionId || '').trim(),
     bookingStatus: String(source.bookingStatus || '').trim(),
@@ -140,7 +163,17 @@ export const bookingPaymentsApi = createApi({
       transformResponse: (response) => mapBookingPaymentsFromApi(response),
       providesTags: [{ type: 'BookingPayments', id: 'LIST' }],
     }),
+
+    /** GET /web/:role/booking/payments/:bookingId/invoice — PDF download. */
+    downloadBookingPaymentInvoice: builder.mutation({
+      query: ({ role = 'nurse', bookingId }) => ({
+        url: paymentInvoiceUrl(role, bookingId),
+        method: 'GET',
+        responseHandler: fileResponseHandler,
+        cache: 'no-store',
+      }),
+    }),
   }),
 });
 
-export const { useGetBookingPaymentsQuery } = bookingPaymentsApi;
+export const { useGetBookingPaymentsQuery, useDownloadBookingPaymentInvoiceMutation } = bookingPaymentsApi;

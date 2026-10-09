@@ -22,9 +22,16 @@ function mapBlock(block) {
   const source = asObject(block);
   return {
     amount: toNumber(source.amount),
+    formatted: String(source.formatted || '').trim(),
     hours: toNumber(source.hours),
     bookings: toNumber(source.bookings),
+    period: String(source.period || '').trim(),
   };
+}
+
+function mapSnapshot(block) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return null;
+  return mapBlock(block);
 }
 
 function mapSummary(summary) {
@@ -47,6 +54,8 @@ function mapDaily(daily) {
     toNumberList(series.find((item) => String(item?.name).toLowerCase() === name)?.data);
 
   return {
+    from: String(daily.from || ''),
+    to: String(daily.to || ''),
     categories: Array.isArray(daily.categories) ? daily.categories.map(String) : [],
     dates: Array.isArray(daily.dates) ? daily.dates.map(String) : [],
     earned: byName('earned'),
@@ -156,12 +165,20 @@ export function mapEarningsFromApi(response) {
   return {
     type: data.type === 'spend' ? 'spend' : 'earning',
     role: String(data.role || ''),
+    currency: String(data.currency || 'GBP'),
+    symbol: String(data.symbol || '£'),
+    snapshots: {
+      total: mapSnapshot(data.total),
+      upcoming: mapSnapshot(data.upcoming),
+      thisWeek: mapSnapshot(data.thisWeek),
+      thisMonth: mapSnapshot(data.thisMonth),
+    },
     summary: mapSummary(data.summary ? summarySource : { total: data.total }),
     previous: summarySource.previous ? mapSummary(summarySource.previous) : null,
     daily: mapDaily(data.daily),
     topWorkers: mapTopWorkers(data.topWorkers),
     history: (Array.isArray(data.history) ? data.history : []).map(mapHistoryRow),
-    agencySupplied: agencySupplied?.bookings ? agencySupplied : null,
+    agencySupplied,
     breakdown,
     meta: {
       page: toNumber(meta.currentPage) || 1,

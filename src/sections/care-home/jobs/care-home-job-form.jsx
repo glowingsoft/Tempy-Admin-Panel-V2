@@ -39,6 +39,8 @@ import {
   createDefaultSchedule,
   findBestJobTypeOption,
   getMinJobScheduleDate,
+  getScheduleBreakError,
+  getScheduleDurationMinutes,
   isPastJobScheduleDate,
   jobTypeMatchesAnyTeam,
 } from './care-home-job-utils';
@@ -162,6 +164,8 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
         const endBeforeStart = Boolean(
           entry.startTime && entry.endTime && entry.endTime < entry.startTime
         );
+        const breakError = getScheduleBreakError(entry);
+        const shiftMinutes = getScheduleDurationMinutes(entry.startTime, entry.endTime);
 
         return (
           <Box
@@ -287,22 +291,16 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                     onChange={(e) =>
                       handleScheduleChange(entry.id, 'breakMins', Number(e.target.value))
                     }
-                    inputProps={{ min: 0, step: 5 }}
+                    error={Boolean(breakError)}
+                    helperText={breakError || undefined}
+                    inputProps={{
+                      min: 0,
+                      step: 5,
+                      max: shiftMinutes != null ? shiftMinutes : undefined,
+                    }}
                     sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper' } }}
                   />
                 )}
-
-                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minHeight: 36 }}>
-                  <Switch
-                    checked={entry.receivingBids !== false}
-                    onChange={(e) => handleScheduleChange(entry.id, 'receivingBids', e.target.checked)}
-                    color="primary"
-                    size="small"
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    Receiving bids
-                  </Typography>
-                </Stack>
               </Stack>
             </Stack>
           </Box>

@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Table from '@mui/material/Table';
 import Avatar from '@mui/material/Avatar';
 import MenuItem from '@mui/material/MenuItem';
@@ -17,8 +18,14 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { fCurrency } from 'src/utils/format-number';
 
 import { handleApiError } from 'src/store/handleApiError';
-import { useGetBookingPaymentsQuery } from 'src/store/Reducer/booking-payments-api';
+import { saveBlobAsFile } from 'src/sections/staff/staff-import-utils';
+import {
+  useDownloadBookingPaymentInvoiceMutation,
+  useGetBookingPaymentsQuery,
+} from 'src/store/Reducer/booking-payments-api';
 
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
 import { Label } from 'src/components/label';
 import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom, TablePaginationCustom } from 'src/components/table';
@@ -115,6 +122,7 @@ const TABLE_HEAD = [
   { id: 'bookingStatus', label: 'Booking status' },
   { id: 'gateway', label: 'Gateway' },
   { id: 'paidAt', label: 'Paid at' },
+  { id: 'invoice', label: 'Invoice', align: 'right' },
 ];
 
 export function BookingPaymentsList({ role = 'care-home' }) {
@@ -123,6 +131,8 @@ export function BookingPaymentsList({ role = 'care-home' }) {
   const [from, setFrom] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [payoutStatus, setPayoutStatus] = useState('');
+  const [downloadingId, setDownloadingId] = useState('');
+  const [downloadInvoice] = useDownloadBookingPaymentInvoiceMutation();
 
   const { data, isLoading, isFetching, isError, error } = useGetBookingPaymentsQuery({
     role,
@@ -146,6 +156,23 @@ export function BookingPaymentsList({ role = 'care-home' }) {
         : page * rowsPerPage + payments.length + 1;
 
   const resetPage = () => setPage(0);
+
+  const handleDownloadInvoice = async (row) => {
+    if (!row.bookingId || downloadingId) return;
+    setDownloadingId(row.bookingId);
+    try {
+      const result = await downloadInvoice({ role, bookingId: row.bookingId }).unwrap();
+      if (result?.blob) {
+        saveBlobAsFile(result.blob, result.filename || `invoice-${row.reference || row.bookingId}.pdf`);
+        return;
+      }
+      toast.error(result?.json?.message || 'Could not download the invoice');
+    } catch (err) {
+      toast.error(err?.data?.json?.message || handleApiError(err) || 'Could not download the invoice');
+    } finally {
+      setDownloadingId('');
+    }
+  };
 
   const pagerCount = Math.max(count, page * rowsPerPage + (visiblePayments.length || (page > 0 ? 1 : 0)));
 
@@ -316,6 +343,17 @@ export function BookingPaymentsList({ role = 'care-home' }) {
                     </TableCell>
                     <TableCell sx={{ textTransform: 'capitalize' }}>{row.gateway || '—'}</TableCell>
                     <TableCell>{row.paidAt || '—'}</TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        color="inherit"
+                        disabled={!row.bookingId || downloadingId === row.bookingId}
+                        onClick={() => handleDownloadInvoice(row)}
+                        startIcon={<Iconify icon="solar:download-bold" width={16} />}
+                      >
+                        {downloadingId === row.bookingId ? 'Downloading' : 'PDF'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -197,6 +197,8 @@ export const API_ROUTES = {
   AGENCY_BOOKING: '/web/agency/booking',
   AGENCY_BOOKING_BY_ID: (id) => `/web/agency/booking/${id}`,
   AGENCY_BOOKING_CALENDAR: '/web/agency/booking/calender',
+  AGENCY_BOOKING_PAYMENT_INVOICE: (bookingId) => `/web/agency/booking/payments/${bookingId}/invoice`,
+  AGENCY_EARNINGS: '/web/agency/booking/earnings',
   AGENCY_DASHBOARD: '/web/agency/dashboard',
 
   HOME_CARE_COMPANY_JOB_TYPES: '/web/home-care-company/job/type',
@@ -205,6 +207,9 @@ export const API_ROUTES = {
   HOME_CARE_COMPANY_BOOKING: '/web/home-care-company/booking',
   HOME_CARE_COMPANY_BOOKING_BY_ID: (id) => `/web/home-care-company/booking/${id}`,
   HOME_CARE_COMPANY_BOOKING_CALENDAR: '/web/home-care-company/booking/calender',
+  HOME_CARE_COMPANY_BOOKING_PAYMENT_INVOICE: (bookingId) =>
+    `/web/home-care-company/booking/payments/${bookingId}/invoice`,
+  HOME_CARE_COMPANY_EARNINGS: '/web/home-care-company/booking/earnings',
   HOME_CARE_COMPANY_DASHBOARD: '/web/home-care-company/dashboard',
 
   NURSE_BRANCHES: '/web/nurse/branches',
@@ -214,9 +219,12 @@ export const API_ROUTES = {
   NURSE_AVAILABILITY_BY_ID: (id) => `/web/nurse/availability/${id}`,
   NURSE_BOOKING: '/web/nurse/booking',
   NURSE_BOOKING_CALENDAR: '/web/nurse/booking/calender',
+  NURSE_BOOKING_PAYMENT_INVOICE: (bookingId) => `/web/nurse/booking/payments/${bookingId}/invoice`,
+  NURSE_EARNINGS: '/web/nurse/booking/earnings',
   NURSE_DASHBOARD: '/web/nurse/dashboard',
   BOOKING_EARNINGS: (role) => `/web/${role}/booking/earnings`,
   BOOKING_PAYMENTS: (role) => `/web/${role}/booking/payments`,
+  BOOKING_PAYMENT_INVOICE: (role, bookingId) => `/web/${role}/booking/payments/${bookingId}/invoice`,
   SIDEBAR_COUNTS: (prefix) => `${prefix}/sidebar/counts`,
   SIDEBAR_SEEN: (prefix) => `${prefix}/sidebar/seen`,
   NURSE_STAFF_REQUESTS: '/web/nurse/staff/requests',

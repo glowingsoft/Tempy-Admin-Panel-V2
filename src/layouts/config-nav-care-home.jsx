@@ -25,7 +25,6 @@ export const navDataCareHome = [
       { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.permanentHires, icon: NAV_ICONS.user },
       { title: 'Compliance', path: paths.dashboard.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.payments, icon: NAV_ICONS.banking },
-      { title: 'Invoices', path: paths.dashboard.invoice.root, icon: NAV_ICONS.invoice },
       {
         title: 'Help & Info',
         path: paths.dashboard.faqs,

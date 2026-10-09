@@ -22,7 +22,7 @@ import { resolveCurrentLocation } from './staff-member-location';
 
 // ----------------------------------------------------------------------
 
-const PHOTO_PREVIEW_H = 240;
+const PHOTO_PREVIEW_H = 160;
 
 /** Paint the canvas white, so the saved PNG is black ink on white rather than transparent. */
 function fillWhite(canvas) {
@@ -34,7 +34,7 @@ function fillWhite(canvas) {
   ctx.restore();
 }
 
-export function SignaturePad({ onChange }) {
+export function SignaturePad({ onChange, height = 240 }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
   const [hasInk, setHasInk] = useState(false);
@@ -121,7 +121,7 @@ export function SignaturePad({ onChange }) {
           onTouchStart={startDraw}
           onTouchMove={moveDraw}
           onTouchEnd={endDraw}
-          style={{ display: 'block', width: '100%', height: 240, cursor: 'crosshair' }}
+          style={{ display: 'block', width: '100%', height, cursor: 'crosshair' }}
         />
       </Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
@@ -365,7 +365,7 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Add your signature here…
             </Typography>
-            <SignaturePad onChange={setSignatureDataUrl} />
+            <SignaturePad onChange={setSignatureDataUrl} height={PHOTO_PREVIEW_H} />
           </Box>
 
           <LocationField

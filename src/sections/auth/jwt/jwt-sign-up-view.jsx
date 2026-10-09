@@ -933,8 +933,6 @@ export function JwtSignUpView() {
       <Field.Text
         name="password"
         label="Password"
-        placeholder="8+ chars, uppercase, number & special char"
-
         type={password.value ? 'text' : 'password'}
         InputLabelProps={{ shrink: true }}
         InputProps={{

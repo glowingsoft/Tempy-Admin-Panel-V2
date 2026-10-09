@@ -25,11 +25,6 @@ export const navDataIndividualHomeCare = [
       { title: 'Compliance', path: paths.dashboard.individualHomeCare.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.individualHomeCare.payments, icon: NAV_ICONS.banking },
       {
-        title: 'Invoices',
-        path: paths.dashboard.individualHomeCare.invoices,
-        icon: NAV_ICONS.invoice,
-      },
-      {
         title: 'Help & Info',
         path: paths.dashboard.individualHomeCare.faqs,
         icon: NAV_ICONS.faqs,

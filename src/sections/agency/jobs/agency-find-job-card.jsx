@@ -141,6 +141,10 @@ function getShiftRows(job) {
   return [];
 }
 
+function hasJobDistance(job) {
+  return job?.distance != null && job.distance !== '';
+}
+
 const metaChipSx = {
   height: 20,
   fontSize: 9,
@@ -159,16 +163,17 @@ function JobMetaChips({ job, postedAt }) {
       alignItems="center"
       sx={{ mb: 0.5, minHeight: 20, width: 1 }}
     >
-      <Chip
-        label={job.distance || '— km'}
-        size="small"
-        sx={{
-          ...metaChipSx,
-          opacity: job.distance ? 1 : 0.45,
-          maxWidth: 110,
-          '& .MuiChip-label': { px: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
-        }}
-      />
+      {hasJobDistance(job) ? (
+        <Chip
+          label={job.distance}
+          size="small"
+          sx={{
+            ...metaChipSx,
+            maxWidth: 110,
+            '& .MuiChip-label': { px: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
+          }}
+        />
+      ) : null}
       {postedAt ? (
         <Typography
           variant="caption"
@@ -210,7 +215,7 @@ function JobLocationBlock({ job, sx }) {
       sx={{
         display: 'grid',
         gridTemplateColumns: '14px minmax(0, 1fr) auto',
-        gridTemplateRows: 'auto 14px',
+        gridTemplateRows: hasJobDistance(job) ? 'auto 14px' : 'auto',
         columnGap: 0.75,
         rowGap: 0.35,
         alignItems: 'center',
@@ -259,27 +264,26 @@ function JobLocationBlock({ job, sx }) {
         </span>
       </Tooltip>
 
-      <Iconify
-        icon="solar:routing-2-bold"
-        width={13}
-        sx={{
-          color: 'text.disabled',
-          display: 'block',
-          opacity: job.distance ? 1 : 0.35,
-        }}
-      />
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          gridColumn: '2 / 4',
-          fontSize: 10,
-          lineHeight: 1.45,
-          opacity: job.distance ? 1 : 0.45,
-        }}
-      >
-        {job.distance || '— km'}
-      </Typography>
+      {hasJobDistance(job) ? (
+        <>
+          <Iconify
+            icon="solar:routing-2-bold"
+            width={13}
+            sx={{ color: 'text.disabled', display: 'block' }}
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              gridColumn: '2 / 4',
+              fontSize: 10,
+              lineHeight: 1.45,
+            }}
+          >
+            {job.distance}
+          </Typography>
+        </>
+      ) : null}
     </Box>
   );
 }
@@ -941,18 +945,19 @@ export function AgencyFindJobCard({
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }}>
             <JobStatusChip job={job} variant={variant} />
-            <Chip
-              label={job.distance || '— km'}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: 9,
-                fontWeight: 600,
-                bgcolor: 'grey.100',
-                flexShrink: 0,
-                opacity: job.distance ? 1 : 0.45,
-              }}
-            />
+            {hasJobDistance(job) ? (
+              <Chip
+                label={job.distance}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  bgcolor: 'grey.100',
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
           </Stack>
 
           <Tooltip title={job.description || ''} arrow placement="top" disableHoverListener={!job.description}>

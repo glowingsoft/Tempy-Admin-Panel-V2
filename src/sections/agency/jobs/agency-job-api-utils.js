@@ -129,8 +129,10 @@ export function getAgencyUserLatLng(user) {
 }
 
 export function formatDistanceAway(km) {
-  if (km == null || Number.isNaN(km)) return '';
-  return `${Number(km).toFixed(1)} km away`;
+  const num = Number(km);
+  if (km == null || km === '' || Number.isNaN(num)) return '';
+  const text = Number.isInteger(num) ? num.toFixed(1) : String(Math.round(num * 100) / 100);
+  return `${text} km away`;
 }
 
 function isUsablePoint(point) {
@@ -394,8 +396,33 @@ export function mapShiftTabStatus(apiJobStatus, shiftStatus) {
   return 'new';
 }
 
+function pickRawDistance(source = {}) {
+  if (!source || typeof source !== 'object') return undefined;
+
+  const named = [
+    'distance',
+    'distanceKm',
+    'distanceInKm',
+    'distanceInKM',
+    'distanceINKM',
+    'distance_km',
+    'km',
+    'distanceAway',
+  ];
+  for (const key of named) {
+    if (source[key] != null && source[key] !== '') return source[key];
+  }
+
+  const matched = Object.keys(source).find((key) => {
+    const normalized = key.toLowerCase().replace(/_/g, '');
+    return normalized === 'distanceinkm' || normalized === 'distancekm' || normalized === 'distance';
+  });
+  if (matched && source[matched] != null && source[matched] !== '') return source[matched];
+  return undefined;
+}
+
 function pickDistanceLabel(item = {}, location = {}) {
-  const raw = item.distance ?? item.distanceKm ?? item.distanceInKm ?? item.distance_km ?? item.km ?? item.distanceAway ?? location.distance ?? location.distanceKm ?? location.km;
+  const raw = pickRawDistance(item) ?? pickRawDistance(location);
 
   if (raw == null || raw === '') return '';
 

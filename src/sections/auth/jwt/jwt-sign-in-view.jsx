@@ -397,7 +397,6 @@ export function JwtSignInView({ mode = 'public' }) {
         <Field.Text
           name="password"
           label="Password"
-          placeholder="6+ characters"
           type={password.value ? 'text' : 'password'}
           InputLabelProps={{ shrink: true }}
           InputProps={{

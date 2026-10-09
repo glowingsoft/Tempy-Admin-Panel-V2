@@ -17,16 +17,6 @@ export const navDataHomeCareCompany = [
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.homeCareCompany.contracts, icon: NAV_ICONS.contract },
       { title: 'Earnings', path: paths.dashboard.homeCareCompany.earnings, icon: NAV_ICONS.analytics },
       {
-        title: 'Invoices',
-        path: paths.dashboard.homeCareCompany.invoices,
-        icon: NAV_ICONS.invoice,
-        deep: true,
-        children: [
-          { title: 'List', path: paths.dashboard.homeCareCompany.invoices },
-          { title: 'Create', path: `${paths.dashboard.homeCareCompany.invoices}/new` },
-        ],
-      },
-      {
         title: 'Help & Info',
         path: paths.dashboard.homeCareCompany.faqs,
         icon: NAV_ICONS.faqs,

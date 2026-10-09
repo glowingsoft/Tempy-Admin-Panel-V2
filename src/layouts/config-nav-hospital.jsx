@@ -22,7 +22,6 @@ export const navDataHospital = [
       },
       { title: 'Compliance', path: paths.dashboard.hospital.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.hospital.payments, icon: NAV_ICONS.banking },
-      { title: 'Invoices', path: paths.dashboard.hospital.invoices, icon: NAV_ICONS.invoice },
       {
         title: 'Help & Info',
         path: paths.dashboard.hospital.faqs,

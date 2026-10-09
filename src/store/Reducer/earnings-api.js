@@ -5,6 +5,12 @@ import { mapEarningsFromApi } from 'src/sections/agency/earnings/earnings-api-ut
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
+const EARNINGS_ROUTE_BY_ROLE = {
+  agency: API_ROUTES.AGENCY_EARNINGS,
+  'home-care-company': API_ROUTES.HOME_CARE_COMPANY_EARNINGS,
+  nurse: API_ROUTES.NURSE_EARNINGS,
+};
+
 function buildEarningsParams({ userId, from, to, workerId, paymentStatus, page, limit } = {}) {
   const params = { page: page || 1, limit: limit || 10 };
   if (userId) params.userId = userId;
@@ -21,10 +27,10 @@ export const earningsApi = createApi({
   tagTypes: ['Earnings'],
 
   endpoints: (builder) => ({
-    /** GET /web/:role/booking/earnings — earnings for suppliers, spend for customers. */
+    /** Supplier earnings: nurse, agency, and home care company each have their own route. */
     getEarnings: builder.query({
       query: ({ role = 'agency', ...arg } = {}) => ({
-        url: API_ROUTES.BOOKING_EARNINGS(role),
+        url: EARNINGS_ROUTE_BY_ROLE[role] || API_ROUTES.BOOKING_EARNINGS(role),
         method: 'GET',
         params: buildEarningsParams(arg),
       }),

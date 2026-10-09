@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Card from '@mui/material/Card';
-import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -114,12 +113,6 @@ export function AccountChangePassword() {
               </InputAdornment>
             ),
           }}
-          helperText={
-            <Stack component="span" direction="row" alignItems="center">
-              <Iconify icon="eva:info-fill" width={16} sx={{ mr: 0.5 }} /> Password must be minimum
-              6+
-            </Stack>
-          }
         />
 
         <Field.Text

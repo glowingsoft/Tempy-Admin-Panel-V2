@@ -23,7 +23,6 @@ export const navDataLocalAuthority = [
       },
       { title: 'Compliance', path: paths.dashboard.localAuthority.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.localAuthority.payments, icon: NAV_ICONS.banking },
-      { title: 'Invoices', path: paths.dashboard.localAuthority.invoices, icon: NAV_ICONS.invoice },
       {
         title: 'Help & Info',
         path: paths.dashboard.localAuthority.faqs,
