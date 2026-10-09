@@ -167,14 +167,9 @@ export function getJobDistanceLabel(jobOrApiItem, origin) {
   return formatDistanceAway(getDistanceKm(from, jobPoint));
 }
 
-export function applyJobDistances(jobs = [], origin) {
-  return jobs.map((job) => {
-    const distance = getJobDistanceLabel(job, origin);
-    if (!distance) {
-      return job;
-    }
-    return { ...job, distance };
-  });
+/** Keep the API distance. A missing value stays blank instead of a coordinate estimate. */
+export function applyJobDistances(jobs = []) {
+  return jobs;
 }
 
 
@@ -396,48 +391,10 @@ export function mapShiftTabStatus(apiJobStatus, shiftStatus) {
   return 'new';
 }
 
-function pickRawDistance(source = {}) {
-  if (!source || typeof source !== 'object') return undefined;
-
-  const named = [
-    'distance',
-    'distanceKm',
-    'distanceInKm',
-    'distanceInKM',
-    'distanceINKM',
-    'distance_km',
-    'km',
-    'distanceAway',
-  ];
-  for (const key of named) {
-    if (source[key] != null && source[key] !== '') return source[key];
-  }
-
-  const matched = Object.keys(source).find((key) => {
-    const normalized = key.toLowerCase().replace(/_/g, '');
-    return normalized === 'distanceinkm' || normalized === 'distancekm' || normalized === 'distance';
-  });
-  if (matched && source[matched] != null && source[matched] !== '') return source[matched];
-  return undefined;
-}
-
-function pickDistanceLabel(item = {}, location = {}) {
-  const raw = pickRawDistance(item) ?? pickRawDistance(location);
-
+function pickDistanceLabel(item = {}) {
+  const raw = item?.distanceInKM ?? item?.distanceInKm ?? item?.distanceINKM;
   if (raw == null || raw === '') return '';
-
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) return '';
-    if (/km|mi|away/i.test(trimmed)) return trimmed;
-    const num = Number(trimmed);
-    if (!Number.isNaN(num)) return formatDistanceAway(num);
-    return trimmed;
-  }
-
-  const num = Number(raw);
-  if (Number.isNaN(num)) return '';
-  return formatDistanceAway(num);
+  return formatDistanceAway(raw);
 }
 
 function pickHourlyRate(item = {}, primaryShift = null) {
@@ -517,7 +474,7 @@ export function resolveSupplierBookingAction(bookingId, bookingStatus) {
   return 'assigned';
 }
 
-export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
+export function mapAgencyJobFromApi(item = {}) {
   const id = String(item._id || item.id || '');
   const location = item.location || {};
   const jobPoint = extractLatLng(item, { allowZero: true }) || { latitude: null, longitude: null };
@@ -548,18 +505,7 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
   const rating = pickNumber(item.averageRating, ratingObj?.averageRating, user.averageRating, typeof item.rating === 'number' ? item.rating : null);
   const reviewCount = pickNumber(item.totalReviews, ratingObj?.totalReviews, user.totalReviews, item.reviewCount, item.reviewsCount);
 
-  let distance = pickDistanceLabel(item, location);
-  if (!distance) {
-    distance = getJobDistanceLabel(
-      {
-        location,
-        latitude: jobPoint.latitude,
-        longitude: jobPoint.longitude,
-        branch,
-      },
-      origin || null
-    );
-  }
+  const distance = pickDistanceLabel(item);
 
   const bookingId = String(
     refId(item.myBooking) ||
