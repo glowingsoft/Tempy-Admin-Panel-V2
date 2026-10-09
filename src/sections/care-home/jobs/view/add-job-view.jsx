@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -46,9 +46,11 @@ import { appendAgencyJobRequest } from '../agency-job-request';
 import {
   EMPTY_JOB_DRAFT,
   createDefaultSchedule,
+  mergeEmptyJobContact,
   validateCareDetails,
   validateJobDraft,
 } from '../care-home-job-utils';
+import { useLastJobContactDetails } from '../use-last-job-contact';
 
 
 export function AddJobView({
@@ -156,6 +158,14 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
     schedules: [{ ...createDefaultSchedule() }],
   });
   const [submitting, setSubmitting] = useState(false);
+  const lastContact = useLastJobContactDetails(mode, true);
+  const contactAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (contactAppliedRef.current || !lastContact) return;
+    contactAppliedRef.current = true;
+    setDraft((prev) => mergeEmptyJobContact(prev, lastContact));
+  }, [lastContact]);
 
   const handleClose = useCallback(() => {
     router.push(redirectPath);

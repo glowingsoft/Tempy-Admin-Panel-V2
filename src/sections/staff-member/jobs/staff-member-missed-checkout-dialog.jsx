@@ -26,10 +26,9 @@ import {
   useSubmitNurseCheckOutProofMutation,
 } from 'src/store/Reducer/nurse-bookings-api';
 
-import { SignaturePad } from './staff-member-check-dialogs';
+import { PHOTO_PREVIEW_H, SIGNATURE_H, SignaturePad } from './staff-member-check-dialogs';
 import { mapAttendanceBlock } from './nurse-checkin-api-utils';
 
-// ----------------------------------------------------------------------
 
 function DetailRow({ icon, label, value }) {
   if (!value) return null;
@@ -46,11 +45,7 @@ function DetailRow({ icon, label, value }) {
   );
 }
 
-/**
- * The backend refuses a check-in while an earlier shift is unfinished, and names that booking in
- * the error (`data.bookingId`). This shows which shift it is — job, place, time — and, when the
- * system auto-checked it out, collects the picture, signature and reason it still needs.
- */
+
 export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved, uploadAsset }) {
   const open = Boolean(bookingId);
 
@@ -80,8 +75,7 @@ export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved
   }, [open, bookingId]);
 
   const attendance = mapAttendanceBlock(booking?.attendance);
-  // Same test the backend blocks on: auto-closed and missing the pair → the form. Otherwise the
-  // shift is still open and the worker has to check out of it from its job card.
+
   const rawAttendance = booking?.attendance || {};
   const needsProof = Boolean(
     rawAttendance.autoCheckedOut &&
@@ -160,7 +154,7 @@ export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved
         <Box
           onClick={() => fileInputRef.current?.click()}
           sx={{
-            height: 200,
+            height: PHOTO_PREVIEW_H,
             borderRadius: 1.5,
             cursor: 'pointer',
             overflow: 'hidden',
@@ -201,7 +195,7 @@ export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
           Signature (Digital)
         </Typography>
-        <SignaturePad onChange={setSignature} />
+        <SignaturePad onChange={setSignature} height={SIGNATURE_H} />
       </Box>
 
       <TextField

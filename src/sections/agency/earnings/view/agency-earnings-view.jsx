@@ -41,7 +41,6 @@ import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-stat
 import { PAYMENT_STATUSES } from '../earnings-api-utils';
 import { exportEarningsReport, printEarningsReport } from '../earnings-actions';
 
-// ----------------------------------------------------------------------
 
 const CUSTOMER_ROLES = ['care-home', 'hospital', 'local-authority', 'user'];
 
@@ -68,7 +67,6 @@ const STATUS_META = {
 
 const EXPORT_LIMIT = 1000;
 
-/** This week / this month run up to today, so the API's "previous" range is the same length. */
 function periodRange(periodId, today = new Date()) {
   if (periodId === 'month') return { from: startOfMonth(today), to: today };
   if (periodId === 'lastMonth') {
@@ -96,7 +94,6 @@ function moneyLabel(block) {
   return fCurrency(block?.amount || 0);
 }
 
-// ----------------------------------------------------------------------
 
 export function AgencyEarningsView({ role = 'agency' }) {
   const theme = useTheme();
@@ -137,25 +134,25 @@ export function AgencyEarningsView({ role = 'agency' }) {
 
   const labels = isSpend
     ? {
-        title: 'Spending',
-        description: 'The accepted bid charged when the booking is created (GBP £), before the platform fee.',
-        total: 'Total spent',
-        paid: 'Paid',
-        shifts: 'Shifts booked',
-        series: 'Spent',
-        person: 'Staff',
-      }
+      title: 'Spending',
+      description: 'The accepted bid charged when the booking is created (GBP £), before the platform fee.',
+      total: 'Total spent',
+      paid: 'Paid',
+      shifts: 'Shifts booked',
+      series: 'Spent',
+      person: 'Staff',
+    }
     : {
-        title: 'Earnings',
-        description: isNurse
-          ? 'Pay for shifts you won directly. Shifts through an agency or home care company are counted only; that employer is paid.'
-          : 'What you are owed after the platform fee, once the shift is completed and the customer payment has been paid out.',
-        total: 'Total earned',
-        paid: 'Paid out',
-        shifts: 'Shifts billed',
-        series: 'Earned',
-        person: isNurse ? 'Client' : 'Staff',
-      };
+      title: 'Earnings',
+      description: isNurse
+        ? 'Pay for shifts you won directly. Shifts through an agency or home care company are counted only; that employer is paid.'
+        : 'What you are owed after the platform fee, once the shift is completed and the customer payment has been paid out.',
+      total: 'Total earned',
+      paid: 'Paid out',
+      shifts: 'Shifts billed',
+      series: 'Earned',
+      person: isNurse ? 'Client' : 'Staff',
+    };
 
   const summary = data?.summary;
   const previous = data?.previous;
@@ -164,7 +161,6 @@ export function AgencyEarningsView({ role = 'agency' }) {
   const topWorkers = data?.topWorkers;
   const categories = daily?.categories || [];
 
-  // A nurse's rows are their own shifts, so show who the shift was for instead.
   const personOf = (row) =>
     isNurse
       ? { name: row.customerName, caption: row.jobName }
@@ -179,7 +175,6 @@ export function AgencyEarningsView({ role = 'agency' }) {
     { id: 'status', label: 'Status' },
   ];
 
-  // Show every day on a week; thin the labels out on a month so they don't collide.
   const labelStep = categories.length > 10 ? Math.ceil(categories.length / 8) : 1;
 
   const trendSeries = [
@@ -282,37 +277,37 @@ export function AgencyEarningsView({ role = 'agency' }) {
 
   const snapshotCards = !isSpend
     ? [
-        { key: 'total', title: 'Total earned', block: data?.snapshots?.total },
-        { key: 'upcoming', title: 'Upcoming', block: data?.snapshots?.upcoming },
-        { key: 'thisWeek', title: 'This week', block: data?.snapshots?.thisWeek },
-        { key: 'thisMonth', title: 'This month', block: data?.snapshots?.thisMonth },
-      ].filter((card) => card.block)
+      { key: 'total', title: 'Total earned', block: data?.snapshots?.total },
+      { key: 'upcoming', title: 'Upcoming', block: data?.snapshots?.upcoming },
+      { key: 'thisWeek', title: 'This week', block: data?.snapshots?.thisWeek },
+      { key: 'thisMonth', title: 'This month', block: data?.snapshots?.thisMonth },
+    ].filter((card) => card.block)
     : [];
 
   const statCards = summary
     ? [
-        {
-          title: labels.total,
-          total: summary.total.amount,
-          percent: percentChange(summary.total.amount, previous?.total.amount),
-        },
-        {
-          title: labels.paid,
-          total: summary.paid.amount,
-          percent: percentChange(summary.paid.amount, previous?.paid.amount),
-        },
-        {
-          title: 'Pending',
-          total: summary.pending.amount,
-          percent: percentChange(summary.pending.amount, previous?.pending.amount),
-        },
-        {
-          title: labels.shifts,
-          total: summary.total.bookings,
-          percent: percentChange(summary.total.bookings, previous?.total.bookings),
-          isCount: true,
-        },
-      ]
+      {
+        title: labels.total,
+        total: summary.total.amount,
+        percent: percentChange(summary.total.amount, previous?.total.amount),
+      },
+      {
+        title: labels.paid,
+        total: summary.paid.amount,
+        percent: percentChange(summary.paid.amount, previous?.paid.amount),
+      },
+      {
+        title: 'Pending',
+        total: summary.pending.amount,
+        percent: percentChange(summary.pending.amount, previous?.pending.amount),
+      },
+      {
+        title: labels.shifts,
+        total: summary.total.bookings,
+        percent: percentChange(summary.total.bookings, previous?.total.bookings),
+        isCount: true,
+      },
+    ]
     : [];
 
   const renderTrend = (

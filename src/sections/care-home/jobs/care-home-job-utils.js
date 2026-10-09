@@ -616,6 +616,43 @@ export function normalizeSchedule(entry, fallback = {}) {
   };
 }
 
+export const JOB_CONTACT_FIELDS = [
+  'contactName',
+  'contactPhone',
+  'contactEmail',
+  'emergencyName',
+  'emergencyPhone',
+  'emergencyRelation',
+];
+
+/** Contact and emergency fields from a saved job, or null when none were set. */
+export function pickJobContactDetails(job) {
+  if (!job) return null;
+
+  const contact = {};
+  let hasAny = false;
+  JOB_CONTACT_FIELDS.forEach((field) => {
+    const value = String(job[field] || '').trim();
+    contact[field] = value;
+    if (value) hasAny = true;
+  });
+
+  return hasAny ? contact : null;
+}
+
+/** Fill only contact fields the draft has not already set. */
+export function mergeEmptyJobContact(draft, contact) {
+  if (!contact) return draft;
+
+  const next = { ...draft };
+  JOB_CONTACT_FIELDS.forEach((field) => {
+    if (!String(next[field] || '').trim() && String(contact[field] || '').trim()) {
+      next[field] = contact[field];
+    }
+  });
+  return next;
+}
+
 export const EMPTY_JOB_DRAFT = {
   name: '',
   type: '',

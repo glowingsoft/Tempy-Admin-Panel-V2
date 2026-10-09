@@ -54,14 +54,6 @@ const CANCELLED_BOOKING_STATUSES = ['cancelledByWorker', 'cancelledByEmployer', 
  * Shift timing. The row's `startsAt` / `endsAt` are the real instants from the API and hold in any
  * browser timezone; date + time read as local time is only the fallback for rows without them.
  */
-function hasShiftStarted(row, job) {
-  if (Number.isFinite(row?.startsAt)) return row.startsAt <= Date.now();
-  const start = getStaffJobShiftStart(
-    row?.date ? { shiftDate: row.date, shiftStartTime: row.startTime } : job
-  );
-  return Boolean(start) && start.getTime() <= Date.now();
-}
-
 function hasShiftEnded(row, job) {
   if (Number.isFinite(row?.endsAt)) return row.endsAt <= Date.now();
   return hasStaffShiftEnded(row?.endTime ? row : job);
@@ -580,24 +572,37 @@ function JobActionButtons({
       );
     }
 
-    // No check-in once the shift's end time has passed, or 48 hours after it.
     const staffRow = shiftRow || job?.shiftRows?.[0];
-    if (hasShiftEnded(staffRow, job) || isShiftPast48Hours(staffRow, job)) {
-      return statusChip('Shift ended', 'default');
-    }
+    const checkInClosed = hasShiftEnded(staffRow, job) || isShiftPast48Hours(staffRow, job);
 
     return (
       <Stack direction="row" spacing={0.35} alignItems="center" sx={sx}>
         {chatButton}
-        <Button
-          size="small"
-          variant="contained"
-          color="success"
-          onClick={() => onCheckIn?.(job)}
-          sx={{ ...actionButtonSx, ...sx }}
-        >
-          Check In
-        </Button>
+        <Tooltip title={checkInClosed ? 'Shift time is over' : ''}>
+          <span>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              disabled={checkInClosed}
+              onClick={() => onCheckIn?.(job)}
+              sx={{
+                ...actionButtonSx,
+                ...sx,
+                ...(checkInClosed && {
+                  bgcolor: 'grey.400',
+                  color: 'common.white',
+                  '&.Mui-disabled': {
+                    bgcolor: 'grey.400',
+                    color: 'grey.100',
+                  },
+                }),
+              }}
+            >
+              Check In
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
     );
   }
@@ -666,21 +671,8 @@ function JobActionButtons({
       }
     }
 
-    // Active tab only: 48 hours after the shift, Bid Now becomes Shift ended.
-    // The API still leaves these shifts biddable, so this is decided in the browser.
-    if (variant === 'active' && isShiftPast48Hours(row, job)) {
-      return (
-        <Chip
-          size="small"
-          label="Shift ended"
-          sx={{ height: 22, fontSize: 10, fontWeight: 700 }}
-        />
-      );
-    }
-
-    // Bidding closes when the shift starts (backend `canBid`). Checked here too so an old shift
-    // never offers Bid Now, whatever the list says.
-    if (row?.isBiddingAllowed === false || hasShiftStarted(row, job)) {
+    // Closed only when the API says bidding is off.
+    if (row?.isBiddingAllowed === false) {
       return (
         <Chip
           size="small"

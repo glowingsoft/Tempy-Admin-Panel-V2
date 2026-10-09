@@ -12,6 +12,8 @@ import DialogContent from '@mui/material/DialogContent';
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
 
+import { Iconify } from 'src/components/iconify';
+
 import {
   RATE_SLOTS,
   RATE_STATUS,
@@ -86,6 +88,21 @@ function DetailsDialog({ title, onClose, children }) {
 
 const dateOrDash = (value) => (value ? fDate(value) : '—');
 
+function DateValue({ children }) {
+  return (
+    <Stack
+      component="span"
+      direction="row"
+      spacing={0.75}
+      alignItems="center"
+      justifyContent="flex-end"
+    >
+      <Iconify icon="solar:calendar-bold" width={16} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+      {children}
+    </Stack>
+  );
+}
+
 // ----------------------------------------------------------------------
 
 export function AgreedRateDetailsDialog({ row, onClose }) {
@@ -114,13 +131,19 @@ export function AgreedRateDetailsDialog({ row, onClose }) {
           </DetailRow>
         ))}
         <DetailRow label="Starts on">
-          {row.effectiveFrom ? fDate(row.effectiveFrom) : 'When the customer accepts'}
+          <DateValue>
+            {row.effectiveFrom ? fDate(row.effectiveFrom) : 'When the customer accepts'}
+          </DateValue>
         </DetailRow>
         <DetailRow label="Status">
           <Chip size="small" label={status.label} color={status.color} />
         </DetailRow>
-        <DetailRow label="Offered on">{dateOrDash(row.createdAt)}</DetailRow>
-        <DetailRow label="Responded on">{dateOrDash(row.respondedAt)}</DetailRow>
+        <DetailRow label="Offered on">
+          <DateValue>{dateOrDash(row.createdAt)}</DateValue>
+        </DetailRow>
+        <DetailRow label="Responded on">
+          <DateValue>{dateOrDash(row.respondedAt)}</DateValue>
+        </DetailRow>
       </Stack>
 
       {(row.reviewNote || row.reviewRates) && (
@@ -140,7 +163,9 @@ export function AgreedRateDetailsDialog({ row, onClose }) {
                 {fCurrency(day.rate)}/h
               </DetailRow>
             ))}
-            <DetailRow label="Requested on">{dateOrDash(row.reviewRequestedAt)}</DetailRow>
+            <DetailRow label="Requested on">
+              <DateValue>{dateOrDash(row.reviewRequestedAt)}</DateValue>
+            </DetailRow>
           </Stack>
         </>
       )}

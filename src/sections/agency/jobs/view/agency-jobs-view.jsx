@@ -12,8 +12,6 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import LinearProgress from '@mui/material/LinearProgress';
-
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 import { useRouter } from 'src/routes/hooks';
@@ -29,6 +27,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import {
   getStatusTabButtonSx,
@@ -2040,8 +2039,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
   return (
     <DashboardContent maxWidth="xl">
-      {listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
-
       <Stack
         direction="row"
         alignItems="center"
@@ -2289,7 +2286,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
         </Button>
       </Stack>
 
-      {viewMode === 'calendar' ? (
+      {listLoading ? (
+        <ModuleLoading />
+      ) : viewMode === 'calendar' ? (
         <JobsAltViewBoundary>
           <AgencyJobsCalendarView
             jobs={jobs}
@@ -2408,7 +2407,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
         </Box>
       )}
 
-      {viewMode !== 'calendar' && viewMode !== 'map' && jobs.length > rowsPerPage && (
+      {!listLoading && viewMode !== 'calendar' && viewMode !== 'map' && jobs.length > rowsPerPage && (
         <Pagination
           page={page}
           count={pageCount}
