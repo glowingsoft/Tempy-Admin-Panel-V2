@@ -749,10 +749,17 @@ export function JwtSignUpView() {
       setSocialLoading('google');
       setErrorMsg('');
 
+      const formValues = getValues();
       const { profile, user } = await authenticateWithGoogleSocial({
         socialAuthMutation: socialAuth,
         role: selectedRole,
         userType: ROLE_TO_API_USER_TYPE[selectedRole] || roleOption.apiUserType,
+        location: {
+          address: formValues.address,
+          city: formValues.city,
+          country: formValues.country,
+          postalCode: formValues.postalCode,
+        },
       });
 
       if (user?.token) {

@@ -269,7 +269,6 @@ export function JwtSignInView({ mode = 'public' }) {
       isAdminMode,
       locationState: location.state,
     });
-    const roleOption = getAuthRoleOption(storedRole);
 
     try {
       setSocialLoading('google');
@@ -278,8 +277,7 @@ export function JwtSignInView({ mode = 'public' }) {
 
       const { user } = await authenticateWithGoogleSocial({
         socialAuthMutation: socialAuth,
-        role: storedRole || undefined,
-        userType: ROLE_TO_API_USER_TYPE[storedRole] || roleOption?.apiUserType || '',
+        purpose: 'login',
       });
 
       if (!user?.token) {
