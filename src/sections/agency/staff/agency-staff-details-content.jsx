@@ -62,7 +62,7 @@ function resolveBranchLabel(staff, branches = []) {
 
   const locationLabel = getAgencyBranchLocationLabel(matched);
   if (locationLabel && locationLabel !== '—') {
-    return `${matched.name || 'Branch'} — ${locationLabel}`;
+    return `${matched.name || 'Location'} — ${locationLabel}`;
   }
 
   return matched.name || branchId;
@@ -138,7 +138,7 @@ function ProfileCard({ staff, branchLabel, onToggleFavorite }) {
       <Grid container spacing={3}>
         <Grid xs={12} sm={6}>
           <Stack spacing={2.5}>
-            <DetailField label="Branch" value={branchLabel} />
+            <DetailField label="Location" value={branchLabel} />
             <DetailField label="Specialties" value={getSpecialitiesLabel(staff)} />
             <DetailField label="Rate per hour" value={fCurrency(staff.ratePerHour ?? 0)} />
             <DetailField label="Platform percent" value={`${staff.platformPercent ?? 10}%`} />

@@ -5,7 +5,7 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-/** Icon-only table action with a tooltip, like the other list tables (e.g. Branches). */
+/** Icon-only table action with a tooltip, like the other list tables (e.g. Locations). */
 export function RowActionButton({ title, icon, color = 'default', disabled, ...other }) {
   return (
     <Tooltip title={title}>

@@ -12,12 +12,12 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/components/iconify';
+import { getJobDateParts } from 'src/components/jobs/job-date-filters';
 import { resolveJobImageSrc } from 'src/components/jobs/job-image';
 import { fCurrency } from 'src/utils/format-number';
 
 import { getEmptyJobCareDetails } from './agency-job-care-details-store';
 
-// ----------------------------------------------------------------------
 
 function formatGender(value) {
   const text = String(value || '').trim();
@@ -30,10 +30,14 @@ function formatRate(job) {
   return `${fCurrency(job.hourlyRate)} / hr`;
 }
 
-function shiftLine(row) {
-  const people = Number(row?.allowedPersons) > 0 ? `${row.allowedPersons} staff` : '';
-  const breakLabel = Number(row?.breakMin) > 0 ? `Break ${row.breakMin} min` : '';
-  return [row?.label, breakLabel, people].filter(Boolean).join(' · ');
+function shiftDateTime(row) {
+  const parts = getJobDateParts({
+    shiftDate: row?.date,
+    shiftStartTime: row?.startTime,
+    shiftEndTime: row?.endTime,
+  });
+  const date = parts.hasDate ? `${parts.weekday} ${parts.day} ${parts.month} ${parts.iso.slice(0, 4)}` : '';
+  return { date, time: parts.time || '' };
 }
 
 function seedFromJob(job) {
@@ -49,11 +53,11 @@ function seedFromJob(job) {
     emergencyRelation: job?.emergencyRelation || '',
     documents: Array.isArray(job?.careDocuments)
       ? job.careDocuments.map((doc, index) => ({
-          id: doc.id || doc._id || `api-doc-${index}`,
-          name: doc.name || doc.fileName || doc.file || `Document ${index + 1}`,
-          url: doc.url || doc.fileUrl || '',
-          uploadedAt: doc.uploadedAt || '',
-        }))
+        id: doc.id || doc._id || `api-doc-${index}`,
+        name: doc.name || doc.fileName || doc.file || `Document ${index + 1}`,
+        url: doc.url || doc.fileUrl || '',
+        uploadedAt: doc.uploadedAt || '',
+      }))
       : [],
   };
 }
@@ -91,7 +95,7 @@ export function AgencyJobCareDetailsDialog({ open, job, onClose }) {
   const imageSrc = resolveJobImageSrc(job?.image);
   const shifts = Array.isArray(job?.shiftRows) ? job.shiftRows : [];
   const jobType = job?.jobTypeTitle || job?.typeTitle || job?.role || '';
-  const shiftLines = shifts.map(shiftLine).filter(Boolean);
+  const shiftTimes = shifts.map(shiftDateTime).filter((row) => row.date || row.time);
 
   return (
     <Dialog open={open} onClose={() => onClose?.(false)} fullWidth maxWidth="sm" scroll="paper">
@@ -142,12 +146,13 @@ export function AgencyJobCareDetailsDialog({ open, job, onClose }) {
                 <Typography variant="caption" color="text.secondary" display="block">
                   {shifts.length > 1 ? 'Shifts' : 'Shift'}
                 </Typography>
-                {shiftLines.length ? (
-                  <Stack spacing={0.75} sx={{ mt: 0.75 }}>
-                    {shiftLines.map((line) => (
-                      <Typography key={line} variant="body2">
-                        {line}
-                      </Typography>
+                {shiftTimes.length ? (
+                  <Stack spacing={1} sx={{ mt: 0.75 }}>
+                    {shiftTimes.map((row) => (
+                      <Stack key={`${row.date}-${row.time}`} direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                        <Fact label="Date" value={row.date} />
+                        <Fact label="Time" value={row.time} />
+                      </Stack>
                     ))}
                   </Stack>
                 ) : (

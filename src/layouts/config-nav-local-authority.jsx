@@ -6,7 +6,7 @@ export const navDataLocalAuthority = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.localAuthority.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.localAuthority.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.localAuthority.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.localAuthority.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.localAuthority.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.localAuthority.messages, icon: NAV_ICONS.chat },

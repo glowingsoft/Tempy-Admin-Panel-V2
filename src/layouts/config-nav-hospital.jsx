@@ -6,7 +6,7 @@ export const navDataHospital = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.hospital.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.hospital.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.hospital.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.hospital.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.hospital.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.hospital.messages, icon: NAV_ICONS.chat },

@@ -6,7 +6,7 @@ export const navDataHomeCareCompany = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.homeCareCompany.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.homeCareCompany.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.homeCareCompany.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.homeCareCompany.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.homeCareCompany.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.homeCareCompany.messages, icon: NAV_ICONS.chat },

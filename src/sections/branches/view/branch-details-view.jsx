@@ -243,6 +243,16 @@ export function BranchDetailsView() {
 
       {branch ? (
         <Stack spacing={3}>
+          <Stack spacing={1}>
+          <Button
+            component={RouterLink}
+            href={nav.list}
+            color="inherit"
+            size="medium"
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            Back to {nav.nounPlural.toLowerCase()}
+          </Button>
           <Card sx={{ p: { xs: 2, md: 2.5 } }}>
             <Stack
               direction={{ xs: 'column', md: 'row' }}
@@ -314,17 +324,14 @@ export function BranchDetailsView() {
                     Post job
                   </Button>
                 ) : null}
-                <Button component={RouterLink} href={nav.list} color="inherit" size="medium">
-                  Back to {nav.nounPlural.toLowerCase()}
-                </Button>
               </Stack>
             </Stack>
           </Card>
+          </Stack>
 
           <SectionCard title="Details">
             <DetailGrid>
               <DetailItem label={`${nav.noun} name`} value={name} />
-              <DetailItem label="Location name" value={branch.locationName || branch.location?.name} />
               <DetailItem
                 label="Status"
                 value={

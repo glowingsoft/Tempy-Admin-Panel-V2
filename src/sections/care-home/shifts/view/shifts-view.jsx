@@ -3234,7 +3234,7 @@ function ShiftsViewContent({
           const coords = getCareHomeBranchLatLng(branch);
           return {
             id: branch.id,
-            label: branch.branchName || branch.name || 'Branch',
+            label: branch.branchName || branch.name || 'Location',
             address: branch.location?.fullAddress || '',
             latitude: coords?.latitude,
             longitude: coords?.longitude,
@@ -3496,7 +3496,7 @@ function ShiftsViewContent({
         throw new Error('Please select a job type');
       }
       if (!branchId || !branch) {
-        throw new Error(isUserApi ? 'Please select a location' : 'Please select a valid branch location');
+        throw new Error('Please select a valid location');
       }
 
       const staff =
@@ -3536,7 +3536,7 @@ function ShiftsViewContent({
       if (!body.name) throw new Error('Please enter a job name');
       if (!body.type) throw new Error('Please select a job type');
       if (!(body.branch || body.address)) {
-        throw new Error(isUserApi ? 'Please select a location' : 'Please select a branch location');
+        throw new Error('Please select a location');
       }
       if (!body.shift?.length) throw new Error('Please add at least one shift');
 
@@ -4753,7 +4753,7 @@ function ShiftsViewContent({
 
       if (!nextDraft.branchId || !branch) {
         throw new Error(
-          isUserApi ? 'Please select a location on the job first' : 'Please select a branch on the job first'
+          'Please select a location on the job first'
         );
       }
 

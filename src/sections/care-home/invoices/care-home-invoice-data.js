@@ -80,7 +80,7 @@ export const PAYMENT_FLOW_STEPS = [
     key: 'shift',
     label: 'Shift completed',
     description: 'Occasional staff finished the booked shift',
-    icon: 'solar:calendar-check-bold',
+    icon: 'solar:check-circle-bold',
   },
   {
     key: 'wait',

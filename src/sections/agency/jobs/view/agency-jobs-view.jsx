@@ -257,6 +257,7 @@ function expandJobsByShift(jobs) {
         schedules: undefined,
         shiftDate: row.date || job.shiftDate,
         shiftStartTime: row.startTime || job.shiftStartTime,
+        shiftEndTime: row.endTime || job.shiftEndTime,
         breakType: row.breakType || job.breakType,
         breakMin: row.breakMin != null ? row.breakMin : job.breakMin,
         hourlyRate: row.hourlyRate != null ? row.hourlyRate : job.hourlyRate,
@@ -1971,7 +1972,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
         try {
           await refetchJobs();
         } catch {
-          // the card already shows the new state from the check-out response
         }
       } catch (error) {
         const message =

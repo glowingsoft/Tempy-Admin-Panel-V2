@@ -6,7 +6,7 @@ export const navDataAgency = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.agency.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.agency.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.agency.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.agency.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.agency.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.agency.messages, icon: NAV_ICONS.chat },

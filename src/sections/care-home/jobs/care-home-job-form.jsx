@@ -417,7 +417,7 @@ export function JobDraftForm({
   const branches = apiBranches;
 
   const agencyPartners = getCareHomeAgencyPartners();
-  const locationLabel = isUser || isHomeCareCompany ? 'Location' : 'Branch Location';
+  const locationLabel = 'Location';
 
   // Edit only: the API says whether the rate and shift times can still change.
   const rateAndTimesLocked = Boolean(draft.id) && draft.canEditRateAndShiftTimes === false;
@@ -599,7 +599,7 @@ export function JobDraftForm({
               }
             >
               <MenuItem value="" disabled>
-                <em>{isUser || isHomeCareCompany ? 'Select location' : 'Select branch location'}</em>
+                <em>Select location</em>
               </MenuItem>
               {branches.map((branch) => (
                 <MenuItem key={branch.id} value={branch.id}>
@@ -611,9 +611,7 @@ export function JobDraftForm({
                     />
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="body2" noWrap fontWeight={600}>
-                        {branch.name ||
-                          branch.branchName ||
-                          (isUser || isHomeCareCompany ? 'Location' : 'Branch')}
+                        {branch.name || branch.branchName || 'Location'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap display="block">
                         {getAgencyBranchLocationLabel(branch)}
@@ -625,16 +623,12 @@ export function JobDraftForm({
             </Select>
             {branchesError && (
               <FormHelperText>
-                {isUser || isHomeCareCompany
-                  ? 'Could not load locations. Please retry.'
-                  : 'Could not load branches. Please retry.'}
+                Could not load locations. Please retry.
               </FormHelperText>
             )}
             {!branchesLoading && !branchesError && !branches.length && (
               <FormHelperText>
-                {isUser || isHomeCareCompany
-                  ? 'No locations found — add them under Locations on your dashboard first.'
-                  : 'No branches found — add locations in Branches first.'}
+                No locations found — add them under Locations on your dashboard first.
               </FormHelperText>
             )}
           </FormControl>

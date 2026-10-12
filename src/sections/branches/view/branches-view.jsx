@@ -84,9 +84,9 @@ import { getBranchesNav } from '../branch-paths';
 const API_BRANCH_ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
 
 const API_TABLE_HEAD = [
-  { id: 'name', label: 'Branch name', width: 160 },
+  { id: 'profile', label: 'Profile', width: 72 },
+  { id: 'name', label: 'Location name', width: 160 },
   { id: 'fullAddress', label: 'Full address' },
-  { id: 'profile', label: 'Profile', width: 140 },
   { id: 'city', label: 'City', width: 120 },
   { id: 'country', label: 'Country', width: 120 },
   { id: 'status', label: 'Status', width: 110 },
@@ -94,9 +94,9 @@ const API_TABLE_HEAD = [
 ];
 
 const HCC_TABLE_HEAD = [
-  { id: 'name', label: 'Branch name', width: 150 },
+  { id: 'profile', label: 'Profile', width: 72 },
+  { id: 'name', label: 'Location name', width: 150 },
   { id: 'fullAddress', label: 'Full address' },
-  { id: 'profile', label: 'Profile', width: 120 },
   { id: 'cqc', label: 'CQC', width: 130 },
   { id: 'city', label: 'City', width: 110 },
   { id: 'status', label: 'Status', width: 100 },
@@ -174,25 +174,13 @@ function getCqcRatingLabel(value) {
 
 function BranchProfileCell({ branch }) {
   const images = Array.isArray(branch?.images) ? branch.images : [];
-  const imageCount = images.length;
-  const certCount = Array.isArray(branch?.certifications) ? branch.certifications.length : 0;
   const iconUrl = resolveProfileAssetUrl(branch?.profileIcon || images[0]);
   const name = branch?.name || branch?.branchName || '';
 
   return (
-    <Stack direction="row" spacing={1.25} alignItems="center">
-      <Avatar src={iconUrl} alt={name} sx={{ width: 36, height: 36, fontSize: 14 }}>
-        {name.charAt(0).toUpperCase()}
-      </Avatar>
-      <Typography variant="caption" color={imageCount || certCount ? 'text.secondary' : 'text.disabled'}>
-        {[
-          imageCount ? `${imageCount} photo${imageCount === 1 ? '' : 's'}` : null,
-          certCount ? `${certCount} cert${certCount === 1 ? '' : 's'}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ') || 'No photos / certs'}
-      </Typography>
-    </Stack>
+    <Avatar src={iconUrl} alt={name} sx={{ width: 36, height: 36, fontSize: 14 }}>
+      {name.charAt(0).toUpperCase()}
+    </Avatar>
   );
 }
 
@@ -266,8 +254,8 @@ export function BranchesView() {
   const localAuthorityMode = isLocalAuthorityUser(user);
   const homeCareCompanyMode = isHomeCareCompanyUser(user);
   const userMode = isIndividualHomeCareUser(user);
-  const entityLabel = userMode ? 'Location' : 'Branch';
-  const entityLabelPlural = userMode ? 'Locations' : 'Branches';
+  const entityLabel = 'Location';
+  const entityLabelPlural = 'Locations';
   const apiMode =
     agencyMode ||
     careHomeMode ||
@@ -459,9 +447,9 @@ export function BranchesView() {
   const tableHead = apiMode
     ? userMode
       ? [
+        { id: 'profile', label: 'Profile', width: 72 },
         { id: 'name', label: 'Title', width: 160 },
         { id: 'fullAddress', label: 'Full address' },
-        { id: 'profile', label: 'Profile', width: 140 },
         { id: 'city', label: 'City', width: 120 },
         { id: 'country', label: 'Country', width: 120 },
         { id: 'status', label: 'Status', width: 110 },
@@ -525,8 +513,8 @@ export function BranchesView() {
   const handleFormSubmit = useCallback(
     async (data) => {
       if (!apiMode) {
-        toast.error('Branch API is not available for this account.');
-        throw new Error('Branch API unavailable');
+        toast.error('Locations are not available for this account.');
+        throw new Error('Locations unavailable');
       }
 
       const payload = userMode ? buildUserAddressPayload(data) : buildAgencyBranchPayload(data);
@@ -547,12 +535,12 @@ export function BranchesView() {
             await createCareHomeBranch(payload).unwrap();
           }
           await refetchApiBranches();
-          toast.success(userMode ? 'Location added' : 'Branch added');
+          toast.success('Location added');
         } catch (error) {
           toast.error(
             error?.data?.message ||
             error?.error ||
-            (userMode ? 'Failed to add location' : 'Failed to add branch')
+            'Failed to add location'
           );
           throw error;
         }
@@ -561,8 +549,8 @@ export function BranchesView() {
 
       const branchId = getAgencyBranchMongoId(editingBranch);
       if (!branchId) {
-        toast.error(userMode ? 'Invalid location id. Cannot update on API.' : 'Invalid branch id. Cannot update branch on API.');
-        throw new Error('Invalid branch ObjectId');
+        toast.error('Invalid location id. Cannot update on API.');
+        throw new Error('Invalid location id');
       }
 
       const updatePayload = userMode
@@ -584,12 +572,12 @@ export function BranchesView() {
           await updateCareHomeBranch({ id: branchId, ...updatePayload }).unwrap();
         }
         await refetchApiBranches();
-        toast.success(userMode ? 'Location updated' : 'Branch updated');
+        toast.success('Location updated');
       } catch (error) {
         toast.error(
           error?.data?.message ||
           error?.error ||
-          (userMode ? 'Failed to update location' : 'Failed to update branch')
+          'Failed to update location'
         );
         throw error;
       }
@@ -630,14 +618,14 @@ export function BranchesView() {
     if (!branchToDelete) return;
 
     if (!apiMode) {
-      toast.error('Branch API is not available for this account.');
+      toast.error('Locations are not available for this account.');
       return;
     }
 
     const branchId = getAgencyBranchMongoId(branchToDelete);
 
     if (!branchId) {
-      toast.error(userMode ? 'Invalid location id. This row is not linked to the API.' : 'Invalid branch id. This row is not linked to the API.');
+      toast.error('Invalid location id. This row is not linked to the API.');
       return;
     }
 
@@ -657,14 +645,14 @@ export function BranchesView() {
       }
       await refetchApiBranches();
       table.onUpdatePageDeleteRow(visibleBranches.length);
-      toast.success(userMode ? 'Location deleted' : 'Branch deleted');
+      toast.success('Location deleted');
       setBranchToDelete(null);
       deleteDialog.onFalse();
     } catch (error) {
       toast.error(
         error?.data?.message ||
         error?.error ||
-        (userMode ? 'Failed to delete location' : 'Failed to delete branch')
+        'Failed to delete location'
       );
     }
   }, [
@@ -720,7 +708,7 @@ export function BranchesView() {
             onResetPage={table.onResetPage}
             branchList={countSourceList}
             statusCounts={statusCounts}
-            searchPlaceholder={userMode ? 'Search locations...' : 'Search branches...'}
+            searchPlaceholder="Search locations..."
           />
 
           {apiMode && apiBranchesError ? (
@@ -728,9 +716,7 @@ export function BranchesView() {
               <Typography color="error" variant="body2">
                 {apiBranchesError?.data?.message ||
                   apiBranchesError?.error ||
-                  (userMode
-                    ? 'Could not load locations. Please try again.'
-                    : 'Could not load branches. Please try again.')}
+                  'Could not load locations. Please try again.'}
               </Typography>
             </Box>
           ) : null}
@@ -761,6 +747,9 @@ export function BranchesView() {
                     <TableRow key={branch.id || branch._id} hover>
                       {apiMode ? (
                         <>
+                          <TableCell sx={{ width: 72 }}>
+                            <BranchProfileCell branch={branch} />
+                          </TableCell>
                           <TableCell sx={{ maxWidth: 220 }}>
                             <Typography
                               variant="subtitle2"
@@ -786,9 +775,6 @@ export function BranchesView() {
                             >
                               {branch.location?.fullAddress || getLocationLabel(branch)}
                             </Typography>
-                          </TableCell>
-                          <TableCell sx={{ maxWidth: 160 }}>
-                            <BranchProfileCell branch={branch} />
                           </TableCell>
                           {homeCareCompanyMode ? (
                             <TableCell>
@@ -939,20 +925,21 @@ export function BranchesView() {
         onSubmit={handleFormSubmit}
         submitting={apiBusy}
         entityLabel={entityLabel}
+        addressOnly={userMode}
         showComplianceFields={homeCareCompanyMode}
       />
 
       <ConfirmDialog
         open={deleteDialog.value}
         onClose={deleteBusy ? undefined : deleteDialog.onFalse}
-        title={userMode ? 'Delete location' : 'Delete branch'}
+        title="Delete location"
         content={
           <>
             Are you sure you want to delete{' '}
             <strong>
               {branchToDelete?.name ||
                 branchToDelete?.branchName ||
-                (userMode ? 'this location' : 'this branch')}
+                'this location'}
             </strong>
             ?
           </>

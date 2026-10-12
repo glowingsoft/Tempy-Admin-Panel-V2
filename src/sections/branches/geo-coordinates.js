@@ -45,4 +45,4 @@ export function parseCoordinates(coords) {
 }
 
 export const INVALID_BRANCH_COORDINATES_MESSAGE =
-  'Selected branch has invalid latitude/longitude. Edit the branch and set latitude between -90 and 90, longitude between -180 and 180 (Lahore example: 31.52, 74.36).';
+  'Selected location has invalid latitude/longitude. Edit the location and set latitude between -90 and 90, longitude between -180 and 180 (Lahore example: 31.52, 74.36).';

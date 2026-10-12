@@ -213,7 +213,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
       toast.error(
         isUser || isHomeCareCompany
           ? 'Please select a location'
-          : 'Please select a valid branch location'
+          : 'Please select a valid location'
       );
       return;
     }

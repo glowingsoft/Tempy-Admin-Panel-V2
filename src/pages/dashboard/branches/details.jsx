@@ -4,7 +4,7 @@ import { CONFIG } from 'src/config-global';
 
 import { BranchDetailsView } from 'src/sections/branches/view/branch-details-view';
 
-const metadata = { title: `Branch | Dashboard - ${CONFIG.site.name}` };
+const metadata = { title: `Location | Dashboard - ${CONFIG.site.name}` };
 
 export default function Page() {
   return (

@@ -519,11 +519,11 @@ export function AdminOrgProfileView() {
           {branches.length ? (
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                Branches ({branches.length})
+                Locations ({branches.length})
               </Typography>
               <Stack spacing={2} divider={<Divider flexItem />}>
                 {branches.map((branch) => {
-                  const branchName = asDisplayText(branch.name) || 'Branch';
+                  const branchName = asDisplayText(branch.name) || 'Location';
                   const branchLocation = branch.location || {};
                   const address =
                     asDisplayText(branchLocation.fullAddress) ||

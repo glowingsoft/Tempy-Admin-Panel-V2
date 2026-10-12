@@ -26,7 +26,7 @@ export function BranchTableToolbar({
   branchList = [],
   statusTabs = BRANCH_STATUS_TABS,
   statusCounts,
-  searchPlaceholder = 'Search branches...',
+  searchPlaceholder = 'Search locations...',
   hideStatusTabs = false,
 }) {
   const handleFilterName = useCallback(
