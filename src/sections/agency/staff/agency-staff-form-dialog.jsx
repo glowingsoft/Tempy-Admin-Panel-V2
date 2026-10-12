@@ -897,11 +897,13 @@ export function AgencyStaffFormDialog({
                     type="number"
                     inputProps={{ min: 0, max: 100, step: 1 }}
                   />
-                  <SupplierStaffStatusField
-                    required
-                    isEdit={isEdit}
-                    currentStatus={isEdit ? currentStaff?.status : 'pending'}
-                  />
+                  {isEdit ? (
+                    <SupplierStaffStatusField
+                      required
+                      isEdit
+                      currentStatus={currentStaff?.status}
+                    />
+                  ) : null}
                 </Box>
               </>
             )}

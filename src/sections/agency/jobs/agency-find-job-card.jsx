@@ -130,8 +130,32 @@ const metaChipSx = {
   height: 20,
   fontSize: 9,
   fontWeight: 600,
+  border: 'none',
   bgcolor: 'grey.100',
   color: 'text.primary',
+  '&:hover': {
+    border: 'none',
+    bgcolor: 'info.lighter',
+    color: 'info.darker',
+  },
+};
+
+const shiftDateRowSx = {
+  minWidth: 0,
+  color: 'text.primary',
+  '&:hover': { color: 'info.darker' },
+};
+
+const shiftDateChipSx = {
+  maxWidth: 1,
+  fontWeight: 700,
+  fontSize: 11,
+  border: 'none',
+  bgcolor: 'transparent',
+  color: 'inherit',
+  '&:hover': { bgcolor: 'transparent', color: 'inherit', border: 'none' },
+  '& .MuiChip-icon': { color: 'inherit' },
+  '& .MuiChip-label': { color: 'inherit' },
 };
 
 function JobMetaChips({ job, postedAt }) {
@@ -147,6 +171,7 @@ function JobMetaChips({ job, postedAt }) {
         <Chip
           label={job.distance}
           size="small"
+          variant="outlined"
           sx={{
             ...metaChipSx,
             maxWidth: 110,
@@ -912,11 +937,9 @@ export function AgencyFindJobCard({
               <Chip
                 label={job.distance}
                 size="small"
+                variant="outlined"
                 sx={{
-                  height: 20,
-                  fontSize: 9,
-                  fontWeight: 600,
-                  bgcolor: 'grey.100',
+                  ...metaChipSx,
                   flexShrink: 0,
                 }}
               />
@@ -932,24 +955,20 @@ export function AgencyFindJobCard({
           {primaryShift && (
             <Tooltip title={dateParts.label} arrow>
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.35, minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={shiftDateRowSx}>
                 <Chip
                   size="small"
+                  variant="outlined"
                   icon={<Iconify icon="solar:calendar-bold" width={12} />}
                   label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
-                  sx={{
-                    height: 22,
-                    fontWeight: 700,
-                    fontSize: 11,
-                    bgcolor: 'info.lighter',
-                    color: 'info.darker',
-                    '& .MuiChip-icon': { color: 'info.darker', ml: 0.5 },
-                  }}
+                  sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
                 />
                 {dateParts.time ? (
-                  <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700 }}>
+                  <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700 }}>
                     {dateParts.time}
                   </Typography>
                 ) : null}
+                </Stack>
                 {hasMultipleSchedules && (
                   <Button
                     size="small"
@@ -1135,9 +1154,10 @@ export function AgencyFindJobCard({
           shiftRows.slice(0, 1).map((row) => (
             <Stack key={row.id} spacing={0.35}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}>
-                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={shiftDateRowSx}>
                   <Chip
                     size="small"
+                    variant="outlined"
                     icon={<Iconify icon="solar:calendar-bold" width={14} />}
                     label={
                       dateParts.hasDate
@@ -1145,22 +1165,18 @@ export function AgencyFindJobCard({
                         : 'Date TBC'
                     }
                     sx={{
+                      ...shiftDateChipSx,
                       height: 24,
-                      maxWidth: 1,
-                      fontWeight: 700,
-                      fontSize: 11,
-                      bgcolor: 'info.lighter',
-                      color: 'info.darker',
-                      '& .MuiChip-icon': { color: 'info.darker', ml: 0.75 },
-                      '& .MuiChip-label': { px: 0.75 },
+                      '& .MuiChip-icon': { color: 'inherit', ml: 0.75 },
+                      '& .MuiChip-label': { color: 'inherit', px: 0.75 },
                     }}
                   />
                   {dateParts.time ? (
-                    <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700, fontSize: 12 }}>
+                    <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700, fontSize: 12 }}>
                       {dateParts.time}
                     </Typography>
                   ) : !dateParts.hasDate && row.label ? (
-                    <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700, fontSize: 12 }}>
+                    <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700, fontSize: 12 }}>
                       {row.label}
                     </Typography>
                   ) : null}

@@ -283,6 +283,27 @@ export function HomeCareCompanyStaffListView() {
         <CustomBreadcrumbs
           heading="Staff"
           links={[{ name: 'Dashboard', href: paths.dashboard.homeCareCompany.root }, { name: 'Staff' }]}
+          action={
+            viewOnly ? null : (
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  startIcon={<Iconify icon="solar:upload-bold" />}
+                  onClick={importDialog.onTrue}
+                >
+                  Import staff
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                  onClick={handleOpenAdd}
+                >
+                  Add Staff
+                </Button>
+              </Stack>
+            )
+          }
           sx={{ mb: { xs: 2, md: 3 } }}
         />
 
@@ -294,10 +315,7 @@ export function HomeCareCompanyStaffListView() {
             staffList={staffList}
             statusCounts={statusCountCache}
             onResetPage={table.onResetPage}
-            onOpenAdd={viewOnly ? undefined : handleOpenAdd}
-            onOpenImport={viewOnly ? undefined : importDialog.onTrue}
-            showImportButton
-            addButtonColor="primary"
+            showAddButton={false}
             statusTabs={AGENCY_STAFF_STATUS_TABS}
           />
 

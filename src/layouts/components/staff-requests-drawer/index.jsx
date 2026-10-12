@@ -42,7 +42,6 @@ export function StaffRequestsDrawer({ sx, ...other }) {
   const viewOnly = useViewOnly();
 
   const { data, isLoading, isFetching, isError, refetch } = useGetNurseStaffRequestsQuery(undefined, {
-    skip: !drawer.value,
     refetchOnMountOrArgChange: true,
   });
   const [respond, respondState] = useRespondNurseStaffRequestMutation();

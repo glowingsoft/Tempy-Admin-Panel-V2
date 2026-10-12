@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import dayjs from 'dayjs';
 
@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Select from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import MenuItem from '@mui/material/MenuItem';
@@ -21,17 +22,35 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { DesktopTimePicker } from '@mui/x-date-pickers/DesktopTimePicker';
 import { renderTimeViewClock } from '@mui/x-date-pickers/timeViewRenderers';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { AppButton } from 'src/components/app-button';
 import { JobImageUpload } from 'src/components/jobs/job-image';
 
-import { useGetCareHomeBranchesQuery } from 'src/store/Reducer/care-home-branches-api';
-import { useGetHospitalBranchesQuery } from 'src/store/Reducer/hospital-branches-api';
-import { useGetLocalAuthorityBranchesQuery } from 'src/store/Reducer/local-authority-branches-api';
-import { useGetHomeCareCompanyBranchesQuery } from 'src/store/Reducer/home-care-company-branches-api';
-import { useUserAddressesQuery } from 'src/store/Reducer/user-branches-api';
+import {
+  useCreateCareHomeBranchMutation,
+  useGetCareHomeBranchesQuery,
+} from 'src/store/Reducer/care-home-branches-api';
+import {
+  useCreateHospitalBranchMutation,
+  useGetHospitalBranchesQuery,
+} from 'src/store/Reducer/hospital-branches-api';
+import {
+  useCreateLocalAuthorityBranchMutation,
+  useGetLocalAuthorityBranchesQuery,
+} from 'src/store/Reducer/local-authority-branches-api';
+import {
+  useCreateHomeCareCompanyBranchMutation,
+  useGetHomeCareCompanyBranchesQuery,
+} from 'src/store/Reducer/home-care-company-branches-api';
+import {
+  useCreateUserBranchMutation,
+  useUserAddressesQuery,
+} from 'src/store/Reducer/user-branches-api';
 
-import { getAgencyBranchLocationLabel } from 'src/sections/branches/agency-branch-utils';
+import { mapAgencyBranchFromApi, getAgencyBranchLocationLabel } from 'src/sections/branches/agency-branch-utils';
+import { BranchFormDialog, buildAgencyBranchPayload } from 'src/sections/branches/branch-form-dialog';
+import { buildUserAddressPayload, mapUserAddressFromApi } from 'src/sections/branches/user-address-utils';
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 
 import {
@@ -65,6 +84,13 @@ function formatBranchAddress(branch) {
     return `${label} — ${address}`;
   }
   return address !== '—' ? address : label;
+}
+
+function createdLocationFromResponse(result, { userMode = false } = {}) {
+  const raw = result?.data ?? result;
+  const item = Array.isArray(raw) ? raw[0] : raw;
+  if (!item || typeof item !== 'object') return null;
+  return userMode ? mapUserAddressFromApi(item) : mapAgencyBranchFromApi(item);
 }
 
 function isActiveBranch(branch) {
@@ -343,6 +369,21 @@ export function JobDraftForm({
   const isHomeCareCompany = mode === 'homeCareCompany';
   const skipCareHome = isHospital || isUser || isLocalAuthority || isHomeCareCompany;
   const didAutoSelectTypeRef = useRef(false);
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const [addLocationOpen, setAddLocationOpen] = useState(false);
+  const [createCareHomeBranch, { isLoading: creatingCareHomeBranch }] = useCreateCareHomeBranchMutation();
+  const [createHospitalBranch, { isLoading: creatingHospitalBranch }] = useCreateHospitalBranchMutation();
+  const [createLocalAuthorityBranch, { isLoading: creatingLocalAuthorityBranch }] =
+    useCreateLocalAuthorityBranchMutation();
+  const [createHomeCareCompanyBranch, { isLoading: creatingHomeCareCompanyBranch }] =
+    useCreateHomeCareCompanyBranchMutation();
+  const [createUserBranch, { isLoading: creatingUserBranch }] = useCreateUserBranchMutation();
+  const creatingLocation =
+    creatingCareHomeBranch ||
+    creatingHospitalBranch ||
+    creatingLocalAuthorityBranch ||
+    creatingHomeCareCompanyBranch ||
+    creatingUserBranch;
 
   const {
     data: typesList,
@@ -480,7 +521,49 @@ export function JobDraftForm({
     }
   };
 
+  const handleAddLocation = async (data) => {
+    const payload = isUser ? buildUserAddressPayload(data) : buildAgencyBranchPayload(data);
+
+    try {
+      let result;
+      if (isUser) {
+        result = await createUserBranch(payload).unwrap();
+      } else if (isHospital) {
+        result = await createHospitalBranch(payload).unwrap();
+      } else if (isLocalAuthority) {
+        result = await createLocalAuthorityBranch(payload).unwrap();
+      } else if (isHomeCareCompany) {
+        result = await createHomeCareCompanyBranch(payload).unwrap();
+      } else {
+        result = await createCareHomeBranch(payload).unwrap();
+      }
+
+      const refreshed = await branchesQuery.refetch();
+      const list = refreshed?.data?.data || [];
+      const created = createdLocationFromResponse(result, { userMode: isUser });
+      const createdName = String(data?.name || '').trim();
+      const branch =
+        list.find((item) => created?.id && String(item.id) === String(created.id)) ||
+        list.find((item) => createdName && String(item.name || item.branchName || '').trim() === createdName) ||
+        created;
+
+      if (branch?.id) {
+        handleFieldChange({
+          branchId: branch.id,
+          address: formatBranchAddress(branch),
+          location: branch.location || null,
+        });
+      }
+
+      toast.success('Location added');
+    } catch (error) {
+      toast.error(error?.data?.message || error?.error || 'Failed to add location');
+      throw error;
+    }
+  };
+
   return (
+    <>
     <Grid container spacing={3}>
       <Grid item xs={12} md={6}>
         <Stack spacing={2.5}>
@@ -568,6 +651,9 @@ export function JobDraftForm({
               label={locationLabel}
               notched
               displayEmpty
+              open={locationMenuOpen}
+              onOpen={() => setLocationMenuOpen(true)}
+              onClose={() => setLocationMenuOpen(false)}
               onChange={(e) => {
                 const nextId = e.target.value;
                 if (!nextId) {
@@ -598,9 +684,27 @@ export function JobDraftForm({
                 ) : null
               }
             >
-              <MenuItem value="" disabled>
-                <em>Select location</em>
+              <MenuItem value="" sx={{ display: 'none' }}>
+                Select location
               </MenuItem>
+              <Box
+                sx={{ px: 1, py: 1 }}
+                onMouseDown={(event) => event.preventDefault()}
+              >
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                  onClick={() => {
+                    setLocationMenuOpen(false);
+                    setAddLocationOpen(true);
+                  }}
+                >
+                  Add location
+                </Button>
+              </Box>
               {branches.map((branch) => (
                 <MenuItem key={branch.id} value={branch.id}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, width: 1 }}>
@@ -750,5 +854,18 @@ export function JobDraftForm({
         </Stack>
       </Grid>
     </Grid>
+
+    <BranchFormDialog
+      open={addLocationOpen}
+      onClose={() => setAddLocationOpen(false)}
+      currentBranch={null}
+      onSubmit={handleAddLocation}
+      submitting={creatingLocation}
+      entityLabel="Location"
+      addressOnly={isUser}
+      showComplianceFields={isHomeCareCompany}
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 5 }}
+    />
+    </>
   );
 }
