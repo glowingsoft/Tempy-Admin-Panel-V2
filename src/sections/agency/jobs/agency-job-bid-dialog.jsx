@@ -39,6 +39,13 @@ const defaultValues = {
   notes: '',
 };
 
+function defaultBidPrice(job, shiftRow) {
+  const raw = shiftRow?.hourlyRate ?? job?.hourlyRate;
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+  return String(Math.round(amount * 100) / 100);
+}
+
 export function AgencyJobBidDialog({
   open,
   job,
@@ -76,8 +83,11 @@ export function AgencyJobBidDialog({
 
   useEffect(() => {
     if (!open || blocked) return;
-    reset(defaultValues);
-  }, [open, blocked, job?.id, shiftRow?.id, reset]);
+    reset({
+      ...defaultValues,
+      bidPrice: defaultBidPrice(job, shiftRow),
+    });
+  }, [open, blocked, job?.id, job?.hourlyRate, shiftRow?.id, shiftRow?.hourlyRate, reset]);
 
   useEffect(() => {
     if (!open || blocked || !isAgreed || !rateOptions.length) return;
