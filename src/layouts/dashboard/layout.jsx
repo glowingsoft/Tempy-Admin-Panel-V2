@@ -192,8 +192,9 @@ export function DashboardLayout({ sx, children, data }) {
                 settings: false,
                 // Customers + suppliers only (hide on admin)
                 notifications: Number(user?.permission) !== 1,
-                // Nurse staff-requests — disabled until agency→staff invite flow is live
-                staffRequests: false,
+                staffRequests:
+                  user?.accountState?.accountType === 'staff_member' ||
+                  Number(user?.permission) === 8,
                 contacts: false,
               }}
               slots={{

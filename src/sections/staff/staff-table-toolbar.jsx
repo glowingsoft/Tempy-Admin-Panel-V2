@@ -119,7 +119,7 @@ export function StaffTableToolbar({
               </InputAdornment>
             ),
           }}
-          sx={{ width: { xs: 1, sm: 280 } }}
+          sx={{ width: { xs: 1, sm: 280 }, flexShrink: 0 }}
         />
 
         <Button

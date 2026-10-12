@@ -168,6 +168,7 @@ export function BranchFormDialog({
   entityLabel = 'Location',
   addressOnly = false,
   showComplianceFields = false,
+  sx,
 }) {
   const isEdit = Boolean(currentBranch);
   const isLocationEntity = addressOnly;
@@ -348,6 +349,7 @@ export function BranchFormDialog({
       fullWidth
       maxWidth="sm"
       scroll="paper"
+      sx={sx}
       PaperProps={{ sx: { maxHeight: 'calc(100dvh - 64px)' } }}
     >
       <Form methods={methods} onSubmit={(event) => event.preventDefault()}>

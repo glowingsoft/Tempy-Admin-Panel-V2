@@ -38,8 +38,6 @@ import {
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } from 'src/store/Reducer/notifications-api';
-import { useRespondNurseBookingOfferMutation } from 'src/store/Reducer/nurse-bookings-api';
-
 import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 
 import { formatNotificationCategoryLabel } from 'src/sections/notifications/notifications-api-utils';
@@ -75,7 +73,6 @@ export function NotificationsDrawer({ sx, ...other }) {
     }
   );
   const [markRead, markState] = useMarkNotificationReadMutation();
-  const [respondBookingOffer, respondState] = useRespondNurseBookingOfferMutation();
 
   const notifications = data?.data || [];
   const totalUnRead = Number(data?.unreadCount);
@@ -140,55 +137,6 @@ export function NotificationsDrawer({ sx, ...other }) {
   const handleCloseModal = useCallback(() => {
     setSelected(null);
   }, []);
-
-  const updateStatus = useCallback(
-    async (status) => {
-      if (!selected?.id) return;
-      try {
-        if (selected.kind === 'jobOffer') {
-          if (!selected.bookingId) {
-            toast.error('Booking not found for this offer');
-            return;
-          }
-          await respondBookingOffer({
-            id: selected.bookingId,
-            action: status === 'accepted' ? 'accept' : 'decline',
-          }).unwrap();
-        }
-
-        await markRead({ id: selected.id, status }).unwrap();
-        const isOffer = selected.kind === 'jobOffer';
-        toast.success(
-          status === 'accepted'
-            ? isOffer
-              ? 'Job offer accepted'
-              : 'Notification accepted'
-            : status === 'rejected'
-              ? isOffer
-                ? 'Job offer rejected'
-                : 'Notification rejected'
-              : status === 'active'
-                ? 'Marked active'
-                : 'Marked inactive'
-        );
-        setSelected((prev) =>
-          prev
-            ? {
-              ...prev,
-              status,
-              isUnRead: false,
-              isRead: true,
-              ...(isOffer && { requiresAction: false }),
-            }
-            : null
-        );
-        refetch();
-      } catch (err) {
-        toast.error(handleApiError(err) || 'Could not update notification');
-      }
-    },
-    [markRead, refetch, respondBookingOffer, selected]
-  );
 
   const handleCloseTerms = useCallback(() => {
     setTermsNotification(null);
@@ -400,11 +348,9 @@ export function NotificationsDrawer({ sx, ...other }) {
 
       <NotificationActionDialog
         open={Boolean(selected)}
-        notification={selected && viewOnly ? { ...selected, requiresAction: false } : selected}
-        loading={markState.isLoading || respondState.isLoading}
+        notification={selected}
+        loading={markState.isLoading}
         onClose={handleCloseModal}
-        onAccept={() => updateStatus('accepted')}
-        onReject={() => updateStatus('rejected')}
       />
 
       <TermsAcceptanceDialog
