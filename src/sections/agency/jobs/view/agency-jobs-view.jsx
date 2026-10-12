@@ -2518,6 +2518,18 @@ export function AgencyJobsView({ mode = 'agency' }) {
         />
       )}
 
+      <JobAttendanceDialog
+        open={Boolean(supplierAttendanceJob)}
+        mode={mode}
+        job={supplierAttendanceJob}
+        bookingId={supplierAttendanceJob?.bookingId}
+        shiftId={supplierAttendanceJob?.shiftRows?.[0]?.id}
+        fallbackAttendance={
+          supplierAttendanceJob ? resolveJobAttendance(supplierAttendanceJob, null) : null
+        }
+        onClose={() => setSupplierAttendanceJob(null)}
+      />
+
       {isStaffMember && (
         <>
           <StaffMemberCheckInDialog
@@ -2546,18 +2558,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
             }
             loading={attendanceLoading}
             onClose={() => setAttendanceJob(null)}
-          />
-
-          <JobAttendanceDialog
-            open={Boolean(supplierAttendanceJob)}
-            mode={mode}
-            job={supplierAttendanceJob}
-            bookingId={supplierAttendanceJob?.bookingId}
-            shiftId={supplierAttendanceJob?.shiftRows?.[0]?.id}
-            fallbackAttendance={
-              supplierAttendanceJob ? resolveJobAttendance(supplierAttendanceJob, null) : null
-            }
-            onClose={() => setSupplierAttendanceJob(null)}
           />
 
           <StaffMemberCheckInDialog
