@@ -13,7 +13,6 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
-import Pagination from '@mui/material/Pagination';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -27,7 +26,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { TableHeadCustom, TableNoData } from 'src/components/table';
+import { TableHeadCustom, TableNoData, TablePaginationCustom } from 'src/components/table';
 import { ModuleLoading } from 'src/components/loading-screen';
 
 import { DashboardStatCard } from 'src/sections/dashboard/dashboard-stat-card';
@@ -47,8 +46,6 @@ import { useAdminAllegations } from '../use-admin-allegations';
 import { ReallocateShiftDialog } from '../reallocate-shift-dialog';
 
 // ----------------------------------------------------------------------
-
-const PAGE_SIZE = 10;
 
 const ALLEGATION_TABLE_HEAD = [
   { id: 'worker', label: 'Worker' },
@@ -84,6 +81,7 @@ function apiMessage(error, fallback) {
 
 export function AdminAllegationsView() {
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState('');
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -108,7 +106,8 @@ export function AdminAllegationsView() {
 
   const {
     allegations,
-    total,
+    hasTotal,
+    serverTotal,
     isLoading,
     isError,
     error,
@@ -123,13 +122,24 @@ export function AdminAllegationsView() {
     loadingReplacements,
   } = useAdminAllegations({
     page,
-    limit: PAGE_SIZE,
+    limit: rowsPerPage,
     status: statusFilter,
     keyword,
     type: screen,
   });
 
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const clientPaged = allegations.length > rowsPerPage;
+  const visibleAllegations = clientPaged
+    ? allegations.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+    : allegations;
+  const count = clientPaged
+    ? allegations.length
+    : hasTotal
+      ? serverTotal
+      : allegations.length < rowsPerPage
+        ? page * rowsPerPage + allegations.length
+        : page * rowsPerPage + allegations.length + 1;
+  const pagerCount = Math.max(count, page * rowsPerPage + (visibleAllegations.length || (page > 0 ? 1 : 0)));
 
   const isRaisedScreen = screen === ALLEGATION_FEED.RAISED;
   const screenCard = ALLEGATION_SCREEN_CARDS.find((card) => card.value === screen) || ALLEGATION_SCREEN_CARDS[0];
@@ -325,7 +335,7 @@ export function AdminAllegationsView() {
               <TableBody>
                 {isRaisedScreen
                   ? null
-                  : allegations.map((row) => (
+                  : visibleAllegations.map((row) => (
                       <TableRow key={row.id} hover>
                         <TableCell>
                           <Typography variant="subtitle2">{row.workerName}</Typography>
@@ -342,7 +352,7 @@ export function AdminAllegationsView() {
                       </TableRow>
                     ))}
                 {isRaisedScreen
-                  ? allegations.map((row) => {
+                  ? visibleAllegations.map((row) => {
                   const shiftsToAction = (row.affectedShifts || []).filter(
                     (shift) => shift.status === SHIFT_ACTION_STATUS.NEEDS_REALLOCATION
                   ).length;
@@ -400,24 +410,26 @@ export function AdminAllegationsView() {
                 })
                   : null}
 
-                <TableNoData notFound={!allegations.length} />
+                <TableNoData notFound={!visibleAllegations.length} />
               </TableBody>
             </Table>
           </Scrollbar>
         )}
 
-        {pageCount > 1 ? (
-          <Pagination
-            page={page + 1}
-            count={pageCount}
-            shape="circular"
-            onChange={(_event, nextPage) => {
-              setPage(nextPage - 1);
-              setSelectedAllegationId('');
-            }}
-            sx={{ py: 2, display: 'flex', justifyContent: 'center' }}
-          />
-        ) : null}
+        <TablePaginationCustom
+          count={pagerCount}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_, nextPage) => {
+            setPage(nextPage);
+            setSelectedAllegationId('');
+          }}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(Number(event.target.value));
+            setPage(0);
+            setSelectedAllegationId('');
+          }}
+        />
       </Card>
 
       {isRaisedScreen && selectedAllegation ? (

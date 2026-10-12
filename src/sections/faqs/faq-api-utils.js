@@ -22,8 +22,7 @@ export const FAQ_ROUTE_KEYS_BY_ACCOUNT = {
 };
 
 export function resolveFaqAccountKey(user) {
-  const accountType =
-    user?.accountState?.accountType || user?.accountType || user?.userType || '';
+  const accountType = user?.accountState?.accountType || user?.accountType || user?.userType || '';
   const permission = Number(user?.permission);
 
   if (FAQ_ROUTE_KEYS_BY_ACCOUNT[accountType]) return accountType;
@@ -59,9 +58,7 @@ export function mapFaqFromApi(item, index = 0) {
 export function resolveFaqApiType(type = '') {
   const raw = String(type || '').trim();
   if (!raw) return '';
-  const match = AUTH_PUBLIC_LOGIN_ROLE_OPTIONS.find(
-    (option) => option.apiUserType === raw || option.value === raw
-  );
+  const match = AUTH_PUBLIC_LOGIN_ROLE_OPTIONS.find((option) => option.apiUserType === raw || option.value === raw);
   return match?.apiUserType || raw;
 }
 
@@ -88,13 +85,19 @@ export function normalizeFaqsResponse(response) {
             ? raw.data
             : [];
 
-  const data = list
-    .map(mapFaqFromApi)
-    .filter((item) => item && item.id && item.status !== 'deleted' && item.status !== 'delete');
+  const data = list.map(mapFaqFromApi).filter((item) => item && item.id && item.status !== 'deleted' && item.status !== 'delete');
+
+  const metaSource = response?.meta && typeof response.meta === 'object' ? response.meta : raw && typeof raw === 'object' && !Array.isArray(raw) && raw.meta ? raw.meta : {};
+  const totalRaw = metaSource.totalRecords ?? metaSource.total ?? metaSource.totalCount ?? metaSource.count;
+  const hasTotal = totalRaw !== undefined && totalRaw !== null && totalRaw !== '';
 
   return {
     data,
-    meta: response?.meta || {},
+    meta: {
+      ...metaSource,
+      totalRecords: hasTotal ? Number(totalRaw) || 0 : null,
+      hasTotal,
+    },
     message: response?.message || '',
   };
 }

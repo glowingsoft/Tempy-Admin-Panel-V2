@@ -1,8 +1,3 @@
-/**
- * Reset role RTK Query caches + shared browser seeds when the active account changes.
- * Prevents a new customer/supplier (or impersonation target) from inheriting another
- * account's lists from the same SPA session / browser storage.
- */
 
 import { supplierRelationshipsApi } from './Reducer/supplier-relationships-api';
 import { agencyAvailabilityApi } from './Reducer/agency-availability-api';
@@ -10,6 +5,8 @@ import { agencyBidsApi } from './Reducer/agency-bids-api';
 import { agencyBranchesApi } from './Reducer/agency-branches-api';
 import { agencyDashboardApi } from './Reducer/agency-dashboard-api';
 import { earningsApi } from './Reducer/earnings-api';
+import { bookingPaymentsApi } from './Reducer/booking-payments-api';
+import { adminTransactionsApi } from './Reducer/admin-transactions-api';
 import { sidebarCountsApi } from './Reducer/sidebar-counts-api';
 import { agencyJobsApi } from './Reducer/agency-jobs-api';
 import { agencyStaffApi } from './Reducer/agency-staff-api';
@@ -57,6 +54,8 @@ const ROLE_APIS = [
   agencyDashboardApi,
   agencyJobsApi,
   earningsApi,
+  bookingPaymentsApi,
+  adminTransactionsApi,
   sidebarCountsApi,
   agencyStaffApi,
   careHomeBranchesApi,
@@ -96,7 +95,6 @@ const ROLE_APIS = [
   gocardlessApi,
 ];
 
-/** Shared localStorage keys that are NOT per-user and can seed another account's UI. */
 const CROSS_USER_LOCAL_KEYS = [
   'agency-bids',
   'care-home-jobs',
@@ -131,7 +129,6 @@ export function clearCrossUserBrowserSeeds() {
       }
     });
   } catch {
-    // ignore
   }
 
   try {
@@ -146,7 +143,6 @@ export function clearCrossUserBrowserSeeds() {
       }
     });
   } catch {
-    // ignore
   }
 }
 
@@ -157,12 +153,10 @@ export function resetRoleApiCaches(dispatch) {
     try {
       dispatch(api.util.resetApiState());
     } catch {
-      // ignore
     }
   });
 }
 
-/** Full wipe used when switching accounts (login / logout / impersonation). */
 export function resetAccountScopedState(dispatch) {
   resetRoleApiCaches(dispatch);
   clearCrossUserBrowserSeeds();

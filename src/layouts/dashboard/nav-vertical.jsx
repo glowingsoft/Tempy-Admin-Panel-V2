@@ -34,8 +34,17 @@ export function NavVertical({ sx, data, logoHref = '/', slots, isNavMini, layout
   const renderNavMini = (
     <>
       {slots?.topArea ?? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2.5 }}>
-          <Logo href={logoHref} />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2.5, px: 1 }}>
+          <Logo
+            href={logoHref}
+            width={40}
+            height={40}
+            sx={{
+              width: 40,
+              height: 40,
+              '& img': { width: 40, height: 40, maxWidth: 40, objectFit: 'contain' },
+            }}
+          />
         </Box>
       )}
 

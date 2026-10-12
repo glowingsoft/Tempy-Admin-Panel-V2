@@ -6,25 +6,23 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import CircularProgress from '@mui/material/CircularProgress';
-import InputAdornment from '@mui/material/InputAdornment';
 import { alpha } from '@mui/material/styles';
+
+import { StandaloneAddressInput } from 'src/sections/tempy-home/standalone-address-input';
 
 import { Iconify } from 'src/components/iconify';
 
 import { resolveCurrentLocation } from './staff-member-location';
 
-// ----------------------------------------------------------------------
 
-const PHOTO_PREVIEW_H = 240;
+export const PHOTO_PREVIEW_H = 110;
+export const SIGNATURE_H = 80;
 
-/** Paint the canvas white, so the saved PNG is black ink on white rather than transparent. */
 function fillWhite(canvas) {
   const ctx = canvas?.getContext('2d');
   if (!ctx) return;
@@ -34,7 +32,7 @@ function fillWhite(canvas) {
   ctx.restore();
 }
 
-export function SignaturePad({ onChange }) {
+export function SignaturePad({ onChange, height = 240 }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
   const [hasInk, setHasInk] = useState(false);
@@ -121,7 +119,7 @@ export function SignaturePad({ onChange }) {
           onTouchStart={startDraw}
           onTouchMove={moveDraw}
           onTouchEnd={endDraw}
-          style={{ display: 'block', width: '100%', height: 240, cursor: 'crosshair' }}
+          style={{ display: 'block', width: '100%', height, cursor: 'crosshair' }}
         />
       </Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
@@ -133,7 +131,7 @@ export function SignaturePad({ onChange }) {
   );
 }
 
-function LocationField({ value, onChange, loading, onDetect }) {
+function LocationField({ value, onChange, onPlaceSelect, loading, onDetect }) {
   return (
     <Box>
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
@@ -142,37 +140,15 @@ function LocationField({ value, onChange, loading, onDetect }) {
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         Enter your location, or detect via GPS.
       </Typography>
-      <TextField
-        fullWidth
-        multiline
-        minRows={2}
-        maxRows={4}
+      <StandaloneAddressInput
+        value={value}
+        onChange={onChange}
+        onPlaceSelect={onPlaceSelect}
+        label=""
         size="small"
         placeholder="Enter current location address…"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 1,
-                  display: 'grid',
-                  placeItems: 'center',
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-                  color: 'primary.main',
-                }}
-              >
-                {loading ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : (
-                  <Iconify icon="solar:map-point-bold" width={18} />
-                )}
-              </Box>
-            </InputAdornment>
-          ),
+        sx={{
+          '& .MuiInputAdornment-root': { alignSelf: 'center', mt: 0 },
         }}
       />
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
@@ -190,7 +166,6 @@ function LocationField({ value, onChange, loading, onDetect }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode = 'checkin' }) {
   const isCheckout = mode === 'checkout';
@@ -240,7 +215,6 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
   };
 
   const trimmedLocation = locationLabel.trim();
-  // Check-in needs photo + signature + location; check-out only needs the location.
   const hasProof = Boolean(photoPreview) && Boolean(signatureDataUrl);
   const canSubmit = (isCheckout || hasProof) && Boolean(trimmedLocation) && !locating;
 
@@ -365,13 +339,29 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Add your signature here…
             </Typography>
-            <SignaturePad onChange={setSignatureDataUrl} />
+            <SignaturePad onChange={setSignatureDataUrl} height={SIGNATURE_H} />
           </Box>
 
           <LocationField
             value={locationLabel}
             onChange={(next) => {
               setLocationLabel(next);
+              setLocationMeta((current) =>
+                current?.label === next
+                  ? current
+                  : { label: next, lat: null, lng: null, source: 'manual' }
+              );
+            }}
+            onPlaceSelect={(place) => {
+              const label = place?.label || '';
+              setLocationLabel(label);
+              setLocationMeta({
+                label,
+                lat: place?.latitude ?? null,
+                lng: place?.longitude ?? null,
+                source: 'places',
+                capturedAt: new Date().toISOString(),
+              });
             }}
             loading={locating}
             onDetect={detectLocation}

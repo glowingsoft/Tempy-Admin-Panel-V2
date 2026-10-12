@@ -6,7 +6,7 @@ export const navDataCareHome = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.staff.root, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.messages, icon: NAV_ICONS.chat },
@@ -25,7 +25,6 @@ export const navDataCareHome = [
       { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.permanentHires, icon: NAV_ICONS.user },
       { title: 'Compliance', path: paths.dashboard.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.payments, icon: NAV_ICONS.banking },
-      { title: 'Invoices', path: paths.dashboard.invoice.root, icon: NAV_ICONS.invoice },
       {
         title: 'Help & Info',
         path: paths.dashboard.faqs,

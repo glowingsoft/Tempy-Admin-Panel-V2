@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { format, subMonths, endOfMonth, startOfWeek, startOfMonth } from 'date-fns';
 
 import { useTheme } from '@mui/material/styles';
@@ -22,6 +23,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { fNumber, fCurrency } from 'src/utils/format-number';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 import { useGetEarningsQuery, useLazyGetEarningsQuery } from 'src/store/Reducer/earnings-api';
 
@@ -39,9 +41,14 @@ import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-stat
 import { PAYMENT_STATUSES } from '../earnings-api-utils';
 import { exportEarningsReport, printEarningsReport } from '../earnings-actions';
 
-// ----------------------------------------------------------------------
 
 const CUSTOMER_ROLES = ['care-home', 'hospital', 'local-authority', 'user'];
+
+const EARNINGS_API_ROLE = {
+  agency: 'agency',
+  homeCareCompany: 'home-care-company',
+  nurse: 'nurse',
+};
 
 const PERIOD_OPTIONS = [
   { id: 'week', label: 'This week' },
@@ -60,7 +67,6 @@ const STATUS_META = {
 
 const EXPORT_LIMIT = 1000;
 
-/** This week / this month run up to today, so the API's "previous" range is the same length. */
 function periodRange(periodId, today = new Date()) {
   if (periodId === 'month') return { from: startOfMonth(today), to: today };
   if (periodId === 'lastMonth') {
@@ -83,11 +89,17 @@ function plural(count, word) {
   return `${fNumber(count)} ${word}${count === 1 ? '' : 's'}`;
 }
 
-// ----------------------------------------------------------------------
+function moneyLabel(block) {
+  if (block?.formatted) return block.formatted;
+  return fCurrency(block?.amount || 0);
+}
+
 
 export function AgencyEarningsView({ role = 'agency' }) {
   const theme = useTheme();
   const userId = useScopedUserId();
+  const sessionUser = useSelector((state) => state.user?.user);
+  const apiRole = EARNINGS_API_ROLE[resolveDashboardRole(sessionUser)] || role;
 
   const [periodId, setPeriodId] = useState('week');
   const [workerFilter, setWorkerFilter] = useState(null);
@@ -104,7 +116,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
   }, [periodId]);
 
   const filterArgs = {
-    role,
+    role: apiRole,
     userId,
     ...range,
     workerId: workerFilter?.id,
@@ -117,30 +129,30 @@ export function AgencyEarningsView({ role = 'agency' }) {
   );
   const [fetchAllEarnings, { isFetching: isExporting }] = useLazyGetEarningsQuery();
 
-  const isSpend = data ? data.type === 'spend' : CUSTOMER_ROLES.includes(role);
-  const isNurse = role === 'nurse';
+  const isSpend = data ? data.type === 'spend' : CUSTOMER_ROLES.includes(apiRole);
+  const isNurse = apiRole === 'nurse';
 
   const labels = isSpend
     ? {
-        title: 'Spending',
-        description: 'The accepted bid charged when the booking is created (GBP £), before the platform fee.',
-        total: 'Total spent',
-        paid: 'Paid',
-        shifts: 'Shifts booked',
-        series: 'Spent',
-        person: 'Staff',
-      }
+      title: 'Spending',
+      description: 'The accepted bid charged when the booking is created (GBP £), before the platform fee.',
+      total: 'Total spent',
+      paid: 'Paid',
+      shifts: 'Shifts booked',
+      series: 'Spent',
+      person: 'Staff',
+    }
     : {
-        title: 'Earnings',
-        description: isNurse
-          ? 'Pay for shifts you won directly. Shifts through an agency or home care company are counted only; that employer is paid.'
-          : 'What you are owed after the platform fee, once the shift is completed and the customer payment has been paid out.',
-        total: 'Total earned',
-        paid: 'Paid out',
-        shifts: 'Shifts billed',
-        series: 'Earned',
-        person: isNurse ? 'Client' : 'Staff',
-      };
+      title: 'Earnings',
+      description: isNurse
+        ? 'Pay for shifts you won directly. Shifts through an agency or home care company are counted only; that employer is paid.'
+        : 'What you are owed after the platform fee, once the shift is completed and the customer payment has been paid out.',
+      total: 'Total earned',
+      paid: 'Paid out',
+      shifts: 'Shifts billed',
+      series: 'Earned',
+      person: isNurse ? 'Client' : 'Staff',
+    };
 
   const summary = data?.summary;
   const previous = data?.previous;
@@ -149,7 +161,6 @@ export function AgencyEarningsView({ role = 'agency' }) {
   const topWorkers = data?.topWorkers;
   const categories = daily?.categories || [];
 
-  // A nurse's rows are their own shifts, so show who the shift was for instead.
   const personOf = (row) =>
     isNurse
       ? { name: row.customerName, caption: row.jobName }
@@ -164,11 +175,16 @@ export function AgencyEarningsView({ role = 'agency' }) {
     { id: 'status', label: 'Status' },
   ];
 
-  // Show every day on a week; thin the labels out on a month so they don't collide.
   const labelStep = categories.length > 10 ? Math.ceil(categories.length / 8) : 1;
 
+  const trendSeries = [
+    { name: 'Earned', data: daily?.earned || [] },
+    { name: 'Paid', data: daily?.paid || [] },
+    { name: 'Pending', data: daily?.pending || [] },
+  ].filter((item) => item.data.length);
+
   const chartOptions = useChart({
-    colors: [theme.palette.primary.main],
+    colors: [theme.palette.primary.main, theme.palette.success.main, theme.palette.warning.main],
     stroke: { width: 2, curve: 'straight' },
     xaxis: {
       categories,
@@ -259,38 +275,39 @@ export function AgencyEarningsView({ role = 'agency' }) {
     }
   };
 
+  const snapshotCards = !isSpend
+    ? [
+      { key: 'total', title: 'Total earned', block: data?.snapshots?.total },
+      { key: 'upcoming', title: 'Upcoming', block: data?.snapshots?.upcoming },
+      { key: 'thisWeek', title: 'This week', block: data?.snapshots?.thisWeek },
+      { key: 'thisMonth', title: 'This month', block: data?.snapshots?.thisMonth },
+    ].filter((card) => card.block)
+    : [];
+
   const statCards = summary
     ? [
-        {
-          title: labels.total,
-          total: summary.total.amount,
-          percent: percentChange(summary.total.amount, previous?.total.amount),
-          color: theme.palette.primary.main,
-          series: daily?.earned,
-        },
-        {
-          title: labels.paid,
-          total: summary.paid.amount,
-          percent: percentChange(summary.paid.amount, previous?.paid.amount),
-          color: theme.palette.success.main,
-          series: daily?.paid,
-        },
-        {
-          title: 'Pending',
-          total: summary.pending.amount,
-          percent: percentChange(summary.pending.amount, previous?.pending.amount),
-          color: theme.palette.warning.main,
-          series: daily?.pending,
-        },
-        {
-          title: labels.shifts,
-          total: summary.total.bookings,
-          percent: percentChange(summary.total.bookings, previous?.total.bookings),
-          color: theme.palette.info.main,
-          series: daily?.bookings,
-          isCount: true,
-        },
-      ]
+      {
+        title: labels.total,
+        total: summary.total.amount,
+        percent: percentChange(summary.total.amount, previous?.total.amount),
+      },
+      {
+        title: labels.paid,
+        total: summary.paid.amount,
+        percent: percentChange(summary.paid.amount, previous?.paid.amount),
+      },
+      {
+        title: 'Pending',
+        total: summary.pending.amount,
+        percent: percentChange(summary.pending.amount, previous?.pending.amount),
+      },
+      {
+        title: labels.shifts,
+        total: summary.total.bookings,
+        percent: percentChange(summary.total.bookings, previous?.total.bookings),
+        isCount: true,
+      },
+    ]
     : [];
 
   const renderTrend = (
@@ -299,7 +316,9 @@ export function AgencyEarningsView({ role = 'agency' }) {
         <Box>
           <Typography variant="h6">{labels.title} trend</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Daily {labels.series.toLowerCase()} on completed shifts, {period.label.toLowerCase()}
+            {daily?.from && daily?.to
+              ? `${daily.from} to ${daily.to}`
+              : `Daily totals, ${period.label.toLowerCase()}`}
           </Typography>
         </Box>
         <Chip
@@ -309,13 +328,8 @@ export function AgencyEarningsView({ role = 'agency' }) {
           label={`${fCurrency(summary?.total.amount || 0)} total`}
         />
       </Stack>
-      {daily?.earned?.some((value) => value > 0) ? (
-        <Chart
-          type="area"
-          series={[{ name: labels.series, data: daily.earned }]}
-          options={chartOptions}
-          height={280}
-        />
+      {trendSeries.length ? (
+        <Chart type="area" series={trendSeries} options={chartOptions} height={280} />
       ) : (
         <DashboardEmptyState
           message={`No completed shifts ${period.label.toLowerCase()}`}
@@ -333,10 +347,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
         Completed shifts, {period.label.toLowerCase()}. Tap one to filter the table.
       </Typography>
       <Stack spacing={1.5}>
-        {PAYMENT_STATUSES.filter(
-          // Refunded and failed only appear once there's something in them.
-          (status) => !['refunded', 'failed'].includes(status) || summary?.[status]?.bookings > 0
-        ).map((status) => {
+        {PAYMENT_STATUSES.map((status) => {
           const meta = STATUS_META[status];
           const block = summary?.[status] || { amount: 0, bookings: 0 };
           const isActive = statusFilter === status;
@@ -378,7 +389,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
                   {plural(block.bookings, 'shift')}
                 </Typography>
               </Box>
-              <Typography variant="subtitle2">{fCurrency(block.amount)}</Typography>
+              <Typography variant="subtitle2">{moneyLabel(block)}</Typography>
             </Stack>
           );
         })}
@@ -403,8 +414,8 @@ export function AgencyEarningsView({ role = 'agency' }) {
 
       {data?.agencySupplied && (
         <Alert severity="info" variant="outlined" sx={{ mt: 2.5 }}>
-          {plural(data.agencySupplied.bookings, 'shift')} ({fNumber(data.agencySupplied.hours)}h)
-          worked through your agency are paid by them and not included here.
+          Agency supplied: {plural(data.agencySupplied.bookings, 'shift')} · {fNumber(data.agencySupplied.hours)}h
+          {isNurse ? '. Those shifts are paid to the employer.' : '.'}
         </Alert>
       )}
     </Card>
@@ -694,6 +705,27 @@ export function AgencyEarningsView({ role = 'agency' }) {
         <ModuleLoading />
       ) : (
         <Grid container spacing={3}>
+          {snapshotCards.map((card) => (
+            <Grid key={card.key} xs={12} sm={6} md={3}>
+              <Card sx={{ p: 3, height: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                  {card.title}
+                </Typography>
+                {card.block.period ? (
+                  <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
+                    {card.block.period}
+                  </Typography>
+                ) : null}
+                <Typography variant="h4" sx={{ mt: 1 }}>
+                  {moneyLabel(card.block)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {plural(card.block.bookings, 'shift')} · {fNumber(card.block.hours)}h
+                </Typography>
+              </Card>
+            </Grid>
+          ))}
+
           {statCards.map((card) => (
             <Grid key={card.title} xs={12} sm={6} md={3}>
               <AppWidgetSummary
@@ -702,7 +734,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
                 total={card.total}
                 formatTotal={card.isCount ? fNumber : fCurrency}
                 trendLabel="vs previous period"
-                chart={{ colors: [card.color], categories, series: card.series || [] }}
+                chart={{ series: [] }}
                 sx={{ height: 1 }}
               />
             </Grid>

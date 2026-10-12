@@ -367,6 +367,7 @@ export const paths = {
     orgProfile: (kind, id) => `${ROOTS.ADMIN_DASHBOARD}/${kind}/${id}`,
     jobTypes: `${ROOTS.ADMIN_DASHBOARD}/job-types`,
     transactions: `${ROOTS.ADMIN_DASHBOARD}/transactions`,
+    payouts: `${ROOTS.ADMIN_DASHBOARD}/payouts`,
     recruitment: `${ROOTS.ADMIN_DASHBOARD}/recruitment`,
     allegations: `${ROOTS.ADMIN_DASHBOARD}/allegations`,
     mail: `${ROOTS.ADMIN_DASHBOARD}/mail`,

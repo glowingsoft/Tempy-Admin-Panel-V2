@@ -127,10 +127,18 @@ export const dashboardSettingsApi = createApi({
       },
     }),
 
-    /** Admin — GET /admin/permanent-hires/settings → { minShifts, fee } */
+    /** Admin — GET /admin/permanent-hires/settings → { minShifts, weeklyHoursLimit, fee } */
     getAdminTempToPermSettings: builder.query({
       query: () => ({ url: API_ROUTES.PERMANENT_HIRE_SETTINGS('/admin'), method: 'GET' }),
-      transformResponse: (response) => response?.data || {},
+      transformResponse: (response) => {
+        const data = response?.data || {};
+        return {
+          ...data,
+          id: data._id || data.id || '',
+          minShifts: data.minShifts ?? data.temp_to_perm_min_shifts,
+          weeklyHoursLimit: data.weeklyHoursLimit ?? data.weekly_hours_limit,
+        };
+      },
       providesTags: ['TempToPerm'],
     }),
 
@@ -165,12 +173,15 @@ export const dashboardSettingsApi = createApi({
       invalidatesTags: ['AdminPermanentHire'],
     }),
 
-    /** Admin — PUT /admin/settings/update/:id { temp_to_perm_min_shifts } */
+    /** Admin — PUT /admin/settings/update/:id { temp_to_perm_min_shifts, weekly_hours_limit } */
     updateAdminTempToPermSettings: builder.mutation({
-      query: ({ id, minShifts }) => ({
+      query: ({ id, minShifts, weeklyHoursLimit }) => ({
         url: API_ROUTES.ADMIN_SETTINGS_UPDATE_BY_ID(id),
         method: 'PUT',
-        body: { temp_to_perm_min_shifts: minShifts },
+        body: {
+          temp_to_perm_min_shifts: minShifts,
+          weekly_hours_limit: weeklyHoursLimit,
+        },
       }),
       invalidatesTags: ['TempToPerm'],
     }),

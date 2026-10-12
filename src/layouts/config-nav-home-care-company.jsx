@@ -6,7 +6,7 @@ export const navDataHomeCareCompany = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.homeCareCompany.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.homeCareCompany.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.homeCareCompany.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.homeCareCompany.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.homeCareCompany.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.homeCareCompany.messages, icon: NAV_ICONS.chat },
@@ -16,16 +16,6 @@ export const navDataHomeCareCompany = [
       { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.homeCareCompany.agreedRates, icon: NAV_ICONS.contract },
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.homeCareCompany.contracts, icon: NAV_ICONS.contract },
       { title: 'Earnings', path: paths.dashboard.homeCareCompany.earnings, icon: NAV_ICONS.analytics },
-      {
-        title: 'Invoices',
-        path: paths.dashboard.homeCareCompany.invoices,
-        icon: NAV_ICONS.invoice,
-        deep: true,
-        children: [
-          { title: 'List', path: paths.dashboard.homeCareCompany.invoices },
-          { title: 'Create', path: `${paths.dashboard.homeCareCompany.invoices}/new` },
-        ],
-      },
       {
         title: 'Help & Info',
         path: paths.dashboard.homeCareCompany.faqs,

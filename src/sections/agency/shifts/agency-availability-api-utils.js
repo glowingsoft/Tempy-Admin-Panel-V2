@@ -583,7 +583,7 @@ export function mapAgencyBranchesToLocations(branches = []) {
       const coords = getBranchCoordinates(branch);
       return {
         id: String(branch.id || branch._id || ''),
-        label: branch.name || branch.branchName || 'Branch',
+        label: branch.name || branch.branchName || 'Location',
         address: branch.location?.fullAddress || '',
         latitude: coords[1],
         longitude: coords[0],

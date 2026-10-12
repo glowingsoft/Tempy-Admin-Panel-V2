@@ -16,7 +16,7 @@ export function RHFPhoneInput({ name, helperText, ...other }) {
           {...field}
           fullWidth
           value={field.value}
-          onChange={(newValue) => setValue(name, newValue, { shouldValidate: true })}
+          onChange={(newValue) => setValue(name, newValue || '', { shouldValidate: true })}
           error={!!error}
           helperText={error ? error?.message : helperText}
           {...other}

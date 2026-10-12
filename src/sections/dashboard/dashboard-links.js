@@ -186,14 +186,21 @@ export const DASHBOARD_LINK_MAPS = {
   },
 
   admin: {
-    // Only real admin-dashboard routes. Users/jobs/bookings are platform-wide
-    // mixes, so those cards stay unlinked instead of opening mock template pages.
-    stats: {},
+    stats: {
+      'active jobs': admin.jobTypes,
+    },
     extraStats: {
       'active agencies': admin.agencies,
       'active home care companies': admin.homeCareCompanies,
+      'total jobs': admin.jobTypes,
+      'total bookings': admin.transactions,
+      'permanent hires': admin.recruitment,
+      'open allegations': admin.allegations,
     },
     breakdowns: {
+      users: admin.careHomes,
+      jobs: admin.jobTypes,
+      bookings: admin.transactions,
       staff: admin.staffMembers,
     },
     userTypes: {

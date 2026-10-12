@@ -129,8 +129,10 @@ export function getAgencyUserLatLng(user) {
 }
 
 export function formatDistanceAway(km) {
-  if (km == null || Number.isNaN(km)) return '';
-  return `${Number(km).toFixed(1)} km away`;
+  const num = Number(km);
+  if (km == null || km === '' || Number.isNaN(num)) return '';
+  const text = Number.isInteger(num) ? num.toFixed(1) : String(Math.round(num * 100) / 100);
+  return `${text} km away`;
 }
 
 function isUsablePoint(point) {
@@ -165,14 +167,9 @@ export function getJobDistanceLabel(jobOrApiItem, origin) {
   return formatDistanceAway(getDistanceKm(from, jobPoint));
 }
 
-export function applyJobDistances(jobs = [], origin) {
-  return jobs.map((job) => {
-    const distance = getJobDistanceLabel(job, origin);
-    if (!distance) {
-      return job;
-    }
-    return { ...job, distance };
-  });
+/** Keep the API distance. A missing value stays blank instead of a coordinate estimate. */
+export function applyJobDistances(jobs = []) {
+  return jobs;
 }
 
 
@@ -394,23 +391,10 @@ export function mapShiftTabStatus(apiJobStatus, shiftStatus) {
   return 'new';
 }
 
-function pickDistanceLabel(item = {}, location = {}) {
-  const raw = item.distance ?? item.distanceKm ?? item.distanceInKm ?? item.distance_km ?? item.km ?? item.distanceAway ?? location.distance ?? location.distanceKm ?? location.km;
-
+function pickDistanceLabel(item = {}) {
+  const raw = item?.distanceInKM ?? item?.distanceInKm ?? item?.distanceINKM;
   if (raw == null || raw === '') return '';
-
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) return '';
-    if (/km|mi|away/i.test(trimmed)) return trimmed;
-    const num = Number(trimmed);
-    if (!Number.isNaN(num)) return formatDistanceAway(num);
-    return trimmed;
-  }
-
-  const num = Number(raw);
-  if (Number.isNaN(num)) return '';
-  return formatDistanceAway(num);
+  return formatDistanceAway(raw);
 }
 
 function pickHourlyRate(item = {}, primaryShift = null) {
@@ -490,7 +474,7 @@ export function resolveSupplierBookingAction(bookingId, bookingStatus) {
   return 'assigned';
 }
 
-export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
+export function mapAgencyJobFromApi(item = {}) {
   const id = String(item._id || item.id || '');
   const location = item.location || {};
   const jobPoint = extractLatLng(item, { allowZero: true }) || { latitude: null, longitude: null };
@@ -521,18 +505,7 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
   const rating = pickNumber(item.averageRating, ratingObj?.averageRating, user.averageRating, typeof item.rating === 'number' ? item.rating : null);
   const reviewCount = pickNumber(item.totalReviews, ratingObj?.totalReviews, user.totalReviews, item.reviewCount, item.reviewsCount);
 
-  let distance = pickDistanceLabel(item, location);
-  if (!distance) {
-    distance = getJobDistanceLabel(
-      {
-        location,
-        latitude: jobPoint.latitude,
-        longitude: jobPoint.longitude,
-        branch,
-      },
-      origin || null
-    );
-  }
+  const distance = pickDistanceLabel(item);
 
   const bookingId = String(
     refId(item.myBooking) ||

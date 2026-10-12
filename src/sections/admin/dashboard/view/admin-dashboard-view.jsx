@@ -85,11 +85,18 @@ const MODULES = [
     href: paths.adminDashboard.recruitment,
   },
   {
-    title: 'Payouts',
-    description: 'Payments · History',
-    icon: 'solar:wallet-money-bold-duotone',
+    title: 'Transactions',
+    description: 'Customer payments',
+    icon: 'solar:card-transfer-bold-duotone',
     color: 'success',
     href: paths.adminDashboard.transactions,
+  },
+  {
+    title: 'Payouts',
+    description: 'Supplier bank transfers',
+    icon: 'solar:wallet-money-bold-duotone',
+    color: 'info',
+    href: paths.adminDashboard.payouts,
   },
   {
     title: 'Support',
@@ -108,6 +115,10 @@ const EMPTY_DASHBOARD = {
   jobStatus: [],
   customerSupplier: [],
   bidsStatus: [],
+  bidsTotal: 0,
+  permanentHires: { total: 0, series: [] },
+  allegations: { total: 0, series: [] },
+  allegationFeeds: { total: 0, series: [] },
   monthlyActivity: { categories: [], series: [] },
   growthChart: { categories: [], series: [] },
   regionalFillRates: { categories: [], series: [] },
@@ -121,7 +132,6 @@ const EMPTY_DASHBOARD = {
   topPerformers: [],
   recentActivity: [],
   moneyByOrg: [],
-  rateMix: [],
 };
 
 export function AdminDashboardView() {
@@ -207,8 +217,22 @@ export function AdminDashboardView() {
           </Grid>
 
           <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <AppCurrentDownload
+              title="Customers & suppliers"
+              subheader="Registered accounts"
+              emptyMessage="No customer or supplier totals yet"
+              sx={{ minHeight: 360 }}
+              chart={{
+                colors: [theme.palette.primary.main, theme.palette.info.main],
+                series: dashboard.customerSupplier,
+              }}
+            />
+          </Grid>
+
+          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AnalyticsCurrentVisits
               title="Bids by status"
+              subheader={`${dashboard.bidsTotal} bids in total`}
               emptyMessage="No bid data yet"
               sx={{ height: 1, minHeight: 360 }}
               chart={{
@@ -227,7 +251,7 @@ export function AdminDashboardView() {
             <AdminUsersByType list={dashboard.usersByType} />
           </Grid>
 
-          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardOverviewChart
               title="Platform activity"
               subheader="Jobs, bids & filled shifts over the last 12 months"
@@ -243,6 +267,36 @@ export function AdminDashboardView() {
               emptyMessage="No regional heat map data yet"
               chart={dashboard.heatMapChart}
               sx={{ height: { md: 480 }, minHeight: { md: 480 } }}
+            />
+          </Grid>
+
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardStatusBreakdown
+              title="Permanent hires"
+              series={dashboard.permanentHires.series}
+              total={dashboard.permanentHires.total}
+              color="success"
+              href={paths.adminDashboard.recruitment}
+            />
+          </Grid>
+
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardStatusBreakdown
+              title="Allegations"
+              series={dashboard.allegations.series}
+              total={dashboard.allegations.total}
+              color="error"
+              href={paths.adminDashboard.allegations}
+            />
+          </Grid>
+
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardStatusBreakdown
+              title="Allegation sources"
+              series={dashboard.allegationFeeds.series}
+              total={dashboard.allegationFeeds.total}
+              color="warning"
+              href={paths.adminDashboard.allegations}
             />
           </Grid>
 
@@ -275,7 +329,7 @@ export function AdminDashboardView() {
           <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AdminFinanceByOrg
               list={dashboard.moneyByOrg}
-              subheader="Static sample until payment totals are on the dashboard API"
+              subheader="Spend and earnings by user type"
             />
           </Grid>
 

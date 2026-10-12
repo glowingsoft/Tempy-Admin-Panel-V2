@@ -555,6 +555,33 @@ export function buildJobScheduleTimeOptions(stepMinutes = 15) {
 
 export const JOB_SCHEDULE_TIME_OPTIONS = buildJobScheduleTimeOptions(15);
 
+/** Minutes between start and end on the same day. Null when the range is missing or invalid. */
+export function getScheduleDurationMinutes(startTime, endTime) {
+  const start = String(startTime || '').trim();
+  const end = String(endTime || '').trim();
+  const startMatch = /^(\d{1,2}):(\d{2})$/.exec(start);
+  const endMatch = /^(\d{1,2}):(\d{2})$/.exec(end);
+  if (!startMatch || !endMatch) return null;
+
+  const startMinutes = Number(startMatch[1]) * 60 + Number(startMatch[2]);
+  const endMinutes = Number(endMatch[1]) * 60 + Number(endMatch[2]);
+  if (endMinutes <= startMinutes) return null;
+  return endMinutes - startMinutes;
+}
+
+/** Break must be shorter than the shift. Returns an error message, or ''. */
+export function getScheduleBreakError(entry) {
+  if (!entry || entry.breakIncluded === false) return '';
+  const duration = getScheduleDurationMinutes(entry.startTime, entry.endTime);
+  if (duration == null) return '';
+  const breakMins = Number(entry.breakMins);
+  if (!Number.isFinite(breakMins) || breakMins < 0) return 'Enter a valid break length';
+  if (breakMins > duration) {
+    return `Break cannot be longer than the shift (${duration} min)`;
+  }
+  return '';
+}
+
 /** Ensure a free-typed HH:mm still appears in the select list. */
 export function withJobScheduleTimeOption(options = JOB_SCHEDULE_TIME_OPTIONS, timeValue = '') {
   const value = String(timeValue || '').trim();
@@ -587,6 +614,43 @@ export function normalizeSchedule(entry, fallback = {}) {
     breakMins: breakIncluded ? Number(entry?.breakMins ?? fallback.breakMins ?? 30) : 0,
     receivingBids: Boolean(receivingBids),
   };
+}
+
+export const JOB_CONTACT_FIELDS = [
+  'contactName',
+  'contactPhone',
+  'contactEmail',
+  'emergencyName',
+  'emergencyPhone',
+  'emergencyRelation',
+];
+
+/** Contact and emergency fields from a saved job, or null when none were set. */
+export function pickJobContactDetails(job) {
+  if (!job) return null;
+
+  const contact = {};
+  let hasAny = false;
+  JOB_CONTACT_FIELDS.forEach((field) => {
+    const value = String(job[field] || '').trim();
+    contact[field] = value;
+    if (value) hasAny = true;
+  });
+
+  return hasAny ? contact : null;
+}
+
+/** Fill only contact fields the draft has not already set. */
+export function mergeEmptyJobContact(draft, contact) {
+  if (!contact) return draft;
+
+  const next = { ...draft };
+  JOB_CONTACT_FIELDS.forEach((field) => {
+    if (!String(next[field] || '').trim() && String(contact[field] || '').trim()) {
+      next[field] = contact[field];
+    }
+  });
+  return next;
 }
 
 export const EMPTY_JOB_DRAFT = {
@@ -856,6 +920,9 @@ export function validateJobDraft(draft, now = new Date()) {
     if (endBeforeStart) return 'End time cannot be earlier than start time';
   }
 
+  const longBreak = draft.schedules.find((entry) => getScheduleBreakError(entry));
+  if (longBreak) return getScheduleBreakError(longBreak);
+
   const rateText = String(draft.hourlyRate ?? '').trim();
   if (draft.id && rateText && !(Number(rateText) > 0)) return 'Rate must be above 0';
 
@@ -877,13 +944,17 @@ function carePhoneError(value, label) {
 }
 
 export function validateCareDetails(draft) {
-  if (!String(draft.careNotes || '').trim()) return 'Please enter care notes';
-  if (!String(draft.instructions || '').trim()) return 'Please enter instructions';
-  if (!String(draft.contactName || '').trim()) return 'Please enter a contact name';
-  const contactPhoneError = carePhoneError(draft.contactPhone, 'contact phone number');
-  if (contactPhoneError) return contactPhoneError;
+  const contactPhone = String(draft.contactPhone || '').trim();
+  if (contactPhone) {
+    const contactPhoneError = carePhoneError(contactPhone, 'contact phone number');
+    if (contactPhoneError) return contactPhoneError;
+  }
+
   const email = String(draft.contactEmail || '').trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid contact email';
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return 'Please enter a valid contact email';
+  }
+
   if (!String(draft.emergencyName || '').trim()) return 'Please enter an emergency contact name';
   const emergencyPhoneError = carePhoneError(draft.emergencyPhone, 'emergency contact phone number');
   if (emergencyPhoneError) return emergencyPhoneError;

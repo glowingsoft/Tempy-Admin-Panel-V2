@@ -71,12 +71,50 @@ export function mapSocialDeviceType() {
   return 'web';
 }
 
+function hasSocialLocation(data) {
+  if (!data || typeof data !== 'object') return false;
+
+  const address = String(data.address || data.fullAddress || '').trim();
+  const city = String(data.city || '').trim();
+  const country = String(data.country || '').trim();
+  const postalCode = String(data.postalCode || '').trim();
+  const coordinates = Array.isArray(data.coordinates) ? data.coordinates : [];
+  const hasCoordinates = coordinates.length === 2 && coordinates.some((value) => Number(value));
+
+  return Boolean(address || city || country || postalCode || hasCoordinates);
+}
+
+/** Same location shape as email registration. Blank [0, 0] is omitted so login does not overwrite a saved address. */
+export function buildSocialAuthLocation(data = {}) {
+  const coordinates =
+    Array.isArray(data.coordinates) && data.coordinates.length === 2
+      ? data.coordinates.map((value) => Number(value) || 0)
+      : [0, 0];
+
+  const location = {
+    type: 'Point',
+    coordinates,
+    fullAddress: String(data.address || data.fullAddress || '').trim(),
+  };
+
+  const city = String(data.city || '').trim();
+  const country = String(data.country || '').trim();
+  const postalCode = String(data.postalCode || '').trim();
+
+  if (city) location.city = city;
+  if (country) location.country = country;
+  if (postalCode) location.postalCode = postalCode;
+
+  return location;
+}
+
 /**
  * Payload for POST /auth/social-auth
- * Body: provider, socialId, name, email, deviceType, userType, deviceId, timezone [, profileIcon]
+ * Body: provider, socialId, name, email, deviceType, userType, location, deviceId, timezone [, profileIcon]
  */
-export function buildSocialAuthPayload({ provider, profile, role, userType }) {
+export function buildSocialAuthPayload({ provider, profile, role, userType, location, purpose }) {
   const resolvedUserType = userType || ROLE_TO_API_USER_TYPE[role] || '';
+  const isLogin = purpose === 'login';
 
   const name =
     profile.name ||
@@ -95,11 +133,17 @@ export function buildSocialAuthPayload({ provider, profile, role, userType }) {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
-  if (resolvedUserType) {
+  // Login must not send another account's userType or a blank map point.
+  // Old Google accounts 500 when those fields are applied on top of their saved record.
+  if (!isLogin && resolvedUserType) {
     payload.userType = resolvedUserType;
   }
 
-  if (profile.profileIcon) {
+  if (!isLogin && hasSocialLocation(location)) {
+    payload.location = buildSocialAuthLocation(location);
+  }
+
+  if (!isLogin && profile.profileIcon) {
     payload.profileIcon = profile.profileIcon;
   }
 

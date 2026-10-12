@@ -285,16 +285,18 @@ export function mapEligibleWorkerFromApi(item = {}) {
 
 /** GET /permanent-hires item → table row */
 export function mapPermanentHireFromApi(item = {}) {
+  const source = item && typeof item === 'object' ? item : {};
+  const status = String(source.status || 'pending').toLowerCase();
   return {
-    id: pickId(item),
-    customer: mapParty(item.customer),
-    supplier: mapParty(item.supplier),
-    worker: mapParty(item.worker),
-    supplierType: item.supplierType || '',
-    shiftsWorked: Number(item.shiftsWorked) || 0,
-    fee: Number(item.fee) || 0,
-    status: item.status || 'pending',
-    createdAt: item.createdAt || '',
-    respondedAt: item.respondedAt || '',
+    id: pickId(source._id || source.id || source.hireId),
+    customer: mapParty(source.customer || source.employer || source.careHome),
+    supplier: mapParty(source.supplier || source.agency),
+    worker: mapParty(source.worker || source.nurse || source.staff),
+    supplierType: source.supplierType || '',
+    shiftsWorked: Number(source.shiftsWorked ?? source.tempShiftsCompleted ?? source.shifts) || 0,
+    fee: Number(source.fee) || 0,
+    status: status === 'permanent_hired' ? 'accepted' : status,
+    createdAt: source.createdAt || '',
+    respondedAt: source.respondedAt || '',
   };
 }

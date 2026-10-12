@@ -27,18 +27,14 @@ import { paths } from 'src/routes/paths';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { TablePaginationCustom } from 'src/components/table';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { Field, Form } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 
 import { handleApiError } from 'src/store/handleApiError';
-import {
-  useCreateFaqMutation,
-  useDeleteFaqMutation,
-  useGetAdminFaqsQuery,
-  useUpdateFaqMutation,
-} from 'src/store/Reducer/faqs-api';
+import { useCreateFaqMutation, useDeleteFaqMutation, useGetAdminFaqsQuery, useUpdateFaqMutation } from 'src/store/Reducer/faqs-api';
 
 import { buildFaqPayload } from 'src/sections/faqs/faq-api-utils';
 import { FAQ_TYPE_OPTIONS, getFaqTypeLabel } from 'src/sections/faqs/faq-store';
@@ -101,21 +97,9 @@ function FaqFormDialog({ open, onClose, onSubmit, currentFaq, submitting = false
               ))}
             </Field.Select>
 
-            <Field.Text
-              name="heading"
-              label="Question"
-              placeholder="Enter the FAQ question"
-              disabled={submitting}
-            />
+            <Field.Text name="heading" label="Question" placeholder="Enter the FAQ question" disabled={submitting} />
 
-            <Field.Text
-              name="detail"
-              label="Answer"
-              placeholder="Write the answer"
-              multiline
-              rows={5}
-              disabled={submitting}
-            />
+            <Field.Text name="detail" label="Answer" placeholder="Write the answer" multiline rows={5} disabled={submitting} />
           </Stack>
         </DialogContent>
 
@@ -143,20 +127,26 @@ export function FaqsView() {
   const [faqToDelete, setFaqToDelete] = useState(null);
   const [faqToEdit, setFaqToEdit] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const {
-    data: faqsData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useGetAdminFaqsQuery({}, { refetchOnMountOrArgChange: true });
+  const { data: faqsData, isLoading, isError, error, refetch } = useGetAdminFaqsQuery({ page: page + 1, limit: rowsPerPage }, { refetchOnMountOrArgChange: true });
 
   const [createFaq] = useCreateFaqMutation();
   const [updateFaq] = useUpdateFaqMutation();
   const [deleteFaq] = useDeleteFaqMutation();
 
-  const faqs = useMemo(() => faqsData?.data || [], [faqsData?.data]);
+  const allFaqs = useMemo(() => faqsData?.data || [], [faqsData?.data]);
+  const clientPaged = allFaqs.length > rowsPerPage;
+  const faqs = useMemo(() => (clientPaged ? allFaqs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) : allFaqs), [allFaqs, clientPaged, page, rowsPerPage]);
+  const totalRecords = faqsData?.meta?.hasTotal ? faqsData.meta.totalRecords : null;
+  const count = clientPaged
+    ? allFaqs.length
+    : totalRecords != null
+      ? totalRecords
+      : allFaqs.length < rowsPerPage
+        ? page * rowsPerPage + allFaqs.length
+        : page * rowsPerPage + allFaqs.length + 1;
 
   useEffect(() => {
     if (!faqs.length) {
@@ -207,12 +197,7 @@ export function FaqsView() {
           toast.success('FAQ updated successfully!');
         } else {
           const created = await createFaq(payload).unwrap();
-          const newId =
-            created?.data?._id ||
-            created?.data?.id ||
-            created?._id ||
-            created?.id ||
-            null;
+          const newId = created?.data?._id || created?.data?.id || created?._id || created?.id || null;
           if (newId) setExpanded(String(newId));
           toast.success('FAQ added successfully!');
         }
@@ -268,12 +253,7 @@ export function FaqsView() {
           heading="FAQs"
           links={[{ name: 'Dashboard', href: paths.adminDashboard.root }, { name: 'FAQs' }]}
           action={
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={handleOpenAdd}
-            >
+            <Button variant="contained" color="primary" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleOpenAdd}>
               Add FAQ
             </Button>
           }
@@ -308,55 +288,27 @@ export function FaqsView() {
             <Stack spacing={2}>
               {faqs.length ? (
                 faqs.map((faq, index) => (
-                  <Accordion
-                    key={faq.id}
-                    expanded={expanded === faq.id}
-                    onChange={handleAccordionChange(faq.id)}
-                  >
+                  <Accordion key={faq.id} expanded={expanded === faq.id} onChange={handleAccordionChange(faq.id)}>
                     <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        spacing={2}
-                        sx={{ width: 1 }}
-                      >
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ width: 1 }}>
                         <Box sx={{ minWidth: 0 }}>
                           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                             <Typography variant="overline" sx={{ color: 'text.disabled' }}>
-                              FAQ {index + 1}
+                              FAQ {page * rowsPerPage + index + 1}
                             </Typography>
-                            <Chip
-                              size="small"
-                              label={getFaqTypeLabel(faq.type)}
-                              color="primary"
-                              variant="soft"
-                            />
+                            <Chip size="small" label={getFaqTypeLabel(faq.type)} color="primary" variant="soft" />
                           </Stack>
                           <Typography variant="subtitle1">{faq.heading}</Typography>
                         </Box>
 
-                        <Stack
-                          direction="row"
-                          spacing={0.25}
-                          onClick={(event) => event.stopPropagation()}
-                        >
+                        <Stack direction="row" spacing={0.25} onClick={(event) => event.stopPropagation()}>
                           <Tooltip title="Edit">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleOpenEdit(faq)}
-                              onFocusCapture={(event) => event.stopPropagation()}
-                            >
+                            <IconButton size="small" onClick={() => handleOpenEdit(faq)} onFocusCapture={(event) => event.stopPropagation()}>
                               <Iconify icon="solar:pen-bold" width={18} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleAskDelete(faq)}
-                              onFocusCapture={(event) => event.stopPropagation()}
-                            >
+                            <IconButton size="small" color="error" onClick={() => handleAskDelete(faq)} onFocusCapture={(event) => event.stopPropagation()}>
                               <Iconify icon="solar:trash-bin-trash-bold" width={18} />
                             </IconButton>
                           </Tooltip>
@@ -365,45 +317,37 @@ export function FaqsView() {
                     </AccordionSummary>
 
                     <AccordionDetails>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: 'text.secondary', whiteSpace: 'pre-line' }}
-                      >
+                      <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'pre-line' }}>
                         {faq.detail}
                       </Typography>
                     </AccordionDetails>
                   </Accordion>
                 ))
               ) : (
-                <Stack
-                  spacing={1}
-                  alignItems="center"
-                  justifyContent="center"
-                  sx={{ py: 8, borderRadius: 2, bgcolor: 'background.neutral' }}
-                >
-                  <Iconify
-                    icon="solar:question-circle-bold"
-                    width={40}
-                    sx={{ color: 'text.disabled' }}
-                  />
+                <Stack spacing={1} alignItems="center" justifyContent="center" sx={{ py: 8, borderRadius: 2, bgcolor: 'background.neutral' }}>
+                  <Iconify icon="solar:question-circle-bold" width={40} sx={{ color: 'text.disabled' }} />
                   <Typography variant="subtitle1">No FAQs available</Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     Create your first FAQ using the Add FAQ button.
                   </Typography>
                 </Stack>
               )}
+              <TablePaginationCustom
+                count={count}
+                page={page}
+                rowsPerPage={rowsPerPage}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                onRowsPerPageChange={(event) => {
+                  setRowsPerPage(Number(event.target.value));
+                  setPage(0);
+                }}
+              />
             </Stack>
           )}
         </Box>
       </Box>
 
-      <FaqFormDialog
-        open={formDialog.value}
-        onClose={handleCloseForm}
-        onSubmit={handleSaveFaq}
-        currentFaq={faqToEdit}
-        submitting={saving}
-      />
+      <FaqFormDialog open={formDialog.value} onClose={handleCloseForm} onSubmit={handleSaveFaq} currentFaq={faqToEdit} submitting={saving} />
 
       <ConfirmDialog
         open={confirmDelete.value}
@@ -415,12 +359,7 @@ export function FaqsView() {
           </>
         }
         action={
-          <Button
-            variant="contained"
-            color="error"
-            disabled={saving}
-            onClick={handleDeleteFaq}
-          >
+          <Button variant="contained" color="error" disabled={saving} onClick={handleDeleteFaq}>
             {saving ? 'Deleting...' : 'Delete'}
           </Button>
         }

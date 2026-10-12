@@ -1,4 +1,4 @@
-import { useState, forwardRef, useCallback } from 'react';
+import { useState, useRef, forwardRef, useCallback } from 'react';
 import PhoneNumberInput from 'react-phone-number-input/input';
 
 import TextField from '@mui/material/TextField';
@@ -34,23 +34,35 @@ export const PhoneInput = forwardRef(
     const defaultCountryCode = getCountryCode(value, inputCountryCode);
 
     const [selectedCountry, setSelectedCountry] = useState(defaultCountryCode);
+    const inputRef = useRef(null);
+
+    const setInputRef = useCallback(
+      (node) => {
+        inputRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref]
+    );
 
     const handleCountryChange = useCallback(
       (nextCountry) => {
         const nextValue = valueForCountry(value, selectedCountry, nextCountry);
         setSelectedCountry(nextCountry);
         if (nextValue && nextValue !== value) onChange?.(nextValue);
+        window.setTimeout(() => inputRef.current?.focus(), 0);
       },
       [onChange, selectedCountry, value]
     );
 
     return (
       <PhoneNumberInput
-        ref={ref}
+        ref={setInputRef}
         country={selectedCountry}
+        smartCaret={false}
         inputComponent={CustomInput}
-        value={value}
-        onChange={onChange}
+        value={value || ''}
+        onChange={(nextValue) => onChange?.(nextValue || '')}
         placeholder={placeholder ?? 'Enter phone number'}
         InputProps={
           disableSelect

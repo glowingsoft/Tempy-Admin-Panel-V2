@@ -104,13 +104,12 @@ export function JobCareDetailsFields({ draft = {}, onChange }) {
           Care details
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Required. Notes, instructions and contacts for staff on this job. Documents can be added later.
+          Emergency contact is required. Notes, instructions, and other contacts are optional.
         </Typography>
       </Box>
 
       <TextField
         {...fieldProps}
-        required
         label="Notes (person / location)"
         value={draft.careNotes || ''}
         onChange={handleField('careNotes')}
@@ -121,7 +120,6 @@ export function JobCareDetailsFields({ draft = {}, onChange }) {
 
       <TextField
         {...fieldProps}
-        required
         label="Instructions"
         value={draft.instructions || ''}
         onChange={handleField('instructions')}
@@ -138,14 +136,12 @@ export function JobCareDetailsFields({ draft = {}, onChange }) {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               {...fieldProps}
-              required
               label="Contact name"
               value={draft.contactName || ''}
               onChange={handleField('contactName')}
               sx={{ flex: 1 }}
             />
             <PhoneWithCountryCode
-              required
               label="Contact phone"
               value={draft.contactPhone || ''}
               onChange={(next) => onChange?.('contactPhone', next)}
@@ -153,7 +149,6 @@ export function JobCareDetailsFields({ draft = {}, onChange }) {
           </Stack>
           <TextField
             {...fieldProps}
-            required
             label="Contact email"
             value={draft.contactEmail || ''}
             onChange={handleField('contactEmail')}

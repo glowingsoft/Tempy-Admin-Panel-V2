@@ -69,7 +69,7 @@ export function HomeCareCompanyStaffDetailsDialog({ open, onClose, staff }) {
             <DetailItem label="Added On" value={staff.addedOn} />
           </Grid>
           <Grid xs={12}>
-            <DetailItem label="Branch" value={staff.branchName} />
+            <DetailItem label="Location" value={staff.branchName} />
           </Grid>
         </Grid>
       </DialogContent>

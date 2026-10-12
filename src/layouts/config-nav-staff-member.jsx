@@ -17,16 +17,6 @@ export const navDataStaffMember = [
       { title: 'Reviews', countKey: 'reviews', path: paths.dashboard.staffMember.reviews, icon: NAV_ICONS.star },
       { title: 'Earnings', path: paths.dashboard.staffMember.earnings, icon: NAV_ICONS.analytics },
       {
-        title: 'Invoices',
-        path: paths.dashboard.staffMember.invoices,
-        icon: NAV_ICONS.invoice,
-        deep: true,
-        children: [
-          { title: 'List', path: paths.dashboard.staffMember.invoices },
-          { title: 'Create', path: `${paths.dashboard.staffMember.invoices}/new` },
-        ],
-      },
-      {
         title: 'Help & Info',
         path: paths.dashboard.staffMember.faqs,
         icon: NAV_ICONS.faqs,

@@ -31,8 +31,8 @@ export async function resolveSocialProfile(provider) {
   throw new Error(`Unsupported social provider: ${provider}`);
 }
 
-export function buildSocialAuthRequest({ provider, profile, role, userType }) {
-  return buildSocialAuthPayload({ provider, profile, role, userType });
+export function buildSocialAuthRequest({ provider, profile, role, userType, location, purpose }) {
+  return buildSocialAuthPayload({ provider, profile, role, userType, location, purpose });
 }
 
 /**
@@ -46,6 +46,8 @@ export async function authenticateWithGoogleSocial({
   socialAuthMutation,
   role,
   userType,
+  location,
+  purpose,
 }) {
   const profile = await resolveSocialProfile('google');
 
@@ -59,6 +61,8 @@ export async function authenticateWithGoogleSocial({
     profile,
     role,
     userType: resolvedUserType,
+    location,
+    purpose,
   });
 
   try {
@@ -69,11 +73,7 @@ export async function authenticateWithGoogleSocial({
 
     return { profile, user, payload };
   } catch (error) {
-    // Attach profile without wrapping so handleApiError still reads `data.message`
-    if (error && typeof error === 'object') {
-      throw Object.assign(error, { socialProfile: profile });
-    }
-
+    // RTK errors are frozen, so copy the profile onto a new error instead of mutating them.
     const enriched = new Error(typeof error === 'string' ? error : 'Social auth failed');
     enriched.socialProfile = profile;
     enriched.cause = error;

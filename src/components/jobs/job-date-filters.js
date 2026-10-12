@@ -123,7 +123,6 @@ export function compareByShiftDate(a, b) {
   return timeA.localeCompare(timeB);
 }
 
-/** Find-jobs board: newest posted first, then earlier shift within the same post. */
 export function compareJobsNewestFirst(a, b) {
   const createdA = Date.parse(a?.createdAt || a?.postedAt) || 0;
   const createdB = Date.parse(b?.createdAt || b?.postedAt) || 0;
@@ -145,7 +144,6 @@ function formatClock(time) {
   }
 }
 
-/** Clear date parts for job cards / calendar / map. */
 export function getJobDateParts(job = {}) {
   const dateStr = job.shiftDate || job.shiftRows?.[0]?.date || '';
   const start = job.shiftStartTime || job.shiftRows?.[0]?.startTime || '';
@@ -182,8 +180,8 @@ export function formatShiftRowLabel(shiftDate, startTime, endTime) {
     const start = parse(startTime, 'HH:mm', new Date());
     const end = parse(endTime, 'HH:mm', new Date());
     if (!isValid(day)) return `${shiftDate} - ${startTime} To ${endTime}`;
-    return `${format(day, 'MMM d yyyy')} - ${isValid(start) ? format(start, 'hh a') : startTime} To ${
-      isValid(end) ? format(end, 'hh a') : endTime
+    return `${format(day, 'EEE d MMM yyyy')} · ${isValid(start) ? format(start, 'h:mm a') : startTime} – ${
+      isValid(end) ? format(end, 'h:mm a') : endTime
     }`;
   } catch {
     return `${shiftDate} - ${startTime} To ${endTime}`;

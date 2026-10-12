@@ -33,7 +33,7 @@ import { TableHeadCustom, TableNoData, TablePaginationCustom, useTable } from 's
 import { handleApiError } from 'src/store/handleApiError';
 
 import { DashboardStatCard } from 'src/sections/dashboard/dashboard-stat-card';
-import { TempToPermSettings } from 'src/sections/active-sections/legal-view/temp-to-perm-settings';
+import { AdminPlatformRules } from 'src/sections/admin/recruitment/admin-platform-rules';
 
 import { getRecruitmentStatusOption } from '../admin-recruitment-constants';
 import { useAdminRecruitment } from '../use-admin-recruitment';
@@ -117,7 +117,7 @@ export function AdminRecruitmentView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <TempToPermSettings />
+      <AdminPlatformRules />
 
       <Alert severity="info" sx={{ mb: 3 }}>
         Accepted offers and current permanent hires. End a hire when that placement is finished.

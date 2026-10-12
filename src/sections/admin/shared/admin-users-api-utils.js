@@ -242,6 +242,30 @@ function pickNumber(...values) {
     const num = Number(value);
     if (Number.isFinite(num)) return num;
   }
+    return null;
+}
+
+function parseMoneyString(value) {
+  const cleaned = String(value).replace(/,/g, '').replace(/[^0-9.-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
+}
+
+function pickMoney(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = parseMoneyString(value);
+      if (parsed != null) return parsed;
+      continue;
+    }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const nested = pickMoney(value.amount, value.total, value.value, value.sum, value.formatted, value.display);
+      if (nested != null) return nested;
+    }
+  }
   return null;
 }
 
@@ -319,7 +343,25 @@ export function mapAdminUserFromApi(item = {}) {
     staffCount: pickNumber(item.staffCount, Array.isArray(item.staff) ? item.staff.length : null),
     activeJobs: pickNumber(item.activeJobs, item.openJobs),
     revenue: item.revenue ?? null,
-    spendings: pickNumber(item.spendings, item.spending, item.totalSpendings, item.totalSpending, meta.spendings, meta.spending, account.spendings),
+    spendings: pickMoney(
+      stats.spending,
+      stats.spendings,
+      stats.totalSpending,
+      stats.totalSpendings,
+      item.spending,
+      item.spendings,
+      item.totalSpending,
+      item.totalSpendings,
+      item.total_spending,
+      basic.spending,
+      basic.spendings,
+      nestedUser.spending,
+      nestedUser.spendings,
+      meta.spending,
+      meta.spendings,
+      account.spending,
+      account.spendings
+    ),
     jobsPosted: pickNumber(stats.jobsPosted, item.jobsPosted, item.jobPosted, item.postedJobs, item.totalJobsPosted, item.jobsCount, meta.jobsPosted, account.jobsPosted),
     bookings: pickNumber(
       stats.totalBookings,
@@ -335,7 +377,28 @@ export function mapAdminUserFromApi(item = {}) {
       account.bookings
     ),
     // Suppliers
-    earnings: pickNumber(item.earnings, item.earning, item.totalEarnings, item.totalEarning, meta.earnings, account.earnings),
+    earnings: pickMoney(
+      stats.earning,
+      stats.earnings,
+      stats.totalEarning,
+      stats.totalEarnings,
+      item.earning,
+      item.earnings,
+      item.totalEarning,
+      item.totalEarnings,
+      item.total_earning,
+      item.total_earnings,
+      basic.earning,
+      basic.earnings,
+      nestedUser.earning,
+      nestedUser.earnings,
+      nestedStaff.earning,
+      nestedStaff.earnings,
+      meta.earning,
+      meta.earnings,
+      account.earning,
+      account.earnings
+    ),
     jobsApplied: pickNumber(item.jobsApplied, item.jobApplied, item.appliedJobs, item.totalJobsApplied, item.applicationsCount, meta.jobsApplied, account.jobsApplied),
     carersCount: item.carersCount ?? null,
     serviceAreas: item.serviceAreas ?? null,

@@ -11,8 +11,8 @@ export function getBranchesNav(pathname = '') {
       shifts: paths.dashboard.agency.shifts,
       jobs: paths.dashboard.jobs.find,
       postJob: '',
-      noun: 'Branch',
-      nounPlural: 'Branches',
+      noun: 'Location',
+      nounPlural: 'Locations',
     };
   }
 
@@ -24,8 +24,8 @@ export function getBranchesNav(pathname = '') {
       shifts: paths.dashboard.hospital.shifts,
       jobs: paths.dashboard.hospital.jobs.created,
       postJob: paths.dashboard.hospital.jobs.post,
-      noun: 'Branch',
-      nounPlural: 'Branches',
+      noun: 'Location',
+      nounPlural: 'Locations',
     };
   }
 
@@ -37,8 +37,8 @@ export function getBranchesNav(pathname = '') {
       shifts: paths.dashboard.localAuthority.shifts,
       jobs: paths.dashboard.localAuthority.jobs.created,
       postJob: paths.dashboard.localAuthority.jobs.post,
-      noun: 'Branch',
-      nounPlural: 'Branches',
+      noun: 'Location',
+      nounPlural: 'Locations',
     };
   }
 
@@ -63,8 +63,8 @@ export function getBranchesNav(pathname = '') {
       shifts: paths.dashboard.homeCareCompany.shifts,
       jobs: paths.dashboard.homeCareCompany.jobs,
       postJob: '',
-      noun: 'Branch',
-      nounPlural: 'Branches',
+      noun: 'Location',
+      nounPlural: 'Locations',
     };
   }
 
@@ -75,7 +75,7 @@ export function getBranchesNav(pathname = '') {
     shifts: paths.dashboard.shifts,
     jobs: paths.dashboard.jobs.created,
     postJob: paths.dashboard.jobs.post,
-    noun: 'Branch',
-    nounPlural: 'Branches',
+    noun: 'Location',
+    nounPlural: 'Locations',
   };
 }

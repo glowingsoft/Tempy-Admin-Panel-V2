@@ -17,7 +17,6 @@ import { StaffMemberShiftAlertSection } from 'src/sections/staff-member/jobs/sta
 import { StaffMemberCancelShiftSection } from 'src/sections/staff-member/jobs/staff-member-cancel-shift-section';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
 function DetailRow({ label, value }) {
   if (value == null || value === '') return null;
@@ -40,12 +39,13 @@ export function SupplierJobDetailsDialog({
   showCancelShift = false,
   onCancelled,
 }) {
-  // Admin viewing the account: no shift alert or cancel actions.
   const viewOnly = useViewOnly();
   if (!job) return null;
 
   const parts = getJobDateParts(job);
-  const dateLabel = [parts.weekday, parts.day, parts.month].filter(Boolean).join(' ');
+  const dateLabel = parts.hasDate
+    ? `${parts.weekday} ${parts.day} ${parts.month} ${parts.iso.slice(0, 4)}`
+    : '';
   const pay =
     job.hourlyRate != null && job.hourlyRate !== ''
       ? `${fCurrency(job.hourlyRate)} / hr`
@@ -71,7 +71,7 @@ export function SupplierJobDetailsDialog({
         <Stack spacing={1.5}>
           <DetailRow label="Status" value={formatSupplierJobStatus(job)} />
           <DetailRow label="Date" value={dateLabel} />
-          <DetailRow label="Time" value={parts.time || job.schedule || ''} />
+          <DetailRow label="Time" value={parts.time} />
           <DetailRow label="Location" value={job.address} />
           <DetailRow label="Role" value={job.role || job.jobTypeTitle} />
           <DetailRow label="Pay" value={pay} />

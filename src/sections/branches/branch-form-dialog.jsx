@@ -117,10 +117,10 @@ export function resolveBranchStatus(status, fallback = BRANCH_STATUS.PENDING) {
     : fallback;
 }
 
-export function buildAgencyBranchPayload(data, { fallbackLocationName = true, userId } = {}) {
+export function buildAgencyBranchPayload(data, { userId } = {}) {
   const branchName = String(data.name || '').trim();
   const locationName = String(data.locationName || '').trim();
-  const locationTitle = locationName || (fallbackLocationName ? branchName : '');
+  const locationTitle = locationName || branchName;
   const callerUserId = String(userId || data.userId || '').trim();
 
   return {
@@ -144,9 +144,7 @@ export function buildAgencyBranchPayload(data, { fallbackLocationName = true, us
 }
 
 export function buildAgencyBranchUpdatePayload(data) {
-  return {
-    ...buildAgencyBranchPayload(data, { fallbackLocationName: false }),
-  };
+  return buildAgencyBranchPayload(data);
 }
 
 function resolveLocationName(locationObj, branch) {
@@ -167,14 +165,15 @@ export function BranchFormDialog({
   currentBranch,
   onSubmit,
   submitting = false,
-  entityLabel = 'Branch',
+  entityLabel = 'Location',
+  addressOnly = false,
   showComplianceFields = false,
 }) {
   const isEdit = Boolean(currentBranch);
-  const isLocationEntity = entityLabel === 'Location';
+  const isLocationEntity = addressOnly;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
-  const nameLabel = isLocationEntity ? 'Title' : 'Branch name';
+  const nameLabel = isLocationEntity ? 'Title' : 'Location name';
 
   const steps = useMemo(() => {
     const list = [
@@ -248,9 +247,9 @@ export function BranchFormDialog({
   const cqcRegistered = watch('cqcRegistered');
 
   useEffect(() => {
-    if (!open || !isLocationEntity) return;
-    setValue('locationName', String(watchedName || '').trim(), { shouldValidate: true });
-  }, [isLocationEntity, open, setValue, watchedName]);
+    if (!open) return;
+    setValue('locationName', String(watchedName || '').trim(), { shouldValidate: Boolean(watchedName) });
+  }, [open, setValue, watchedName]);
 
   useEffect(() => {
     if (!open) return;
@@ -264,9 +263,7 @@ export function BranchFormDialog({
     await handleSubmit(async (data) => {
       try {
         setIsSubmitting(true);
-        const nextData = isLocationEntity
-          ? { ...data, locationName: String(data.name || '').trim() }
-          : data;
+        const nextData = { ...data, locationName: String(data.name || '').trim() };
         await onSubmit?.(nextData);
         onClose?.();
       } catch {
@@ -275,7 +272,7 @@ export function BranchFormDialog({
         setIsSubmitting(false);
       }
     })();
-  }, [handleSubmit, isLocationEntity, onClose, onSubmit]);
+  }, [handleSubmit, onClose, onSubmit]);
 
   const applyPlace = useCallback(
     (place) => {
@@ -305,9 +302,7 @@ export function BranchFormDialog({
 
   const handleNext = useCallback(async () => {
     if (stepKey === 'address') {
-      const fields = isLocationEntity
-        ? ADDRESS_FIELDS.filter((field) => field !== 'locationName')
-        : ADDRESS_FIELDS;
+      const fields = ADDRESS_FIELDS.filter((field) => field !== 'locationName');
       const valid = await trigger(fields);
       if (!valid) return;
 
@@ -335,7 +330,6 @@ export function BranchFormDialog({
   }, [
     activeStep,
     ensureCoordinates,
-    isLocationEntity,
     lastStepIndex,
     saveForm,
     setError,
@@ -384,15 +378,6 @@ export function BranchFormDialog({
                     : undefined
                 }
               />
-
-              {!isLocationEntity && (
-                <Field.Text
-                  name="locationName"
-                  label="Location name"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                />
-              )}
 
               <StandaloneAddressInput
                 value={watch('fullAddress')}
@@ -468,7 +453,7 @@ export function BranchFormDialog({
                 placeholder={
                   isLocationEntity
                     ? 'Short description of this location'
-                    : 'Short description of this home / branch'
+                    : 'Short description of this home / location'
                 }
               />
 
@@ -501,7 +486,7 @@ export function BranchFormDialog({
                 helperText={
                   isLocationEntity
                     ? 'Upload PDF / DOC certificates for this location'
-                    : 'Upload PDF / DOC certificates for this branch'
+                    : 'Upload PDF / DOC certificates for this location'
                 }
               />
 
@@ -511,7 +496,7 @@ export function BranchFormDialog({
                 helperText={
                   isLocationEntity
                     ? 'Upload insurance documents (PDF / DOC)'
-                    : 'Upload insurance documents for this branch (PDF / DOC)'
+                    : 'Upload insurance documents for this location (PDF / DOC)'
                 }
               />
 

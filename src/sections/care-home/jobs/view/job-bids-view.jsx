@@ -534,7 +534,7 @@ export function JobBidsView({ mode = 'careHome' }) {
       const branch = branches.find((item) => item.id === nextDraft.branchId) || branches.find((item) => item._id === nextDraft.branchId) || null;
 
       if (!nextDraft.branchId || !branch) {
-        throw new Error(isUser ? 'Please select a location on the job first' : 'Please select a branch on the job first');
+        throw new Error('Please select a location on the job first');
       }
 
       const body = buildCareHomeJobPayload(

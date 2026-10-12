@@ -6,7 +6,7 @@ export const navDataLocalAuthority = [
   {
     items: [
       { title: 'Dashboard', path: paths.dashboard.localAuthority.root, icon: NAV_ICONS.dashboard },
-      { title: 'Branches', path: paths.dashboard.localAuthority.branches, icon: NAV_ICONS.branches, deep: true },
+      { title: 'Locations', path: paths.dashboard.localAuthority.branches, icon: NAV_ICONS.branches, deep: true },
       { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.localAuthority.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.localAuthority.staff, icon: NAV_ICONS.user },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.localAuthority.messages, icon: NAV_ICONS.chat },
@@ -23,7 +23,6 @@ export const navDataLocalAuthority = [
       },
       { title: 'Compliance', path: paths.dashboard.localAuthority.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.localAuthority.payments, icon: NAV_ICONS.banking },
-      { title: 'Invoices', path: paths.dashboard.localAuthority.invoices, icon: NAV_ICONS.invoice },
       {
         title: 'Help & Info',
         path: paths.dashboard.localAuthority.faqs,

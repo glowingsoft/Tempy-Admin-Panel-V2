@@ -53,7 +53,7 @@ const FIELD_LABELS = {
   fullAddress: 'Full address',
   locationSearch: 'Location',
   taxNumber: 'Tax Number',
-  branch: 'Branch',
+  branch: 'Location',
   specialty: 'Specialty',
   ratePerHour: 'Rate per hour',
   platformPercent: 'Platform percent',
@@ -119,7 +119,7 @@ const AgencyStaffFormSchema = zod
       zod.coerce.number().optional()
     ),
     taxNumber: zod.preprocess(asTrimmedString, zod.string().optional()),
-    branch: zod.string().min(1, { message: 'Branch is required' }),
+    branch: zod.string().min(1, { message: 'Location is required' }),
     specialty: zod.array(zod.string()).min(1, { message: 'Select at least one specialty' }),
     ratePerHour: zod.coerce.number().min(0, { message: 'Rate per hour must be 0 or more' }),
     platformPercent: zod.coerce
@@ -306,10 +306,10 @@ export function AgencyStaffFormDialog({
   }, [branchesData?.data]);
 
   const branchHelperText = useMemo(() => {
-    if (loadingBranches || fetchingBranches) return 'Loading branches...';
-    if (branchesError) return branchesError?.data?.message || 'Could not load branches';
-    if (!branchOptions.length) return 'No branches found. Add a branch first from Branches.';
-    return `${branchOptions.length} branch${branchOptions.length === 1 ? '' : 'es'} available`;
+    if (loadingBranches || fetchingBranches) return 'Loading locations...';
+    if (branchesError) return branchesError?.data?.message || 'Could not load locations';
+    if (!branchOptions.length) return 'No locations found. Add a location first from Locations.';
+    return `${branchOptions.length} location${branchOptions.length === 1 ? '' : 's'} available`;
   }, [branchOptions.length, branchesError, fetchingBranches, loadingBranches]);
 
   // Show full nurses list from API (do not hide by existing agency emails)
@@ -668,16 +668,16 @@ export function AgencyStaffFormDialog({
               <>
                 <Field.Select
                   name="branch"
-                  label="Branch *"
+                  label="Location *"
                   InputLabelProps={{ shrink: true }}
                   helperText={branchHelperText}
                 >
-                  <MenuItem value="">Select branch</MenuItem>
+                  <MenuItem value="">Select location</MenuItem>
                   {branchOptions.map((branch) => {
                     const locationLabel = getAgencyBranchLocationLabel(branch);
                     const label =
                       locationLabel && locationLabel !== '—'
-                        ? `${branch.name || 'Branch'} — ${locationLabel}`
+                        ? `${branch.name || 'Location'} — ${locationLabel}`
                         : branch.name || branch.id;
 
                     return (

@@ -38,6 +38,7 @@ import {
   useGetPermanentHireSettingsQuery,
   useRespondToPermanentHireMutation,
 } from 'src/store/Reducer/supplier-relationships-api';
+import { handleApiError } from 'src/store/handleApiError';
 
 import { RowActionButton } from '../row-action-button';
 import { PermanentHireDetailsDialog } from '../relationship-details-dialogs';
@@ -61,7 +62,7 @@ export function PermanentHiresView() {
   const [viewing, setViewing] = useState(null);
 
   const { data: settings } = useGetPermanentHireSettingsQuery({ base }, { skip: !base });
-  const { data, isLoading, isError } = useGetPermanentHiresQuery({ base }, { skip: !base });
+  const { data, isLoading, isError, error } = useGetPermanentHiresQuery({ base }, { skip: !base });
   const [respond, { isLoading: isResponding }] = useRespondToPermanentHireMutation();
 
   const rows = data?.data || [];
@@ -114,7 +115,7 @@ export function PermanentHiresView() {
 
       {isError && (
         <Alert severity="error" sx={{ mb: 2.5 }}>
-          Could not load permanent hires.
+          {handleApiError(error) || 'Could not load permanent hires.'}
         </Alert>
       )}
 

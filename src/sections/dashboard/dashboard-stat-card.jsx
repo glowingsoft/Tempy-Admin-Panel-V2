@@ -12,6 +12,12 @@ import { varAlpha } from 'src/theme/styles';
 
 // ----------------------------------------------------------------------
 
+function formatStatTotal(total) {
+  if (typeof total === 'number' && Number.isFinite(total)) return fNumber(total);
+  if (typeof total === 'string' && total.trim() !== '' && Number.isFinite(Number(total))) return fNumber(Number(total));
+  return total ?? '';
+}
+
 export function DashboardStatCard({ title, total, icon, color = 'primary', href, sx, ...other }) {
   const theme = useTheme();
   const paletteColor = theme.vars.palette[color] || theme.vars.palette.primary;
@@ -83,7 +89,7 @@ export function DashboardStatCard({ title, total, icon, color = 'primary', href,
         {title}
       </Typography>
       <Typography variant="h3" sx={{ mt: 2, fontWeight: 800, letterSpacing: -0.5 }}>
-        {fNumber(total)}
+        {formatStatTotal(total)}
       </Typography>
       {isLink ? (
         <Typography

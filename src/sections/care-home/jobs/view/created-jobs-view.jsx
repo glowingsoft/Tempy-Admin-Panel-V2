@@ -1116,14 +1116,14 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
         throw new Error(
           isUser || isHomeCareCompany
             ? 'Please select a location'
-            : 'Please select a valid branch location'
+            : 'Please select a valid location'
         );
       }
       if (!branch) {
         throw new Error(
           isUser || isHomeCareCompany
             ? 'Please select a location'
-            : 'Please select a valid branch location'
+            : 'Please select a valid location'
         );
       }
 
@@ -1140,7 +1140,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       if (!body.type) throw new Error('Please select a job type');
       if (!(body.branch || body.address))
         throw new Error(
-          isUser || isHomeCareCompany ? 'Please select a location' : 'Please select a branch location'
+          'Please select a location'
         );
       if (!body.shift?.length) throw new Error('Please add at least one shift');
       if (!editingJob?.id && !String(draft.image || '').trim()) {

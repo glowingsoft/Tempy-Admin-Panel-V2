@@ -12,7 +12,8 @@ export const navDataAdmin = [
       { title: 'Job Types', path: paths.adminDashboard.jobTypes, icon: NAV_ICONS.jobTypes },
       { title: 'Permanent hire', path: paths.adminDashboard.recruitment, icon: NAV_ICONS.recruitment },
       { title: 'Allegations', path: paths.adminDashboard.allegations, icon: NAV_ICONS.allegations },
-      { title: 'Payouts', path: paths.adminDashboard.transactions, icon: NAV_ICONS.transactions },
+      { title: 'Transactions', path: paths.adminDashboard.transactions, icon: NAV_ICONS.transactions },
+      { title: 'Payouts', path: paths.adminDashboard.payouts, icon: NAV_ICONS.payouts },
     ],
   },
   {

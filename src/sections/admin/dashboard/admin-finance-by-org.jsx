@@ -17,18 +17,18 @@ import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-stat
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'type', label: 'Organisation / person' },
-  { id: 'billed', label: 'Billed', align: 'right' },
+  { id: 'type', label: 'User type' },
+  { id: 'spend', label: 'Spend', align: 'right' },
   { id: 'earned', label: 'Earned', align: 'right' },
 ];
 
 export function AdminFinanceByOrg({
-  title = 'Money billed & earned',
-  subheader = 'By organisation or person type',
+  title = 'Spend & earned',
+  subheader = 'By user type',
   list = [],
 }) {
   const rows = Array.isArray(list) ? list : [];
-  const billedTotal = rows.reduce((sum, row) => sum + (Number(row.billed) || 0), 0);
+  const spendTotal = rows.reduce((sum, row) => sum + (Number(row.spend ?? row.billed) || 0), 0);
   const earnedTotal = rows.reduce((sum, row) => sum + (Number(row.earned) || 0), 0);
 
   return (
@@ -46,7 +46,7 @@ export function AdminFinanceByOrg({
                     <TableCell>
                       <Typography variant="subtitle2">{row.label}</Typography>
                     </TableCell>
-                    <TableCell align="right">{fCurrency(row.billed)}</TableCell>
+                    <TableCell align="right">{fCurrency(row.spend ?? row.billed)}</TableCell>
                     <TableCell align="right">{fCurrency(row.earned)}</TableCell>
                   </TableRow>
                 ))}
@@ -55,7 +55,7 @@ export function AdminFinanceByOrg({
                     <Typography variant="subtitle2">Total</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="subtitle2">{fCurrency(billedTotal)}</Typography>
+                    <Typography variant="subtitle2">{fCurrency(spendTotal)}</Typography>
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="subtitle2">{fCurrency(earnedTotal)}</Typography>
@@ -67,7 +67,7 @@ export function AdminFinanceByOrg({
         </Scrollbar>
       ) : (
         <Stack sx={{ px: 3, pb: 3, flexGrow: 1 }}>
-          <DashboardEmptyState message="No billed or earned totals yet" />
+          <DashboardEmptyState message="No spend or earned totals yet" />
         </Stack>
       )}
     </Card>

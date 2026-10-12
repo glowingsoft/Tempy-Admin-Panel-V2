@@ -1,33 +1,33 @@
 name: Deploy Vite App
-
+ 
 on:
   push:
     branches: [origin/dev]
   workflow_dispatch:
-
+ 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+   
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+ 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-
+ 
       - name: Write .env file from secret
         run: echo "${{ secrets.ENV_FILE }}" > .env
-
+ 
       - name: Install dependencies
         run: npm ci
-
+ 
       - name: Build Vite app
         run: npm run build
-
+ 
       - name: Update EC2 and install/ensure Nginx is present
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -44,7 +44,7 @@ jobs:
             sudo chown -R $USER:$USER /var/www/frontend
             sudo systemctl enable nginx
             sudo systemctl start nginx
-
+ 
       - name: Deploy build to EC2 via rsync over SSH
         uses: burnett01/rsync-deployments@7.0.1
         with:
@@ -54,7 +54,7 @@ jobs:
           remote_host: ${{ secrets.EC2_HOST }}
           remote_user: ${{ secrets.EC2_USER }}
           remote_key: ${{ secrets.EC2_SSH_KEY }}
-
+ 
       - name: Reload Nginx
         uses: appleboy/ssh-action@v1.0.3
         with:

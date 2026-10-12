@@ -39,6 +39,8 @@ import {
   createDefaultSchedule,
   findBestJobTypeOption,
   getMinJobScheduleDate,
+  getScheduleBreakError,
+  getScheduleDurationMinutes,
   isPastJobScheduleDate,
   jobTypeMatchesAnyTeam,
 } from './care-home-job-utils';
@@ -162,6 +164,8 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
         const endBeforeStart = Boolean(
           entry.startTime && entry.endTime && entry.endTime < entry.startTime
         );
+        const breakError = getScheduleBreakError(entry);
+        const shiftMinutes = getScheduleDurationMinutes(entry.startTime, entry.endTime);
 
         return (
           <Box
@@ -287,22 +291,16 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                     onChange={(e) =>
                       handleScheduleChange(entry.id, 'breakMins', Number(e.target.value))
                     }
-                    inputProps={{ min: 0, step: 5 }}
+                    error={Boolean(breakError)}
+                    helperText={breakError || undefined}
+                    inputProps={{
+                      min: 0,
+                      step: 5,
+                      max: shiftMinutes != null ? shiftMinutes : undefined,
+                    }}
                     sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper' } }}
                   />
                 )}
-
-                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minHeight: 36 }}>
-                  <Switch
-                    checked={entry.receivingBids !== false}
-                    onChange={(e) => handleScheduleChange(entry.id, 'receivingBids', e.target.checked)}
-                    color="primary"
-                    size="small"
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    Receiving bids
-                  </Typography>
-                </Stack>
               </Stack>
             </Stack>
           </Box>
@@ -419,7 +417,7 @@ export function JobDraftForm({
   const branches = apiBranches;
 
   const agencyPartners = getCareHomeAgencyPartners();
-  const locationLabel = isUser || isHomeCareCompany ? 'Location' : 'Branch Location';
+  const locationLabel = 'Location';
 
   // Edit only: the API says whether the rate and shift times can still change.
   const rateAndTimesLocked = Boolean(draft.id) && draft.canEditRateAndShiftTimes === false;
@@ -601,7 +599,7 @@ export function JobDraftForm({
               }
             >
               <MenuItem value="" disabled>
-                <em>{isUser || isHomeCareCompany ? 'Select location' : 'Select branch location'}</em>
+                <em>Select location</em>
               </MenuItem>
               {branches.map((branch) => (
                 <MenuItem key={branch.id} value={branch.id}>
@@ -613,9 +611,7 @@ export function JobDraftForm({
                     />
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="body2" noWrap fontWeight={600}>
-                        {branch.name ||
-                          branch.branchName ||
-                          (isUser || isHomeCareCompany ? 'Location' : 'Branch')}
+                        {branch.name || branch.branchName || 'Location'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap display="block">
                         {getAgencyBranchLocationLabel(branch)}
@@ -627,16 +623,12 @@ export function JobDraftForm({
             </Select>
             {branchesError && (
               <FormHelperText>
-                {isUser || isHomeCareCompany
-                  ? 'Could not load locations. Please retry.'
-                  : 'Could not load branches. Please retry.'}
+                Could not load locations. Please retry.
               </FormHelperText>
             )}
             {!branchesLoading && !branchesError && !branches.length && (
               <FormHelperText>
-                {isUser || isHomeCareCompany
-                  ? 'No locations found — add them under Locations on your dashboard first.'
-                  : 'No branches found — add locations in Branches first.'}
+                No locations found — add them under Locations on your dashboard first.
               </FormHelperText>
             )}
           </FormControl>

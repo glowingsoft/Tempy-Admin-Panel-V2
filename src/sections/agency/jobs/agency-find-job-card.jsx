@@ -29,13 +29,7 @@ import { hasAttendanceRecord } from 'src/sections/staff-member/jobs/nurse-checki
 import { buildMapsUrl } from './agency-job-care-details-store';
 import { toast } from 'src/components/snackbar';
 
-// ----------------------------------------------------------------------
 
-/**
- * Find Jobs board: Bid Now / edit bid on the status tabs. The Active tab also lists open jobs,
- * so only a shift the supplier already won (job.status 'active') switches to booking actions:
- * assign staff for agencies, offer / check-in / check-out for nurses.
- */
 function isFindJobsBidVariant(variant, mode, job) {
   if (variant === 'active' && job?.status === 'active') return false;
 
@@ -49,18 +43,6 @@ function isFindJobsBidVariant(variant, mode, job) {
 }
 
 const CANCELLED_BOOKING_STATUSES = ['cancelledByWorker', 'cancelledByEmployer', 'cancelledByUser'];
-
-/*
- * Shift timing. The row's `startsAt` / `endsAt` are the real instants from the API and hold in any
- * browser timezone; date + time read as local time is only the fallback for rows without them.
- */
-function hasShiftStarted(row, job) {
-  if (Number.isFinite(row?.startsAt)) return row.startsAt <= Date.now();
-  const start = getStaffJobShiftStart(
-    row?.date ? { shiftDate: row.date, shiftStartTime: row.startTime } : job
-  );
-  return Boolean(start) && start.getTime() <= Date.now();
-}
 
 function hasShiftEnded(row, job) {
   if (Number.isFinite(row?.endsAt)) return row.endsAt <= Date.now();
@@ -81,7 +63,6 @@ function shiftPassedAtMs(row, job) {
   return start ? start.getTime() : NaN;
 }
 
-/** Active tab: 48 hours after the shift, compared with the current time. */
 function isShiftPast48Hours(row, job) {
   const at = shiftPassedAtMs(row, job);
   return Number.isFinite(at) && Date.now() - at >= SHIFT_ENDED_AFTER_MS;
@@ -141,6 +122,10 @@ function getShiftRows(job) {
   return [];
 }
 
+function hasJobDistance(job) {
+  return job?.distance != null && job.distance !== '';
+}
+
 const metaChipSx = {
   height: 20,
   fontSize: 9,
@@ -149,7 +134,6 @@ const metaChipSx = {
   color: 'text.primary',
 };
 
-/** Fixed-height meta chips so every card stays the same tall. */
 function JobMetaChips({ job, postedAt }) {
   return (
     <Stack
@@ -159,16 +143,17 @@ function JobMetaChips({ job, postedAt }) {
       alignItems="center"
       sx={{ mb: 0.5, minHeight: 20, width: 1 }}
     >
-      <Chip
-        label={job.distance || '— km'}
-        size="small"
-        sx={{
-          ...metaChipSx,
-          opacity: job.distance ? 1 : 0.45,
-          maxWidth: 110,
-          '& .MuiChip-label': { px: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
-        }}
-      />
+      {hasJobDistance(job) ? (
+        <Chip
+          label={job.distance}
+          size="small"
+          sx={{
+            ...metaChipSx,
+            maxWidth: 110,
+            '& .MuiChip-label': { px: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
+          }}
+        />
+      ) : null}
       {postedAt ? (
         <Typography
           variant="caption"
@@ -210,7 +195,7 @@ function JobLocationBlock({ job, sx }) {
       sx={{
         display: 'grid',
         gridTemplateColumns: '14px minmax(0, 1fr) auto',
-        gridTemplateRows: 'auto 14px',
+        gridTemplateRows: hasJobDistance(job) ? 'auto 14px' : 'auto',
         columnGap: 0.75,
         rowGap: 0.35,
         alignItems: 'center',
@@ -259,27 +244,26 @@ function JobLocationBlock({ job, sx }) {
         </span>
       </Tooltip>
 
-      <Iconify
-        icon="solar:routing-2-bold"
-        width={13}
-        sx={{
-          color: 'text.disabled',
-          display: 'block',
-          opacity: job.distance ? 1 : 0.35,
-        }}
-      />
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          gridColumn: '2 / 4',
-          fontSize: 10,
-          lineHeight: 1.45,
-          opacity: job.distance ? 1 : 0.45,
-        }}
-      >
-        {job.distance || '— km'}
-      </Typography>
+      {hasJobDistance(job) ? (
+        <>
+          <Iconify
+            icon="solar:routing-2-bold"
+            width={13}
+            sx={{ color: 'text.disabled', display: 'block' }}
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              gridColumn: '2 / 4',
+              fontSize: 10,
+              lineHeight: 1.45,
+            }}
+          >
+            {job.distance}
+          </Typography>
+        </>
+      ) : null}
     </Box>
   );
 }
@@ -324,7 +308,6 @@ function PostedByFooter({ job, postedBy, isCareHome }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function JobStatusChip({ job, variant }) {
   if (variant === 'previous') {
@@ -393,7 +376,6 @@ function JobStatusChip({ job, variant }) {
   );
 }
 
-/** Opens the check-in / check-out proof pictures + signatures for this shift. */
 function AttendanceAction({ job, onOpen, sx }) {
   return (
     <Button
@@ -457,7 +439,6 @@ function JobActionButtons({
   existingBid = null,
   sx,
 }) {
-  // Admin viewing the account: no bidding, booking or chat actions.
   if (readOnly) return null;
 
   const bookingStatus = attendance?.bookingStatus || job?.bookingStatus || '';
@@ -489,14 +470,11 @@ function JobActionButtons({
     </Stack>
   );
 
-  // The Active tab also lists open jobs the nurse is not booked on (e.g. their bid was rejected).
-  // Only their own shift — booked for them, or with a booking/attendance of theirs — gets booking
-  // actions; anything else falls through to the bid actions (Declined chip, Bid Now, …).
+
   const isOwnStaffShift =
     job?.status === 'active' || Boolean(bookingStatus) || Boolean(attendance?.checkInAt);
 
   if (variant === 'active' && mode === 'staffMember' && isOwnStaffShift) {
-    // The booking status decides the nurse's actions; attendance logs only add the times.
     if (bookingStatus === 'pending') {
       return (
         <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
@@ -524,8 +502,6 @@ function JobActionButtons({
 
     if (CANCELLED_BOOKING_STATUSES.includes(bookingStatus)) return statusChip('Cancelled', 'default');
 
-    // Attendance wins over the job list: it holds the check-in/out we just did, which the
-    // cached list still shows as inProgress until it refetches.
     const checkedOut = bookingStatus === 'completed' || Boolean(attendance?.checkOutAt);
     const checkedIn =
       !checkedOut && (bookingStatus === 'inProgress' || Boolean(attendance?.checkInAt));
@@ -576,38 +552,47 @@ function JobActionButtons({
       );
     }
 
-    // No check-in once the shift's end time has passed, or 48 hours after it.
     const staffRow = shiftRow || job?.shiftRows?.[0];
-    if (hasShiftEnded(staffRow, job) || isShiftPast48Hours(staffRow, job)) {
-      return statusChip('Shift ended', 'default');
-    }
+    const checkInClosed = hasShiftEnded(staffRow, job) || isShiftPast48Hours(staffRow, job);
 
     return (
       <Stack direction="row" spacing={0.35} alignItems="center" sx={sx}>
         {chatButton}
-        <Button
-          size="small"
-          variant="contained"
-          color="success"
-          onClick={() => onCheckIn?.(job)}
-          sx={{ ...actionButtonSx, ...sx }}
-        >
-          Check In
-        </Button>
+        <Tooltip title={checkInClosed ? 'Shift time is over' : ''}>
+          <span>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              disabled={checkInClosed}
+              onClick={() => onCheckIn?.(job)}
+              sx={{
+                ...actionButtonSx,
+                ...sx,
+                ...(checkInClosed && {
+                  bgcolor: 'grey.400',
+                  color: 'common.white',
+                  '&.Mui-disabled': {
+                    bgcolor: 'grey.400',
+                    color: 'grey.100',
+                  },
+                }),
+              }}
+            >
+              Check In
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
     );
   }
 
   if (isFindJobsBidVariant(variant, mode, job)) {
     const row = shiftRow || job?.shiftRows?.[0] || null;
-    // Already bid on this shift — edit/delete only while pending
     if (existingBid) {
       const bidStatus = normalizeAgencyBidStatus(existingBid.status);
-      // After withdraw/delete, allow Bid Now again
       if (['withdrawn', 'deleted', 'cancelled', 'canceled'].includes(bidStatus)) {
-        // fall through
       } else if (!canEditAgencyBid(existingBid)) {
-        // normalizeAgencyBidStatus turns "declined" into "rejected".
         const isDeclined = bidStatus === 'rejected' || bidStatus === 'declined';
         const closedLabel = isDeclined ? 'Declined' : bidStatus === 'accepted' ? 'Accepted' : 'Closed';
         return (
@@ -662,21 +647,7 @@ function JobActionButtons({
       }
     }
 
-    // Active tab only: 48 hours after the shift, Bid Now becomes Shift ended.
-    // The API still leaves these shifts biddable, so this is decided in the browser.
-    if (variant === 'active' && isShiftPast48Hours(row, job)) {
-      return (
-        <Chip
-          size="small"
-          label="Shift ended"
-          sx={{ height: 22, fontSize: 10, fontWeight: 700 }}
-        />
-      );
-    }
-
-    // Bidding closes when the shift starts (backend `canBid`). Checked here too so an old shift
-    // never offers Bid Now, whatever the list says.
-    if (row?.isBiddingAllowed === false || hasShiftStarted(row, job)) {
+    if (row?.isBiddingAllowed === false) {
       return (
         <Chip
           size="small"
@@ -760,7 +731,6 @@ function JobActionButtons({
         />
       );
 
-      // Worker accepted but the shift has not started — the supplier can still cancel it.
       if (bookingStatus !== 'active' || !onCancelBooking) return assignedChip;
 
       return (
@@ -869,15 +839,12 @@ export function AgencyFindJobCard({
   onOpenAttendance,
   onOpenJob,
 }) {
-  // The booking on the job list is the state after a refresh; whatever this session just
-  // checked in / out wins over it.
+
   const attendance = resolveJobAttendance(job, liveAttendance);
   const shiftRows = getShiftRows(job);
   const hasMultipleSchedules = shiftRows.length > 1;
   const primaryShift = shiftRows[0];
-  // Reachable on every tab — a checked-out shift leaves the Active tab for Completed. Agencies
-  // and home care companies see it on shifts they assigned their own staff to (their booking).
-  // A completed shift always has attendance, even when its booking is not on the card.
+
   const shiftCompleted = primaryShift?.status === 'completed' || variant === 'completed';
   const showAttendance =
     (mode === 'staffMember' || Boolean(String(job?.bookingId || '').trim()) || shiftCompleted) &&
@@ -941,18 +908,19 @@ export function AgencyFindJobCard({
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }}>
             <JobStatusChip job={job} variant={variant} />
-            <Chip
-              label={job.distance || '— km'}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: 9,
-                fontWeight: 600,
-                bgcolor: 'grey.100',
-                flexShrink: 0,
-                opacity: job.distance ? 1 : 0.45,
-              }}
-            />
+            {hasJobDistance(job) ? (
+              <Chip
+                label={job.distance}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  bgcolor: 'grey.100',
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
           </Stack>
 
           <Tooltip title={job.description || ''} arrow placement="top" disableHoverListener={!job.description}>
@@ -972,13 +940,13 @@ export function AgencyFindJobCard({
                     height: 22,
                     fontWeight: 700,
                     fontSize: 11,
-                    bgcolor: 'primary.lighter',
-                    color: 'primary.dark',
-                    '& .MuiChip-icon': { color: 'primary.dark', ml: 0.5 },
+                    bgcolor: 'info.lighter',
+                    color: 'info.darker',
+                    '& .MuiChip-icon': { color: 'info.darker', ml: 0.5 },
                   }}
                 />
                 {dateParts.time ? (
-                  <Typography variant="caption" color="text.secondary" noWrap>
+                  <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700 }}>
                     {dateParts.time}
                   </Typography>
                 ) : null}
@@ -1167,25 +1135,36 @@ export function AgencyFindJobCard({
           shiftRows.slice(0, 1).map((row) => (
             <Stack key={row.id} spacing={0.35}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}>
-                <Chip
-                  size="small"
-                  icon={<Iconify icon="solar:calendar-bold" width={14} />}
-                  label={
-                    dateParts.hasDate
-                      ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}${dateParts.time ? ` · ${dateParts.time}` : ''}`
-                      : row.label || 'Date TBC'
-                  }
-                  sx={{
-                    height: 24,
-                    maxWidth: 1,
-                    fontWeight: 700,
-                    fontSize: 11,
-                    bgcolor: 'primary.lighter',
-                    color: 'primary.dark',
-                    '& .MuiChip-icon': { color: 'primary.dark', ml: 0.75 },
-                    '& .MuiChip-label': { px: 0.75 },
-                  }}
-                />
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+                  <Chip
+                    size="small"
+                    icon={<Iconify icon="solar:calendar-bold" width={14} />}
+                    label={
+                      dateParts.hasDate
+                        ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}`
+                        : 'Date TBC'
+                    }
+                    sx={{
+                      height: 24,
+                      maxWidth: 1,
+                      fontWeight: 700,
+                      fontSize: 11,
+                      bgcolor: 'info.lighter',
+                      color: 'info.darker',
+                      '& .MuiChip-icon': { color: 'info.darker', ml: 0.75 },
+                      '& .MuiChip-label': { px: 0.75 },
+                    }}
+                  />
+                  {dateParts.time ? (
+                    <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700, fontSize: 12 }}>
+                      {dateParts.time}
+                    </Typography>
+                  ) : !dateParts.hasDate && row.label ? (
+                    <Typography variant="caption" noWrap sx={{ color: 'info.darker', fontWeight: 700, fontSize: 12 }}>
+                      {row.label}
+                    </Typography>
+                  ) : null}
+                </Stack>
                 {hasMultipleSchedules && (
                   <Button
                     size="small"

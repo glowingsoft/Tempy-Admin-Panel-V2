@@ -1,9 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-import {
-  FAQ_ROUTE_KEYS_BY_ACCOUNT,
-  normalizeFaqsResponse,
-} from 'src/sections/faqs/faq-api-utils';
+import { FAQ_ROUTE_KEYS_BY_ACCOUNT, normalizeFaqsResponse } from 'src/sections/faqs/faq-api-utils';
 
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
@@ -14,33 +11,26 @@ function resolveFaqListUrl(accountKey) {
   return API_ROUTES[routeKey] || '';
 }
 
-/**
- * FAQ API
- * - Role dashboards: GET /settings/faqs
- * - Admin /admin-dashboard/faqs: CRUD on /admin/faqs
- */
+
 export const faqsApi = createApi({
   reducerPath: 'faqsApi',
   baseQuery: createCustomFetchBaseQuery(),
   tagTypes: ['Faq', 'AdminFaq'],
 
   endpoints: (builder) => ({
-    /** Role dashboards — GET /settings/faqs */
     getFaqs: builder.query({
-      query: ({ accountKey } = {}) => ({
+      query: ({ accountKey, page = 1, limit = 10 } = {}) => ({
         url: resolveFaqListUrl(accountKey),
         method: 'GET',
+        params: { page, limit },
       }),
       transformResponse: normalizeFaqsResponse,
-      providesTags: (_result, _error, arg) => [
-        { type: 'Faq', id: `LIST-${arg?.accountKey || 'unknown'}` },
-      ],
+      providesTags: (_result, _error, arg) => [{ type: 'Faq', id: `LIST-${arg?.accountKey || 'unknown'}` }],
     }),
 
-    /** Admin — GET /admin/faqs */
     getAdminFaqs: builder.query({
-      query: ({ type = '', keyword = '' } = {}) => {
-        const params = {};
+      query: ({ type = '', keyword = '', page = 1, limit = 10 } = {}) => {
+        const params = { page, limit };
         if (type && type !== 'all') params.type = type;
         if (keyword) params.keyword = keyword;
         return {
@@ -51,15 +41,9 @@ export const faqsApi = createApi({
       },
       transformResponse: normalizeFaqsResponse,
       providesTags: (result) =>
-        result?.data?.length
-          ? [
-              ...result.data.map((item) => ({ type: 'AdminFaq', id: item.id })),
-              { type: 'AdminFaq', id: 'LIST' },
-            ]
-          : [{ type: 'AdminFaq', id: 'LIST' }],
+        result?.data?.length ? [...result.data.map((item) => ({ type: 'AdminFaq', id: item.id })), { type: 'AdminFaq', id: 'LIST' }] : [{ type: 'AdminFaq', id: 'LIST' }],
     }),
 
-    /** Admin — POST /admin/faqs — body: { type, question, answer } */
     createFaq: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.ADMIN_FAQS,
@@ -70,7 +54,6 @@ export const faqsApi = createApi({
       invalidatesTags: [{ type: 'AdminFaq', id: 'LIST' }],
     }),
 
-    /** Admin — PUT /admin/faqs/:id */
     updateFaq: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.ADMIN_FAQS_BY_ID(id),
@@ -84,7 +67,6 @@ export const faqsApi = createApi({
       ],
     }),
 
-    /** Admin — DELETE /admin/faqs/:id */
     deleteFaq: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.ADMIN_FAQS_BY_ID(id),
@@ -98,10 +80,4 @@ export const faqsApi = createApi({
   }),
 });
 
-export const {
-  useGetFaqsQuery,
-  useGetAdminFaqsQuery,
-  useCreateFaqMutation,
-  useUpdateFaqMutation,
-  useDeleteFaqMutation,
-} = faqsApi;
+export const { useGetFaqsQuery, useGetAdminFaqsQuery, useCreateFaqMutation, useUpdateFaqMutation, useDeleteFaqMutation } = faqsApi;

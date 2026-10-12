@@ -24,9 +24,11 @@ import {
   JOB_STATUS_OPTIONS,
   createDefaultSchedule,
   jobToDraft,
+  mergeEmptyJobContact,
   validateCareDetails,
   validateJobDraft,
 } from './care-home-job-utils';
+import { useLastJobContactDetails } from './use-last-job-contact';
 
 
 function buildOpenDraft({ editingJob, initialDraft }) {
@@ -69,6 +71,8 @@ export function PostJobDialog({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const wasOpenRef = useRef(false);
+  const contactAppliedRef = useRef(false);
+  const lastContact = useLastJobContactDetails(mode, open && !editingJob);
 
   const isBookShift = intent === 'bookShift' && !editingJob;
   const isRequest = intent === 'request' && !editingJob;
@@ -88,14 +92,25 @@ export function PostJobDialog({
         : 'Add job';
 
   useEffect(() => {
+    if (!open) {
+      contactAppliedRef.current = false;
+    }
     if (open && !wasOpenRef.current) {
-      setDraft(buildOpenDraft({ editingJob, initialDraft }));
+      const next = buildOpenDraft({ editingJob, initialDraft });
+      setDraft(editingJob ? next : mergeEmptyJobContact(next, lastContact));
       setStep(1);
       setFormError('');
       setSubmitting(false);
+      contactAppliedRef.current = Boolean(!editingJob && lastContact);
     }
     wasOpenRef.current = open;
-  }, [open, editingJob, initialDraft]);
+  }, [open, editingJob, initialDraft, lastContact]);
+
+  useEffect(() => {
+    if (!open || editingJob || !lastContact || contactAppliedRef.current) return;
+    contactAppliedRef.current = true;
+    setDraft((prev) => mergeEmptyJobContact(prev, lastContact));
+  }, [editingJob, lastContact, open]);
 
   const handleDraftChange = useCallback((field, value) => {
     setFormError('');

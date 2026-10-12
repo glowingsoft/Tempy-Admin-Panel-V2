@@ -41,58 +41,17 @@ function findTypeCount(list, keys) {
   return toCount(match?.value);
 }
 
-/** Static until payment/billing lands on /admin/dashboard. */
-export const STATIC_ADMIN_MONEY_BY_ORG = [
-  { label: 'Care Home', billed: 18450, earned: 14220 },
-  { label: 'Hospital / NHS', billed: 12680, earned: 10140 },
-  { label: 'Local Authority', billed: 9420, earned: 7850 },
-  { label: 'Individual (Home Care)', billed: 3680, earned: 2940 },
-  { label: 'Agency', billed: 0, earned: 15680 },
-  { label: 'Home Care Company', billed: 0, earned: 8940 },
-  { label: 'Staff Member', billed: 0, earned: 6720 },
-];
+function mapSpendEarned(source) {
+  const block = asObject(source);
+  const rows = Array.isArray(block.series) ? block.series : Array.isArray(source) ? source : [];
 
-/** Static until rate-type breakdown lands on /admin/dashboard. */
-export const STATIC_ADMIN_RATE_MIX = [
-  { label: 'Bid rates', value: 46 },
-  { label: 'Reduced rates', value: 31 },
-  { label: 'Set rates', value: 23 },
-];
-
-function mapMoneyByOrg(source) {
-  const finance = asObject(source);
-  const rows = Array.isArray(finance.byType)
-    ? finance.byType
-    : Array.isArray(finance.byOrganisation)
-      ? finance.byOrganisation
-      : Array.isArray(finance.rows)
-        ? finance.rows
-        : [];
-
-  const mapped = rows
+  return rows
     .map((row) => ({
-      label: formatSeriesLabel(row?.label || row?.type || row?.organisationType),
-      billed: toCount(row?.billed ?? row?.billedAmount ?? row?.invoiced),
-      earned: toCount(row?.earned ?? row?.earnedAmount ?? row?.paid),
+      label: formatSeriesLabel(row?.label || row?.userType),
+      spend: toCount(row?.spend ?? row?.billed),
+      earned: toCount(row?.earned),
     }))
     .filter((row) => row.label);
-
-  return mapped.length ? mapped : STATIC_ADMIN_MONEY_BY_ORG;
-}
-
-function mapRateMix(source) {
-  const rates = asObject(source);
-  if (Array.isArray(rates.series) && rates.series.length) {
-    const series = labelSeries(rates.series).filter((item) => item.value > 0);
-    if (series.length) return series;
-  }
-  const fromFields = [
-    { label: 'Bid rates', value: toCount(rates.bid ?? rates.bidRates) },
-    { label: 'Reduced rates', value: toCount(rates.reduced ?? rates.reducedRates) },
-    { label: 'Set rates', value: toCount(rates.set ?? rates.setRates) },
-  ].filter((item) => item.value > 0);
-
-  return fromFields.length ? fromFields : STATIC_ADMIN_RATE_MIX;
 }
 
 function statusSeries(source = {}, keys = []) {
@@ -214,6 +173,9 @@ function mapHeatMapChart(rows) {
       { name: 'Total', data: sorted.map((row) => toCount(row.total)) },
       { name: 'Pending', data: sorted.map((row) => toCount(row.pending)) },
       { name: 'Active', data: sorted.map((row) => toCount(row.active)) },
+      { name: 'In progress', data: sorted.map((row) => toCount(row.inProgress)) },
+      { name: 'Completed', data: sorted.map((row) => toCount(row.completed)) },
+      { name: 'Cancelled', data: sorted.map((row) => toCount(row.cancelled)) },
     ],
   };
 }
@@ -274,8 +236,10 @@ export function mapAdminDashboardFromApi(response) {
     ? growth.categories.map((label) => String(label || '').trim() || '—')
     : [];
   const usersByType = labelSeries(data.usersByType?.series);
-  const moneyByOrg = mapMoneyByOrg(data.finance || data.monies || data.billing);
-  const rateMix = mapRateMix(data.rates || data.rateMix || jobs.rateTypes || bids.rateTypes);
+  const moneyByOrg = mapSpendEarned(data.spendEarnedByUserType);
+  const permanentHires = asObject(data.permanentHires);
+  const allegations = asObject(data.allegations);
+  const allegationFeeds = asObject(allegations.derived);
   const regionalHeatMap = mapRegionalHeatMap(data.regionalHeatMap);
   const heatMapChart = mapHeatMapChart(regionalHeatMap);
 
@@ -334,6 +298,24 @@ export function mapAdminDashboardFromApi(response) {
         icon: 'solar:calendar-bold-duotone',
         color: 'info',
       },
+      {
+        title: 'Total bids',
+        total: toCount(bids.total),
+        icon: 'solar:document-text-bold-duotone',
+        color: 'warning',
+      },
+      {
+        title: 'Permanent hires',
+        total: toCount(permanentHires.total),
+        icon: 'solar:user-check-rounded-bold-duotone',
+        color: 'success',
+      },
+      {
+        title: 'Open allegations',
+        total: toCount(allegations.open),
+        icon: 'solar:danger-triangle-bold-duotone',
+        color: 'error',
+      },
     ],
     breakdowns: [
       {
@@ -379,9 +361,32 @@ export function mapAdminDashboardFromApi(response) {
     ],
     usersByType,
     moneyByOrg,
-    rateMix,
+    permanentHires: {
+      total: toCount(permanentHires.total),
+      series: labelSeries(permanentHires.series),
+    },
+    allegations: {
+      total: toCount(allegations.total),
+      series: [
+        { label: 'Raised', value: toCount(allegations.raised) },
+        { label: 'Open', value: toCount(allegations.open) },
+        { label: 'Under review', value: toCount(allegations.underReview) },
+        { label: 'Suspended workers', value: toCount(allegations.suspendedWorkers) },
+        { label: 'Pending shifts', value: toCount(allegations.pendingShifts) },
+      ],
+    },
+    allegationFeeds: {
+      total: toCount(allegationFeeds.total),
+      series: [
+        { label: 'Suspended user', value: toCount(allegationFeeds.suspended_user) },
+        { label: 'Cancellation strike', value: toCount(allegationFeeds.cancellation_strike) },
+        { label: 'Abandoned shift', value: toCount(allegationFeeds.abandoned_shift) },
+        { label: 'Reported user', value: toCount(allegationFeeds.reported_user) },
+      ],
+    },
     jobStatus: labelSeries(data.jobStatus?.series),
     customerSupplier: labelSeries(data.customerSupplier?.series),
+    bidsTotal: toCount(bids.total),
     bidsStatus: [
       { label: 'Open', value: toCount(bids.open) },
       { label: 'Accepted', value: toCount(bids.accepted) },
