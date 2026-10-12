@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { fToNow } from 'src/utils/format-time';
 
@@ -25,7 +26,10 @@ export function NotificationActionDialog({
   open,
   notification,
   loading = false,
+  showActions = false,
   onClose,
+  onAccept,
+  onReject,
 }) {
   if (!notification) return null;
 
@@ -72,6 +76,21 @@ export function NotificationActionDialog({
         <Button color="inherit" variant="outlined" onClick={onClose} disabled={loading}>
           Close
         </Button>
+        {showActions ? (
+          <>
+            <LoadingButton
+              color="error"
+              variant="outlined"
+              loading={loading}
+              onClick={onReject}
+            >
+              Reject
+            </LoadingButton>
+            <LoadingButton variant="contained" loading={loading} onClick={onAccept}>
+              Accept
+            </LoadingButton>
+          </>
+        ) : null}
       </DialogActions>
     </Dialog>
   );
@@ -81,5 +100,8 @@ NotificationActionDialog.propTypes = {
   open: PropTypes.bool,
   notification: PropTypes.object,
   loading: PropTypes.bool,
+  showActions: PropTypes.bool,
   onClose: PropTypes.func,
+  onAccept: PropTypes.func,
+  onReject: PropTypes.func,
 };

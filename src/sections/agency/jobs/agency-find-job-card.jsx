@@ -994,13 +994,13 @@ export function AgencyFindJobCard({
         </Stack>
 
         <Stack alignItems="flex-end" spacing={0.25} sx={{ flexShrink: 0, minWidth: 90 }}>
-          {job.totalPay != null ? (
+          {job.hourlyRate != null ? (
+            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ color: 'primary.main', lineHeight: 1.2 }}>
+              {fCurrency(job.hourlyRate)}/hr
+            </Typography>
+          ) : job.totalPay != null ? (
             <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'primary.main', lineHeight: 1.2 }}>
               {fCurrency(job.totalPay)}
-            </Typography>
-          ) : job.hourlyRate != null ? (
-            <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'primary.main', lineHeight: 1.2 }}>
-              {fCurrency(job.hourlyRate)}
             </Typography>
           ) : null}
           <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
@@ -1181,15 +1181,22 @@ export function AgencyFindJobCard({
                     </Typography>
                   ) : null}
                 </Stack>
-                {hasMultipleSchedules && (
-                  <Button
-                    size="small"
-                    onClick={() => onViewAllSchedules?.(job)}
-                    sx={{ minWidth: 'auto', px: 0.5, py: 0, fontSize: 9, fontWeight: 700 }}
-                  >
-                    View All
-                  </Button>
-                )}
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: 'auto' }}>
+                  {hasMultipleSchedules && (
+                    <Button
+                      size="small"
+                      onClick={() => onViewAllSchedules?.(job)}
+                      sx={{ minWidth: 'auto', px: 0.5, py: 0, fontSize: 9, fontWeight: 700 }}
+                    >
+                      View All
+                    </Button>
+                  )}
+                  {job.hourlyRate != null && (
+                    <Typography variant="subtitle2" noWrap sx={{ color: 'primary.main', fontWeight: 800, fontSize: 13 }}>
+                      {fCurrency(job.hourlyRate)}/hr
+                    </Typography>
+                  )}
+                </Stack>
               </Stack>
 
               {(showCareDetails || isFindJobsBidVariant(variant, mode, job) || bookingActionsInShiftRow) && (
