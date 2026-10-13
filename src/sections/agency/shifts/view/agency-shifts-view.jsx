@@ -322,9 +322,9 @@ function formatShiftTime(t) {
   const hour = parseInt(h, 10);
   const min = parseInt(m, 10);
   if (!Number.isFinite(hour) || !Number.isFinite(min)) return '--:--';
-  const suffix = hour >= 12 ? 'p' : 'a';
+  const suffix = hour >= 12 ? 'PM' : 'AM';
   const h12 = hour % 12 || 12;
-  return `${h12}:${String(min).padStart(2, '0')}${suffix}`;
+  return `${h12}:${String(min).padStart(2, '0')} ${suffix}`;
 }
 
 function shiftHours(startTime, endTime) {
