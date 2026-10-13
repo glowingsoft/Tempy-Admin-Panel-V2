@@ -583,21 +583,25 @@ function JobActionButtons({
       !checkedOut && (bookingStatus === 'inProgress' || Boolean(attendance?.checkInAt));
 
     if (checkedOut) {
+      const inTime = formatAttendanceTime(attendance?.checkInAt);
+      const outTime = formatAttendanceTime(attendance?.checkOutAt);
+
       return (
-        <Stack spacing={0.35} alignItems="flex-end" sx={sx}>
-          <Stack direction="row" spacing={0.35} alignItems="center">
-            {chatButton}
-            <Chip
-              size="small"
-              label="Completed"
-              color="success"
-              sx={{ height: 22, fontSize: 10, fontWeight: 700 }}
-            />
-          </Stack>
-          {attendance?.checkInAt || attendance?.checkOutAt ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 9, lineHeight: 1.3 }}>
-              In {formatAttendanceTime(attendance.checkInAt) || '—'} · Out{' '}
-              {formatAttendanceTime(attendance.checkOutAt) || '—'}
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
+          {chatButton}
+          <Chip
+            size="small"
+            label="Completed"
+            color="success"
+            sx={{ height: 22, fontSize: 10, fontWeight: 700, flexShrink: 0 }}
+          />
+          {inTime || outTime ? (
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: 'text.secondary', fontSize: 10, fontWeight: 600, lineHeight: 1 }}
+            >
+              In {inTime || '—'} · Out {outTime || '—'}
             </Typography>
           ) : null}
         </Stack>
@@ -605,23 +609,27 @@ function JobActionButtons({
     }
 
     if (checkedIn) {
+      const inTime = formatAttendanceTime(attendance?.checkInAt);
+
       return (
-        <Stack spacing={0.35} alignItems="flex-end" sx={sx}>
-          <Stack direction="row" spacing={0.35} alignItems="center">
-            {chatButton}
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              onClick={() => onCheckOut?.(job)}
-              sx={{ ...actionButtonSx, ...sx }}
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
+          {chatButton}
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            onClick={() => onCheckOut?.(job)}
+            sx={{ ...actionButtonSx, ...sx, flexShrink: 0 }}
+          >
+            Check Out
+          </Button>
+          {inTime ? (
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: 'text.secondary', fontSize: 10, fontWeight: 600, lineHeight: 1 }}
             >
-              Check Out
-            </Button>
-          </Stack>
-          {attendance?.checkInAt ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 9 }}>
-              In {formatAttendanceTime(attendance.checkInAt)}
+              In {inTime}
             </Typography>
           ) : null}
         </Stack>

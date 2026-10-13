@@ -895,12 +895,38 @@ export function JwtSignUpView() {
       {activeStep === 0 && (
         <>
           <Stack spacing={1} sx={{ width: 1 }}>
+            {!role && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1,
+                  width: 1,
+                  px: 1.5,
+                  py: 1,
+                  mb: 1.5,
+                  borderRadius: 1.5,
+                  bgcolor: 'warning.lighter',
+                  border: '1px solid',
+                  borderColor: 'warning.light',
+                }}
+              >
+                <Iconify
+                  icon="solar:info-circle-bold"
+                  width={18}
+                  sx={{ color: 'warning.dark', mt: '1px', flexShrink: 0 }}
+                />
+                <Typography variant="caption" sx={{ color: 'warning.darker', fontWeight: 700, lineHeight: 1.5 }}>
+                  Select a role first. Continue with Google stays off until you choose one.
+                </Typography>
+              </Box>
+            )}
             <AuthRoleSelect
               name="role"
               label="Select Role"
               options={AUTH_SIGNUP_ROLE_OPTIONS}
               placeholder="Select role"
-              helperText="Choose your role first. Google sign-up uses this account type."
+              helperText={role ? '' : 'Google sign-up uses the role you pick here.'}
             />
           </Stack>
 
@@ -1342,6 +1368,7 @@ export function JwtSignUpView() {
           onGoogleClick={handleGoogleSignUp}
           loadingProvider={socialLoading}
           disabled={!role}
+          disabledHint={role ? '' : 'Select a role above to continue with Google'}
         />
       )}
     </Stack>

@@ -139,7 +139,9 @@ export function useConversationsSocket({
         token,
       },
       reconnection: true,
-      reconnectionAttempts: 8,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socketRef.current = socket;
@@ -193,8 +195,16 @@ export function useConversationsSocket({
       });
     };
 
+    const handleVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!socket.connected) socket.connect();
+    };
+
     socket.on('connect', handleConnect);
     socket.on('receiveMessage', handleReceiveMessage);
+    socket.on('newMessage', handleReceiveMessage);
+    socket.on('message', handleReceiveMessage);
+    socket.on('messageReceived', handleReceiveMessage);
     socket.on('chatUpdated', handleChatUpdated);
     socket.on('messageDeleted', handleMessageDeleted);
     socket.on('deleteMessage', handleMessageDeleted);
@@ -206,10 +216,17 @@ export function useConversationsSocket({
     socket.on('userOffline', handleUserOffline);
     socket.on('onlineStatus', handleOnlineStatus);
     socket.on('presenceUpdate', handleOnlineStatus);
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('online', handleVisible);
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('online', handleVisible);
       socket.off('connect', handleConnect);
       socket.off('receiveMessage', handleReceiveMessage);
+      socket.off('newMessage', handleReceiveMessage);
+      socket.off('message', handleReceiveMessage);
+      socket.off('messageReceived', handleReceiveMessage);
       socket.off('chatUpdated', handleChatUpdated);
       socket.off('messageDeleted', handleMessageDeleted);
       socket.off('deleteMessage', handleMessageDeleted);

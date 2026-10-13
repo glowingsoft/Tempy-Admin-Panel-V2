@@ -41,7 +41,7 @@ export function ApiMessagesView({ groupByCategory = true } = {}) {
     <DashboardContent
       maxWidth={false}
       sx={{
-        px: { xs: 1, sm: 2, md: 3 },
+        px: { xs: 1, md: 1.5 },
         pb: { xs: 1, lg: 1.5 },
         minHeight: 0,
       }}

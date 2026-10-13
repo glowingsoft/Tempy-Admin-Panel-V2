@@ -96,6 +96,7 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
   const [pendingByObjectId, setPendingByObjectId] = useState({});
   const [sendBusy, setSendBusy] = useState(false);
   const skipSocketRefreshRef = useRef(false);
+  const socketRefreshTimerRef = useRef(null);
 
   const filterVisibleMessages = useCallback((messages = []) => messages || [], []);
 
@@ -280,39 +281,25 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     [refetch, updateConversationOnlineStatus]
   );
 
+  const refreshOpenChat = useCallback(() => {
+    if (selectedObjectId) refetchMessages();
+    refetch();
+  }, [refetch, refetchMessages, selectedObjectId]);
+
   const handleSocketMessage = useCallback(
-    async (payload, eventType = 'receiveMessage') => {
+    (payload) => {
       if (payload?.isOnline !== undefined || payload?.online !== undefined) {
         handleOnlineStatus(payload);
       }
 
-      if (skipSocketRefreshRef.current) return;
-
-      const conversationId = String(payload?.conversationId || payload?.conversation?._id || '').trim();
-      const objectId = String(
-        payload?.objectId ||
-          payload?.participantId ||
-          payload?.senderId ||
-          payload?.sender?._id ||
-          ''
-      ).trim();
-
-      if (eventType === 'chatUpdated') {
-        if (objectId && objectId === selectedObjectId) {
-          await refetchMessages();
-        }
-        await refetch();
-        return;
-      }
-
-      if (objectId && objectId === selectedObjectId) {
-        await refetchMessages();
-      } else if (conversationId || objectId) {
-        await refetch();
-      }
+      refreshOpenChat();
+      window.clearTimeout(socketRefreshTimerRef.current);
+      socketRefreshTimerRef.current = window.setTimeout(refreshOpenChat, 800);
     },
-    [handleOnlineStatus, refetch, refetchMessages, selectedObjectId]
+    [handleOnlineStatus, refreshOpenChat]
   );
+
+  useEffect(() => () => window.clearTimeout(socketRefreshTimerRef.current), []);
 
   const handleSocketMessageDeleted = useCallback(async () => {
     if (skipSocketRefreshRef.current) return;
@@ -327,8 +314,8 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
   }, [refetch, refetchMessages]);
 
   const handleSocketConnect = useCallback(() => {
-    refetch();
-  }, [refetch]);
+    refreshOpenChat();
+  }, [refreshOpenChat]);
 
   const { emitDeleteMessage, emitDeleteConversation } = useConversationsSocket({
     enabled: Boolean(currentUserId && selectedObjectId),

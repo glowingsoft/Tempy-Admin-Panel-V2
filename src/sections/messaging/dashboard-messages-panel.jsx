@@ -276,7 +276,7 @@ function MessageBubble({ message, onDelete }) {
       <Stack alignItems={isMe ? 'flex-end' : 'flex-start'} sx={{ mb: 1.5, width: 1 }}>
         <Box
           sx={{
-            maxWidth: { xs: '88%', sm: '78%', md: '72%' },
+            maxWidth: { xs: '92%', md: '78%' },
             px: 2,
             py: 1.25,
             borderRadius: 2.5,
@@ -299,7 +299,7 @@ function MessageBubble({ message, onDelete }) {
   }
 
   const bubbleSx = {
-    maxWidth: '72%',
+    maxWidth: { xs: '92%', md: '78%' },
     minWidth: 0,
     borderRadius: 2.5,
     borderTopRightRadius: isMe ? 6 : 20,
@@ -513,6 +513,26 @@ function MessageBubble({ message, onDelete }) {
   );
 }
 
+function compactChatTime(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const lower = text.toLowerCase();
+  if (lower.includes('second')) return 'now';
+  if (/^an?\s+minute/.test(lower)) return '1m';
+  const minutes = lower.match(/(\d+)\s*minute/);
+  if (minutes) return `${minutes[1]}m`;
+  if (lower.includes('minute')) return '1m';
+  if (/^an?\s+hour/.test(lower)) return '1h';
+  const hours = lower.match(/(\d+)\s*hour/);
+  if (hours) return `${hours[1]}h`;
+  if (lower.includes('hour')) return '1h';
+  if (/^a\s+day/.test(lower)) return '1d';
+  const days = lower.match(/(\d+)\s*day/);
+  if (days) return `${days[1]}d`;
+  if (lower.includes('day')) return '1d';
+  return text.length > 12 ? text.slice(0, 12) : text;
+}
+
 function ChatListItem({ item, selected, onClick, onDelete }) {
   const menu = usePopover();
   const canDelete = typeof onDelete === 'function';
@@ -532,7 +552,7 @@ function ChatListItem({ item, selected, onClick, onDelete }) {
         '&:hover': { bgcolor: selected ? 'primary.lighter' : 'action.hover' },
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.25} alignItems="center">
         <OnlineAvatar
           label={item.avatar}
           avatarUrl={item.avatarUrl || resolveProfileAssetUrl(item.chatIcon || item.profileIcon)}
@@ -540,53 +560,48 @@ function ChatListItem({ item, selected, onClick, onDelete }) {
           size={44}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={0.75}>
             <Typography
               variant="subtitle2"
-              fontWeight={item.unread ? 700 : 600}
-              sx={{ wordBreak: 'break-word', whiteSpace: 'normal', flex: 1, minWidth: 0 }}
+              noWrap
+              fontWeight={item.unread ? 800 : 700}
+              sx={{ flex: 1, minWidth: 0 }}
             >
               {item.name}
             </Typography>
-            <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0, mt: 0.15 }}>
-              {item.lastAt ? (
-                <Typography variant="caption" color="text.disabled" sx={{ whiteSpace: 'nowrap' }}>
-                  {item.lastAt}
-                </Typography>
-              ) : null}
-              {canDelete ? (
-                <IconButton
-                  size="small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    menu.onOpen(event);
-                  }}
-                  aria-label="Conversation options"
-                  sx={{
-                    width: 26,
-                    height: 26,
-                    color: 'text.secondary',
-                    '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
-                  }}
-                >
-                  <Iconify icon="eva:more-vertical-fill" width={16} />
-                </IconButton>
-              ) : null}
-            </Stack>
+            {item.lastAt ? (
+              <Typography variant="caption" noWrap sx={{ flexShrink: 0, color: 'text.disabled', fontWeight: 600 }}>
+                {compactChatTime(item.lastAt)}
+              </Typography>
+            ) : null}
+            {canDelete ? (
+              <IconButton
+                size="small"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  menu.onOpen(event);
+                }}
+                aria-label="Conversation options"
+                sx={{
+                  width: 24,
+                  height: 24,
+                  flexShrink: 0,
+                  color: 'text.disabled',
+                  '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                }}
+              >
+                <Iconify icon="eva:more-vertical-fill" width={16} />
+              </IconButton>
+            ) : null}
           </Stack>
           {(item.lovedOne || item.relationship) && (
-            <Typography variant="caption" color="text.disabled" display="block" sx={{ mt: 0.15, wordBreak: 'break-word' }}>
+            <Typography variant="caption" color="text.disabled" noWrap display="block">
               {item.relationship && item.lovedOne
                 ? `${item.relationship} · ${item.lovedOne}`
                 : item.lovedOne || item.relationship}
             </Typography>
           )}
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            noWrap
-            sx={{ mt: 0.25, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}
-          >
+          <Typography variant="body2" color="text.secondary" noWrap sx={{ display: 'block' }}>
             {item.lastMessage}
           </Typography>
         </Box>
@@ -657,11 +672,7 @@ export function DashboardMessagesPanel({
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState('');
   const [chatsOpen, setChatsOpen] = useState(true);
-  const [detailsOpen, setDetailsOpen] = useState(true);
-  // Below lg the details panel overlays the thread, so it starts closed there.
-  useEffect(() => {
-    setDetailsOpen(lgUp);
-  }, [lgUp]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(true);
   const [mobileView, setMobileView] = useState('inbox');
   const wasLgUpRef = useRef(lgUp);
@@ -1557,6 +1568,7 @@ export function DashboardMessagesPanel({
       >
         <Box
           sx={{
+            width: 1,
             minHeight: '100%',
             display: 'flex',
             flexDirection: 'column',
@@ -1582,7 +1594,7 @@ export function DashboardMessagesPanel({
         </Box>
       </Box>
 
-      <Box sx={{ px: { xs: 1, sm: 2 }, pb: { xs: 1, sm: 2 }, pt: 0.5 }}>
+      <Box sx={{ width: 1, px: { xs: 1.5, md: 2.5 }, pb: { xs: 1.5, md: 2 }, pt: 1 }}>
         {recording && (
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, px: 0.5 }}>
             <Box
@@ -1928,10 +1940,13 @@ export function DashboardMessagesPanel({
           width: 1,
           maxWidth: 1,
           height: {
-            xs: 'calc(100dvh - var(--layout-header-mobile-height) - 32px)',
-            lg: 'calc(100dvh - var(--layout-header-desktop-height) - 36px)',
+            xs: 'calc(100dvh - var(--layout-header-mobile-height) - var(--layout-dashboard-content-pt) - 24px)',
+            lg: 'calc(100dvh - var(--layout-header-desktop-height) - var(--layout-dashboard-content-pt) - 28px)',
           },
-          maxHeight: 'calc(100dvh - var(--layout-header-mobile-height) - 16px)',
+          maxHeight: {
+            xs: 'calc(100dvh - var(--layout-header-mobile-height) - var(--layout-dashboard-content-pt) - 24px)',
+            lg: 'calc(100dvh - var(--layout-header-desktop-height) - var(--layout-dashboard-content-pt) - 28px)',
+          },
           minHeight: 320,
           display: 'flex',
           overflow: 'hidden',
@@ -1941,7 +1956,7 @@ export function DashboardMessagesPanel({
       >
         <Box
           sx={{
-            width: { xs: 1, lg: 280, xl: 320 },
+            width: { xs: 1, lg: 300 },
             flex: { xs: '1 1 auto', lg: '0 0 auto' },
             minWidth: 0,
             maxWidth: 1,
