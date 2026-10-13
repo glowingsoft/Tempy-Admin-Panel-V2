@@ -4,15 +4,16 @@ import { useCallback, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
+import Avatar from '@mui/material/Avatar';
 import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import ListItemText from '@mui/material/ListItemText';
 import LinearProgress from '@mui/material/LinearProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
+import { fCurrency } from 'src/utils/format-number';
 import { fToNow } from 'src/utils/format-time';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -31,6 +32,27 @@ import {
   useRespondNurseStaffRequestMutation,
 } from 'src/store/Reducer/nurse-staff-requests-api';
 
+import { StaffRequestProfileDialog } from './staff-request-profile-dialog';
+
+function requestMeta(request) {
+  const parts = [];
+
+  if (request.specialtyLabel || request.specialty) {
+    parts.push(request.specialtyLabel || request.specialty);
+  }
+
+  if (request.ratePerHour != null && request.ratePerHour !== '') {
+    const amount = fCurrency(request.ratePerHour);
+    if (amount) parts.push(`${amount}/hr`);
+  }
+
+  if (request.platformPercent != null && request.platformPercent !== '') {
+    parts.push(`${request.platformPercent}% platform`);
+  }
+
+  return parts.join(' · ');
+}
+
 const STATUS_COLOR = {
   pending: 'warning',
   accepted: 'success',
@@ -40,6 +62,7 @@ const STATUS_COLOR = {
 export function StaffRequestsDrawer({ sx, ...other }) {
   const drawer = useBoolean();
   const viewOnly = useViewOnly();
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetNurseStaffRequestsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -61,6 +84,7 @@ export function StaffRequestsDrawer({ sx, ...other }) {
           response?.message ||
           (action === 'reject' ? 'Staff request rejected' : 'Staff request accepted')
         );
+        setSelectedRequest(null);
         refetch();
       } catch (err) {
         toast.error(
@@ -117,39 +141,70 @@ export function StaffRequestsDrawer({ sx, ...other }) {
             <Box
               component="li"
               key={request.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedRequest(request)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedRequest(request);
+                }
+              }}
               sx={{
                 p: 2.5,
+                cursor: 'pointer',
                 borderBottom: (theme) => `dashed 1px ${theme.vars.palette.divider}`,
+                '&:hover': { bgcolor: 'action.hover' },
               }}
             >
               <Stack spacing={1.25}>
-                <Stack direction="row" alignItems="flex-start" spacing={1}>
-                  <ListItemText
-                    primary={
-                      <Typography variant="subtitle2">{request.agencyName}</Typography>
-                    }
-                    secondary={
-                      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                        {request.message ? (
-                          <Typography variant="body2" color="text.secondary">
-                            {request.message}
-                          </Typography>
-                        ) : null}
-                        <Typography variant="caption" color="text.disabled">
-                          {[request.specialty, request.createdAt ? fToNow(request.createdAt) : '']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </Typography>
-                      </Stack>
-                    }
-                  />
-                  <Label
-                    variant="soft"
-                    color={STATUS_COLOR[request.status] || 'default'}
-                    sx={{ textTransform: 'capitalize', flexShrink: 0 }}
+                <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                  <Avatar
+                    src={request.avatarUrl || undefined}
+                    alt={request.agencyName}
+                    sx={{ width: 44, height: 44, flexShrink: 0 }}
                   >
-                    {request.status}
-                  </Label>
+                    {request.agencyName?.[0]}
+                  </Avatar>
+
+                  <Stack spacing={0.5} sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Stack direction="row" alignItems="flex-start" spacing={1}>
+                      <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                        {request.agencyName}
+                      </Typography>
+                      <Label
+                        variant="soft"
+                        color={STATUS_COLOR[request.status] || 'default'}
+                        sx={{ textTransform: 'capitalize', flexShrink: 0 }}
+                      >
+                        {request.status}
+                      </Label>
+                    </Stack>
+
+                    {request.email ? (
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        {request.email}
+                      </Typography>
+                    ) : null}
+
+                    {request.message ? (
+                      <Typography variant="body2" color="text.secondary">
+                        {request.message}
+                      </Typography>
+                    ) : null}
+
+                    {requestMeta(request) ? (
+                      <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                        {requestMeta(request)}
+                      </Typography>
+                    ) : null}
+
+                    {request.createdAt ? (
+                      <Typography variant="caption" color="text.disabled">
+                        {fToNow(request.createdAt)}
+                      </Typography>
+                    ) : null}
+                  </Stack>
                 </Stack>
 
                 {request.canRespond && !viewOnly ? (
@@ -164,7 +219,10 @@ export function StaffRequestsDrawer({ sx, ...other }) {
                         activeAction?.action === 'accept'
                       }
                       disabled={respondState.isLoading && activeAction?.id === request.id}
-                      onClick={() => handleAccept(request)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleAccept(request);
+                      }}
                       startIcon={<Iconify icon="solar:check-circle-bold" width={18} />}
                     >
                       Accept
@@ -180,7 +238,10 @@ export function StaffRequestsDrawer({ sx, ...other }) {
                         activeAction?.action === 'reject'
                       }
                       disabled={respondState.isLoading && activeAction?.id === request.id}
-                      onClick={() => handleReject(request)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleReject(request);
+                      }}
                       startIcon={<Iconify icon="solar:close-circle-bold" width={18} />}
                     >
                       Reject
@@ -223,6 +284,19 @@ export function StaffRequestsDrawer({ sx, ...other }) {
         {renderHead}
         {renderList}
       </Drawer>
+
+      <StaffRequestProfileDialog
+        request={selectedRequest}
+        open={Boolean(selectedRequest)}
+        onClose={() => setSelectedRequest(null)}
+        onAccept={handleAccept}
+        onReject={handleReject}
+        responding={Boolean(respondState.isLoading && selectedRequest && activeAction?.id === selectedRequest.id)}
+        activeAction={
+          selectedRequest && activeAction?.id === selectedRequest.id ? activeAction.action : ''
+        }
+        viewOnly={viewOnly}
+      />
     </>
   );
 }
