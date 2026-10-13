@@ -1,6 +1,6 @@
 import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
-import { parseCoordinates } from 'src/sections/branches/geo-coordinates';
+import { parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
 import { normalizeBookingStatus } from 'src/sections/agency/jobs/agency-job-api-utils';
 
 /** Staff-member check-in / check-out — PUT + GET logs only (no booking list). */
@@ -227,15 +227,15 @@ export function extractBookingIdFromResponse(response) {
 /** Job pin for radius check — browser GPS is often far from the shift location. */
 export function getJobCheckInPoint(job) {
   const parsed = parseCoordinates(job?.raw?.location?.coordinates || job?.location?.coordinates);
-  const lat = Number(job?.latitude ?? job?.lat ?? job?.raw?.latitude ?? parsed?.latitude);
-  const lng = Number(job?.longitude ?? job?.lng ?? job?.raw?.longitude ?? parsed?.longitude);
+  const lat = Number(readApiLate(job) ?? readApiLate(job?.raw) ?? parsed?.latitude);
+  const lng = Number(readApiLong(job) ?? readApiLong(job?.raw) ?? parsed?.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
   return { lat, lng };
 }
 
 export function buildCheckInOutBody({ status, location, proofPicture, signature }) {
-  const lat = location?.lat != null ? Number(location.lat) : null;
-  const lng = location?.lng != null ? Number(location.lng) : null;
+  const lat = Number(readApiLate(location));
+  const lng = Number(readApiLong(location));
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
   const body = {
@@ -245,7 +245,7 @@ export function buildCheckInOutBody({ status, location, proofPicture, signature 
   if (hasCoords) {
     body.location = {
       type: 'Point',
-      coordinates: [lat, lng],
+      coordinates: toApiCoordinates(lat, lng),
     };
   }
 
@@ -359,14 +359,20 @@ export const EMPTY_ATTENDANCE = {
   bookingStatus: '',
 };
 
-/** GeoJSON `{ type: 'Point', coordinates: [lat, lng] }` → `{ lat, lng }`, or null. */
+/** API point `{ coordinates: [long, lat] }` → `{ lat, lng }`, or null. */
 function pickPoint(value) {
-  const coordinates = Array.isArray(value?.coordinates) ? value.coordinates : null;
-  if (!coordinates || coordinates.length < 2) return null;
-  const lat = Number(coordinates[0]);
-  const lng = Number(coordinates[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
-  return { lat, lng };
+  const parsed = parseCoordinates(value?.coordinates);
+  if (parsed && !(parsed.latitude === 0 && parsed.longitude === 0)) {
+    return { lat: parsed.latitude, lng: parsed.longitude };
+  }
+
+  const lat = Number(readApiLate(value));
+  const lng = Number(readApiLong(value));
+  if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+    return { lat, lng };
+  }
+
+  return null;
 }
 
 /** Booking `attendance` block → the flat shape the Active cards read. */

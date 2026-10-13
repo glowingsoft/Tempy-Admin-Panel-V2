@@ -357,6 +357,7 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
       } else if (type === 'location') {
         const location = extras.location || {};
         const coords = normalizeLocationCoords({
+          ...location,
           latitude: location.latitude ?? extras.latitude,
           longitude: location.longitude ?? extras.longitude,
         });
@@ -365,7 +366,6 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
           throw new Error('Valid latitude and longitude are required');
         }
 
-        // Backend accepts location coords only (no title/description).
         body.latitude = coords.latitude;
         body.longitude = coords.longitude;
         body.location = {

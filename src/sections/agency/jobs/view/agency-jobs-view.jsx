@@ -424,7 +424,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   }, [useAgencyApis]);
 
   useEffect(() => {
-    if (isStaffMember || profileOrigin) return undefined;
+    if (profileOrigin) return undefined;
 
     let cancelled = false;
     getBrowserPosition({ timeout: 12000, maximumAge: 120000 })
@@ -441,7 +441,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return () => {
       cancelled = true;
     };
-  }, [isStaffMember, profileOrigin]);
+  }, [profileOrigin]);
 
   const jobsQueryArgs = useMemo(
     () => ({

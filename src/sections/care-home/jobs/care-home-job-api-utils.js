@@ -3,7 +3,7 @@ import { format, isValid, parseISO } from 'date-fns';
 import { fToNow } from 'src/utils/format-time';
 
 import { getAgencyBranchMongoId, isMongoObjectId } from 'src/sections/branches/agency-branch-utils';
-import { INVALID_BRANCH_COORDINATES_MESSAGE, isValidLngLat, parseCoordinates, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
+import { INVALID_BRANCH_COORDINATES_MESSAGE, isValidLngLat, parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
 import { isApiReviewed, pickApiReview } from 'src/sections/reviews/reviews-api-utils';
 import { pickStoredMediaValue } from 'src/store/Reducer/upload-api';
 import { resolveJobApiStatus } from './care-home-job-utils';
@@ -528,8 +528,8 @@ export function getCareHomeUserLatLng(user) {
   const candidates = [user.location, user.basicInfo?.location, user.accountState?.location, user].filter(Boolean);
 
   for (const node of candidates) {
-    const lat = Number(node.latitude ?? node.lat);
-    const lng = Number(node.longitude ?? node.lng ?? node.lon ?? node.long);
+    const lat = Number(readApiLate(node));
+    const lng = Number(readApiLong(node));
     if (!Number.isNaN(lat) && !Number.isNaN(lng) && !(lat === 0 && lng === 0)) {
       return { latitude: lat, longitude: lng };
     }
@@ -593,8 +593,8 @@ export function mergeUserWithProfile(user, profile) {
     state: profile.state || location.state || user.state || '',
     country: profile.country || location.country || user.country || '',
     postalCode: profile.postalCode || location.postalCode || user.postalCode || '',
-    longitude: profile.longitude ?? location.longitude ?? user.longitude,
-    latitude: profile.latitude ?? location.latitude ?? user.latitude,
+    longitude: readApiLong(profile) ?? readApiLong(location) ?? readApiLong(user),
+    latitude: readApiLate(profile) ?? readApiLate(location) ?? readApiLate(user),
     location: {
       ...location,
       ...(fullAddress ? { fullAddress } : {}),
@@ -667,8 +667,8 @@ export function buildUserHomeBranchFromProfile(user) {
     {};
 
   const parsed = parseCoordinates(location.coordinates);
-  const lng = Number(parsed?.longitude ?? user.longitude ?? location.longitude ?? location.lng ?? location.long);
-  const lat = Number(parsed?.latitude ?? user.latitude ?? location.latitude ?? location.lat);
+  const lng = Number(parsed?.longitude ?? readApiLong(user) ?? readApiLong(location));
+  const lat = Number(parsed?.latitude ?? readApiLate(user) ?? readApiLate(location));
 
   const fullAddress = pickUserLocationAddress(user, location);
   if (!fullAddress && !(Number.isFinite(lng) && Number.isFinite(lat))) {

@@ -1,6 +1,6 @@
 import { parsePhoneNumber } from 'react-phone-number-input';
 
-import { parseCoordinates, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
+import { parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
 import { getDeviceId } from 'src/sections/auth/jwt/care-home-register-utils';
 import { toApiUploadedFileName, resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
@@ -60,10 +60,8 @@ export function mapUserProfileFromApi(raw = {}) {
 
   const longitudeFromCoords = parsedCoords.longitude;
   const latitudeFromCoords = parsedCoords.latitude;
-  const longitude =
-    Number(location.longitude ?? location.lng ?? raw.longitude ?? longitudeFromCoords) || 0;
-  const latitude =
-    Number(location.latitude ?? location.lat ?? raw.latitude ?? latitudeFromCoords) || 0;
+  const longitude = Number(readApiLong(location) ?? readApiLong(raw) ?? longitudeFromCoords) || 0;
+  const latitude = Number(readApiLate(location) ?? readApiLate(raw) ?? latitudeFromCoords) || 0;
 
   return {
     id,

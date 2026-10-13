@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { parsePhoneNumber } from 'react-phone-number-input';
 
 import { toApiUploadedFileName } from 'src/store/Reducer/upload-api';
-import { isValidLngLat, parseCoordinates, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
+import { isValidLngLat, parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
 import { deriveCityFromLabel } from 'src/sections/tempy-home/standalone-address-input';
 
 function getFileName(file) {
@@ -327,8 +327,8 @@ export function mapAgencyNurseFromApi(item = {}) {
     state: locationSource?.state || '',
     country: locationSource?.country || '',
     postalCode: locationSource?.postalCode != null ? String(locationSource.postalCode) : '',
-    longitude: parseCoordinates(coords)?.longitude || 0,
-    latitude: parseCoordinates(coords)?.latitude || 0,
+    longitude: parseCoordinates(coords)?.longitude || Number(readApiLong(locationSource)) || 0,
+    latitude: parseCoordinates(coords)?.latitude || Number(readApiLate(locationSource)) || 0,
     taxNumber: source.taxNumber != null && source.taxNumber !== '' ? String(source.taxNumber) : nested.taxNumber != null && nested.taxNumber !== '' ? String(nested.taxNumber) : '',
     specialities: normalizeSpecialities(
       source.specialities,
@@ -446,8 +446,8 @@ export function mapAgencyStaffFromApi(item = {}) {
       (typeof locationSource === 'object' && locationSource?.postalCode != null ? String(locationSource.postalCode) : '') ||
       (item.postalCode != null ? String(item.postalCode) : '') ||
       '',
-    longitude: parseCoordinates(coords)?.longitude || 0,
-    latitude: parseCoordinates(coords)?.latitude || 0,
+    longitude: parseCoordinates(coords)?.longitude || Number(readApiLong(locationSource)) || 0,
+    latitude: parseCoordinates(coords)?.latitude || Number(readApiLate(locationSource)) || 0,
     taxNumber: pickTaxNumber(
       item.taxNumber,
       staff.taxNumber,
@@ -648,8 +648,8 @@ export function mapAgencyStaffDetailFromApi(raw = {}, staffId = '') {
     state: (typeof locationSource === 'object' && locationSource?.state) || '',
     country: (typeof locationSource === 'object' && locationSource?.country) || '',
     postalCode: typeof locationSource === 'object' && locationSource?.postalCode != null ? String(locationSource.postalCode) : '',
-    longitude: parseCoordinates(coords)?.longitude || 0,
-    latitude: parseCoordinates(coords)?.latitude || 0,
+    longitude: parseCoordinates(coords)?.longitude || Number(readApiLong(locationSource)) || 0,
+    latitude: parseCoordinates(coords)?.latitude || Number(readApiLate(locationSource)) || 0,
     avatarUrl: resolveProfileIconUrl(basic.profileIcon, details.profileIcon, data.profileIcon),
     isFavorite: Boolean(basic.isFavorite),
     specialty: details.speciality || details.specialty || 'generalNurse',

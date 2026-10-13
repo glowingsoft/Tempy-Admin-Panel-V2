@@ -50,7 +50,7 @@ function toUserLocation(point) {
   return {
     latitude,
     longitude,
-    coordinates: [latitude, longitude],
+    coordinates: [longitude, latitude],
   };
 }
 

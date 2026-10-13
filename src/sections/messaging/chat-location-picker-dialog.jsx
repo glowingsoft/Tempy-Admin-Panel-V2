@@ -36,7 +36,7 @@ import 'leaflet/dist/leaflet.css';
  * Mobile-like location picker.
  * Google Map needs Cloud Billing + Maps JavaScript API.
  * If BillingNotEnabledMapError (or key blocked), we fall back to street tiles
- * so search + pin + Send Location still work. Payload stays lat/long only.
+ * so search + pin + Send Location still work.
  */
 
 const GOOGLE_MAPS_API_KEY =
