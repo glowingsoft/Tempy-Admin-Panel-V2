@@ -16,8 +16,8 @@ const CHECK_OUT_RESPONSE = {
       checkOutSignature: 'https://tempys3-bucket.s3.eu-west-2.amazonaws.com/checkout-signature.png',
       checkOutReason: '',
       autoCheckedOut: false,
-      checkInLocation: { type: 'Point', coordinates: [31.5021839, 74.4260607] },
-      checkOutLocation: { type: 'Point', coordinates: [31.5021839, 74.4260607] },
+      checkInLocation: { type: 'Point', coordinates: [74.4260607, 31.5021839] },
+      checkOutLocation: { type: 'Point', coordinates: [74.4260607, 31.5021839] },
     },
   },
 };

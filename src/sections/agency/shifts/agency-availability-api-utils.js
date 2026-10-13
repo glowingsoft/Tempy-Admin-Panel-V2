@@ -10,7 +10,7 @@ import {
 } from 'date-fns';
 
 import { isMongoObjectId } from 'src/sections/branches/agency-branch-utils';
-import { parseCoordinates } from 'src/sections/branches/geo-coordinates';
+import { parseCoordinates, readApiLate, readApiLong } from 'src/sections/branches/geo-coordinates';
 
 
 function pickId(...values) {
@@ -104,8 +104,8 @@ export function resolveAvailabilityDateTimes({
 export function getBranchCoordinates(branch) {
   const parsed = parseCoordinates(branch?.location?.coordinates);
   if (parsed) return [parsed.longitude, parsed.latitude];
-  const lng = Number(branch?.longitude ?? branch?.lng);
-  const lat = Number(branch?.latitude ?? branch?.lat);
+  const lng = Number(readApiLong(branch));
+  const lat = Number(readApiLate(branch));
   if (Number.isFinite(lng) && Number.isFinite(lat)) return [lng, lat];
   return [9.999, 9.999];
 }

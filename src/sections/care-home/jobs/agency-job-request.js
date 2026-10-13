@@ -1,6 +1,7 @@
 import { format, parse, isValid } from 'date-fns';
 
 import { getAgreedRatePartnersByType } from 'src/_mock/_agreed-rates';
+import { parseCoordinates } from 'src/sections/branches/geo-coordinates';
 
 const STORAGE_KEY = 'agency-incoming-job-requests';
 
@@ -50,8 +51,8 @@ export function careHomeJobToAgencyJob(job) {
     shiftType: schedules.length > 1 ? 'Multi Shift' : 'Single Shift',
     // Distance filled by applyJobDistances when coords / origin available
     distance: '',
-    latitude: job.latitude ?? job.location?.coordinates?.[0] ?? null,
-    longitude: job.longitude ?? job.location?.coordinates?.[1] ?? null,
+    latitude: job.latitude ?? parseCoordinates(job.location?.coordinates)?.latitude ?? null,
+    longitude: job.longitude ?? parseCoordinates(job.location?.coordinates)?.longitude ?? null,
     location: job.location || undefined,
     hourlyRate: job.hourlyRate ?? job.ratePerHour ?? null,
     breakType: schedules.some((entry) => entry.breakIncluded !== false) ? 'Paid' : 'Unpaid',

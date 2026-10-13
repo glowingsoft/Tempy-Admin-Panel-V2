@@ -29,7 +29,7 @@ export function mapAgencyBookingCalendarFromApi(response = {}) {
 
 export { formatCalendarMetaStats };
 
-/** Branch pin for calendar lat/lng. API stores [lat, lng]. */
+/** Branch pin for calendar. API stores [long, lat]. */
 export function getAgencyBranchLatLng(branch) {
   if (!branch || typeof branch !== 'object') return null;
   const parsed = parseCoordinates(branch.location?.coordinates);

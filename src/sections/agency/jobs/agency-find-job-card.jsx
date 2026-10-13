@@ -30,8 +30,39 @@ import { buildMapsUrl } from './agency-job-care-details-store';
 import { toast } from 'src/components/snackbar';
 
 
+function isCompletedWorkJob(job) {
+  return (
+    String(job?.apiStatus || '').toLowerCase() === 'completed' ||
+    String(job?.status || '').toLowerCase() === 'completed' ||
+    String(job?.shiftRows?.[0]?.status || '').toLowerCase() === 'completed' ||
+    String(job?.bookingStatus || '').toLowerCase() === 'completed'
+  );
+}
+
+function hasSupplierWorkAction(job) {
+  return ['assignStaff', 'assigned', 'reassign', 'awaitingWorker', 'viewStaff'].includes(job?.actionType);
+}
+
+/** Active-tab Assign / Assigned / Check In, also on All and Completed for the same jobs. */
+function shouldUseActiveJobActions(variant, mode, job) {
+  if (variant === 'active' && job?.status === 'active') return true;
+  if (variant !== 'all' && variant !== 'completed') return false;
+
+  if (mode === 'staffMember') {
+    const ownShift =
+      job?.status === 'active' ||
+      Boolean(job?.bookingStatus) ||
+      Boolean(String(job?.bookingId || '').trim());
+    if (!ownShift) return false;
+    return job?.status === 'active' || variant === 'completed' || isCompletedWorkJob(job);
+  }
+
+  if (job?.status === 'active') return true;
+  return (variant === 'completed' || isCompletedWorkJob(job)) && hasSupplierWorkAction(job);
+}
+
 function isFindJobsBidVariant(variant, mode, job) {
-  if (variant === 'active' && job?.status === 'active') return false;
+  if (shouldUseActiveJobActions(variant, mode, job)) return false;
 
   return (
     variant === 'new' ||
@@ -424,6 +455,24 @@ function AttendanceAction({ job, onOpen, sx }) {
   );
 }
 
+function AttendanceSpot({ job, showButton, notCheckedIn, onOpen, sx }) {
+  if (!showButton && !notCheckedIn) return null;
+
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
+      {notCheckedIn && (
+        <Chip
+          size="small"
+          label="Not checked in"
+          color="warning"
+          sx={{ height: 22, fontSize: 10, fontWeight: 700, flexShrink: 0 }}
+        />
+      )}
+      {showButton && <AttendanceAction job={job} onOpen={onOpen} />}
+    </Stack>
+  );
+}
+
 function CareDetailsAction({ job, onOpen, sx }) {
   return (
     <Button
@@ -499,7 +548,9 @@ function JobActionButtons({
   const isOwnStaffShift =
     job?.status === 'active' || Boolean(bookingStatus) || Boolean(attendance?.checkInAt);
 
-  if (variant === 'active' && mode === 'staffMember' && isOwnStaffShift) {
+  const activeActions = shouldUseActiveJobActions(variant, mode, job);
+
+  if (activeActions && mode === 'staffMember' && isOwnStaffShift) {
     if (bookingStatus === 'pending') {
       return (
         <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
@@ -532,21 +583,25 @@ function JobActionButtons({
       !checkedOut && (bookingStatus === 'inProgress' || Boolean(attendance?.checkInAt));
 
     if (checkedOut) {
+      const inTime = formatAttendanceTime(attendance?.checkInAt);
+      const outTime = formatAttendanceTime(attendance?.checkOutAt);
+
       return (
-        <Stack spacing={0.35} alignItems="flex-end" sx={sx}>
-          <Stack direction="row" spacing={0.35} alignItems="center">
-            {chatButton}
-            <Chip
-              size="small"
-              label="Completed"
-              color="success"
-              sx={{ height: 22, fontSize: 10, fontWeight: 700 }}
-            />
-          </Stack>
-          {attendance?.checkInAt || attendance?.checkOutAt ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 9, lineHeight: 1.3 }}>
-              In {formatAttendanceTime(attendance.checkInAt) || '—'} · Out{' '}
-              {formatAttendanceTime(attendance.checkOutAt) || '—'}
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
+          {chatButton}
+          <Chip
+            size="small"
+            label="Completed"
+            color="success"
+            sx={{ height: 22, fontSize: 10, fontWeight: 700, flexShrink: 0 }}
+          />
+          {inTime || outTime ? (
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: 'text.secondary', fontSize: 10, fontWeight: 600, lineHeight: 1 }}
+            >
+              In {inTime || '—'} · Out {outTime || '—'}
             </Typography>
           ) : null}
         </Stack>
@@ -554,23 +609,27 @@ function JobActionButtons({
     }
 
     if (checkedIn) {
+      const inTime = formatAttendanceTime(attendance?.checkInAt);
+
       return (
-        <Stack spacing={0.35} alignItems="flex-end" sx={sx}>
-          <Stack direction="row" spacing={0.35} alignItems="center">
-            {chatButton}
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              onClick={() => onCheckOut?.(job)}
-              sx={{ ...actionButtonSx, ...sx }}
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
+          {chatButton}
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            onClick={() => onCheckOut?.(job)}
+            sx={{ ...actionButtonSx, ...sx, flexShrink: 0 }}
+          >
+            Check Out
+          </Button>
+          {inTime ? (
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: 'text.secondary', fontSize: 10, fontWeight: 600, lineHeight: 1 }}
             >
-              Check Out
-            </Button>
-          </Stack>
-          {attendance?.checkInAt ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 9 }}>
-              In {formatAttendanceTime(attendance.checkInAt)}
+              In {inTime}
             </Typography>
           ) : null}
         </Stack>
@@ -695,7 +754,7 @@ function JobActionButtons({
     );
   }
 
-  if (variant === 'active' && job.actionType === 'reassign') {
+  if (activeActions && job.actionType === 'reassign') {
     return (
       <Button
         size="small"
@@ -709,7 +768,7 @@ function JobActionButtons({
     );
   }
 
-  if (variant === 'active' && job.actionType === 'awaitingWorker') {
+  if (activeActions && job.actionType === 'awaitingWorker') {
     return (
       <Stack direction="row" spacing={0.5} alignItems="center" sx={sx}>
         <Chip
@@ -732,7 +791,7 @@ function JobActionButtons({
     );
   }
 
-  if (variant === 'active' && (job.actionType === 'assignStaff' || job.actionType === 'assigned')) {
+  if (activeActions && (job.actionType === 'assignStaff' || job.actionType === 'assigned')) {
     const alreadyAssigned = Boolean(
       job.actionType === 'assigned' ||
       String(job.bookingId || '').trim() ||
@@ -787,7 +846,7 @@ function JobActionButtons({
     );
   }
 
-  if (variant === 'active' && job.actionType === 'bidUnavailable') {
+  if (activeActions && job.actionType === 'bidUnavailable') {
     return (
       <Chip
         size="small"
@@ -805,7 +864,7 @@ function JobActionButtons({
     );
   }
 
-  if (variant === 'active' && job.actionType === 'viewStaff') {
+  if (activeActions && job.actionType === 'viewStaff') {
     return (
       <Stack direction="row" alignItems="center" spacing={0.75}>
         {job.assignedStaff?.length > 0 && (
@@ -871,11 +930,25 @@ export function AgencyFindJobCard({
   const primaryShift = shiftRows[0];
 
   const shiftCompleted = primaryShift?.status === 'completed' || variant === 'completed';
+  const bookingStatus = attendance?.bookingStatus || job?.bookingStatus || '';
+  const hasBooking = Boolean(String(job?.bookingId || '').trim());
+  const assignedWork =
+    hasBooking ||
+    shiftCompleted ||
+    job?.actionType === 'assigned' ||
+    ['active', 'inProgress', 'completed', 'assigned'].includes(bookingStatus);
+  const checkedIn = Boolean(attendance?.checkInAt);
+  const showNotCheckedIn =
+    typeof onOpenAttendance === 'function' &&
+    assignedWork &&
+    !checkedIn &&
+    bookingStatus !== 'pending' &&
+    !CANCELLED_BOOKING_STATUSES.includes(bookingStatus);
   const showAttendance =
-    (mode === 'staffMember' || Boolean(String(job?.bookingId || '').trim()) || shiftCompleted) &&
+    (mode === 'staffMember' || hasBooking || shiftCompleted) &&
     typeof onOpenAttendance === 'function' &&
     (hasAttendanceRecord(attendance) ||
-      ['inProgress', 'completed'].includes(attendance?.bookingStatus || job?.bookingStatus) ||
+      ['inProgress', 'completed'].includes(bookingStatus) ||
       shiftCompleted);
   const dateParts = getJobDateParts(job);
   const postedBy = job.postedBy || {};
@@ -956,18 +1029,18 @@ export function AgencyFindJobCard({
             <Tooltip title={dateParts.label} arrow>
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.35, minWidth: 0 }}>
                 <Stack direction="row" alignItems="center" spacing={0.5} sx={shiftDateRowSx}>
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  icon={<Iconify icon="solar:calendar-bold" width={12} />}
-                  label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
-                  sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
-                />
-                {dateParts.time ? (
-                  <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700 }}>
-                    {dateParts.time}
-                  </Typography>
-                ) : null}
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    icon={<Iconify icon="solar:calendar-bold" width={12} />}
+                    label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
+                    sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
+                  />
+                  {dateParts.time ? (
+                    <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700 }}>
+                      {dateParts.time}
+                    </Typography>
+                  ) : null}
                 </Stack>
                 {hasMultipleSchedules && (
                   <Button
@@ -1030,9 +1103,14 @@ export function AgencyFindJobCard({
           />
         </Box>
 
-        {showAttendance && (
+        {(showAttendance || showNotCheckedIn) && (
           <Box sx={{ flexShrink: 0 }}>
-            <AttendanceAction job={job} onOpen={onOpenAttendance} />
+            <AttendanceSpot
+              job={job}
+              showButton={showAttendance}
+              notCheckedIn={showNotCheckedIn}
+              onOpen={onOpenAttendance}
+            />
           </Box>
         )}
 
@@ -1142,7 +1220,7 @@ export function AgencyFindJobCard({
           sx={{
             ...descriptionSx,
             mb: 0.5,
-            minHeight: '2.175rem', // 2 lines @ 0.75rem / 1.45
+            minHeight: '2.175rem',
           }}
         >
           {job.description || '—'}
@@ -1265,9 +1343,14 @@ export function AgencyFindJobCard({
             {job.gender || '—'}
           </Box>
         </Typography>
-        {showAttendance && (
+        {(showAttendance || showNotCheckedIn) && (
           <Box sx={{ ml: 'auto' }}>
-            <AttendanceAction job={job} onOpen={onOpenAttendance} />
+            <AttendanceSpot
+              job={job}
+              showButton={showAttendance}
+              notCheckedIn={showNotCheckedIn}
+              onOpen={onOpenAttendance}
+            />
           </Box>
         )}
       </Stack>

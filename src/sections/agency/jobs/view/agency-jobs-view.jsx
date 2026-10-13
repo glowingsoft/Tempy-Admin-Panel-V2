@@ -424,7 +424,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   }, [useAgencyApis]);
 
   useEffect(() => {
-    if (isStaffMember || profileOrigin) return undefined;
+    if (profileOrigin) return undefined;
 
     let cancelled = false;
     getBrowserPosition({ timeout: 12000, maximumAge: 120000 })
@@ -441,7 +441,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return () => {
       cancelled = true;
     };
-  }, [isStaffMember, profileOrigin]);
+  }, [profileOrigin]);
 
   const jobsQueryArgs = useMemo(
     () => ({
@@ -1073,14 +1073,29 @@ export function AgencyJobsView({ mode = 'agency' }) {
         const wonByBid =
           job.status === 'new' && normalizeAgencyBidStatus(bid?.status) === 'accepted';
 
-        if (!(job.status === 'active' || wonByBid) || !canAssignViaModal) {
+        const completedWork =
+          String(job.apiStatus || '').toLowerCase() === 'completed' ||
+          String(job.shiftRows?.[0]?.status || '').toLowerCase() === 'completed' ||
+          String(job.bookingStatus || '').toLowerCase() === 'completed';
+
+        const activeWork = job.status === 'active' || wonByBid;
+
+        if (!(activeWork || completedWork) || !canAssignViaModal) {
           return bookingId ? { ...job, bookingId } : job;
         }
 
         const state = getJobAssignState(job);
+        const workAction = ['assignStaff', 'assigned', 'reassign', 'awaitingWorker', 'viewStaff'].includes(
+          state.actionType
+        );
+
+        if (completedWork && !activeWork && !workAction) {
+          return bookingId ? { ...job, bookingId } : job;
+        }
+
         return {
           ...job,
-          status: 'active',
+          status: activeWork ? 'active' : job.status,
           bookingId: state.bookingId || bookingId,
           actionType: state.actionType,
         };

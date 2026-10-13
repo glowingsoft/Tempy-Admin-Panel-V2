@@ -1,5 +1,5 @@
 import { fToNow } from 'src/utils/format-time';
-import { isValidLatitude, isValidLongitude } from 'src/sections/branches/geo-coordinates';
+import { isValidLatitude, isValidLongitude, readApiLate, readApiLong } from 'src/sections/branches/geo-coordinates';
 
 function toCount(value) {
   const num = Number(value);
@@ -113,8 +113,8 @@ function mapRegionalFillRates(source) {
  * in fields named latitude / longitude.
  */
 function heatMapLatLng(item) {
-  const first = Number(item?.latitude ?? item?.lat);
-  const second = Number(item?.longitude ?? item?.lng);
+  const first = Number(readApiLate(item));
+  const second = Number(readApiLong(item));
   if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
 
   const storedAsLngLat =

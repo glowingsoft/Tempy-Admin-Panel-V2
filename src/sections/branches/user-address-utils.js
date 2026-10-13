@@ -3,6 +3,7 @@ import {
   getAgencyBranchMongoId,
   mapAgencyBranchFromApi,
 } from './agency-branch-utils';
+import { toApiCoordinates } from './geo-coordinates';
 
 
 export function mapUserAddressFromApi(item) {
@@ -67,7 +68,7 @@ function buildUserAddressLocation(data) {
         : String(postalRaw).trim();
 
   return {
-    coordinates: [Number(data.latitude) || 0, Number(data.longitude) || 0],
+    coordinates: toApiCoordinates(Number(data.latitude) || 0, Number(data.longitude) || 0),
     fullAddress: String(data.fullAddress || '').trim(),
     city: String(data.city || '').trim(),
     country: String(data.country || '').trim(),

@@ -18,6 +18,7 @@ import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
 
 import { CheckoutProvider } from 'src/sections/checkout/context';
+import { useAppRealtime } from 'src/realtime/use-app-realtime';
 
 import { AuthProvider as JwtAuthProvider } from 'src/auth/context/jwt';
 import { AuthProvider as Auth0AuthProvider } from 'src/auth/context/auth0';
@@ -36,6 +37,7 @@ const AuthProvider =
 
 export default function App() {
   useScrollToTop();
+  useAppRealtime();
 
   return (
     <I18nProvider>

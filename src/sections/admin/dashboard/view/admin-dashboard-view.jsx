@@ -166,6 +166,13 @@ export function AdminDashboardView() {
             />
           </Grid>
 
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <AdminFinanceByOrg
+              list={dashboard.moneyByOrg}
+              subheader="Spend and earnings by user type"
+            />
+          </Grid>
+
           <DashboardQuickAccess description="Jump into live sections">
             {MODULES.map((module) => (
               <Grid
@@ -318,18 +325,11 @@ export function AdminDashboardView() {
             </Grid>
           ))}
 
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AdminRegionalFillRates
               title="Regional fill rates"
               subheader={`Fill rate ${dashboard.fillRate}% · Completion ${dashboard.completionRate}%`}
               chart={dashboard.regionalFillRates}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <AdminFinanceByOrg
-              list={dashboard.moneyByOrg}
-              subheader="Spend and earnings by user type"
             />
           </Grid>
 

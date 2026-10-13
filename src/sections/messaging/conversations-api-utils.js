@@ -236,7 +236,7 @@ export function normalizeLocationCoords(input = {}) {
     source.latitude ?? source.lat ?? (Array.isArray(source) ? source[1] : undefined)
   );
   const longitude = Number(
-    source.longitude ?? source.lng ?? source.lon ?? (Array.isArray(source) ? source[0] : undefined)
+    source.long ?? source.longitude ?? source.lng ?? source.lon ?? (Array.isArray(source) ? source[0] : undefined)
   );
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
@@ -305,7 +305,15 @@ export function resolveLocationFromApi(item = {}) {
     nested.latitude ?? nested.lat ?? item.latitude ?? item.lat ?? coordsArray[1]
   );
   const longitude = Number(
-    nested.longitude ?? nested.lng ?? nested.lon ?? item.longitude ?? item.lng ?? item.lon ?? coordsArray[0]
+    nested.long ??
+      nested.longitude ??
+      nested.lng ??
+      nested.lon ??
+      item.long ??
+      item.longitude ??
+      item.lng ??
+      item.lon ??
+      coordsArray[0]
   );
 
   const title = pickText(
@@ -653,6 +661,7 @@ export function buildSendMessagePayload({
 
   if (type === 'location') {
     const coords = normalizeLocationCoords({
+      ...(location && typeof location === 'object' ? location : {}),
       latitude:
         latitude ??
         (location && typeof location === 'object' ? location.latitude : null),
@@ -665,7 +674,6 @@ export function buildSendMessagePayload({
       throw new Error('Valid latitude and longitude are required for location messages');
     }
 
-    // Backend: location coords only (no title/description).
     payload.messageType = 'location';
     payload.latitude = coords.latitude;
     payload.longitude = coords.longitude;

@@ -151,6 +151,18 @@ export function StaffMemberDashboardView() {
             />
           </Grid>
 
+          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <StaffEarningsSnapshotCard />
+          </Grid>
+
+          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardEarningsChart
+              title="Your earnings"
+              chart={dashboard.earningsGraph}
+              href={paths.dashboard.staffMember.earnings}
+            />
+          </Grid>
+
           <Grid xs={12}>
             <StaffMemberStrikeRuleAlert cancellationStats={cancellationStats} />
           </Grid>
@@ -188,18 +200,6 @@ export function StaffMemberDashboardView() {
               jobs={upcomingJobs}
               loading={jobsLoading}
               onJobClick={openJobDetails}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <StaffEarningsSnapshotCard />
-          </Grid>
-
-          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <DashboardEarningsChart
-              title="Your earnings"
-              chart={dashboard.earningsGraph}
-              href={paths.dashboard.staffMember.earnings}
             />
           </Grid>
 

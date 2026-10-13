@@ -136,6 +136,13 @@ export function AgencyDashboardView() {
             />
           </Grid>
 
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardEarningsChart
+              chart={dashboard.earningsGraph}
+              href={paths.dashboard.agency.earnings}
+            />
+          </Grid>
+
           <DashboardQuickAccess description="Jump into live sections">
             {MODULES.map((module) => (
               <Grid
@@ -174,13 +181,6 @@ export function AgencyDashboardView() {
               jobs={upcomingJobs}
               loading={jobsLoading}
               onJobClick={openJobDetails}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <DashboardEarningsChart
-              chart={dashboard.earningsGraph}
-              href={paths.dashboard.agency.earnings}
             />
           </Grid>
 

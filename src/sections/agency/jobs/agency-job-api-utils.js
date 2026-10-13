@@ -2,7 +2,7 @@ import { format, isValid, parseISO } from 'date-fns';
 
 import { fToNow } from 'src/utils/format-time';
 import { formatShiftRowLabel } from 'src/components/jobs/job-date-filters';
-import { parseCoordinates } from 'src/sections/branches/geo-coordinates';
+import { parseCoordinates, readApiLate, readApiLong } from 'src/sections/branches/geo-coordinates';
 import { pickStoredMediaValue } from 'src/store/Reducer/upload-api';
 
 export const SUPPLIER_JOB_STATUS_TABS = [
@@ -106,8 +106,8 @@ export function extractLatLng(source, { allowZero = true } = {}) {
   );
 
   for (const node of candidates) {
-    const latDirect = pickNumber(node.latitude, node.lat);
-    const lngDirect = pickNumber(node.longitude, node.lng, node.lon, node.long);
+    const latDirect = pickNumber(readApiLate(node));
+    const lngDirect = pickNumber(readApiLong(node));
 
     if (latDirect != null && lngDirect != null) {
       if (!allowZero && latDirect === 0 && lngDirect === 0) continue;
@@ -167,9 +167,15 @@ export function getJobDistanceLabel(jobOrApiItem, origin) {
   return formatDistanceAway(getDistanceKm(from, jobPoint));
 }
 
-/** Keep the API distance. A missing value stays blank instead of a coordinate estimate. */
-export function applyJobDistances(jobs = []) {
-  return jobs;
+/** Card distance from the viewer's location and the job pin. API distanceInKM is kept only when either point is missing. */
+export function applyJobDistances(jobs = [], origin) {
+  if (!isUsablePoint(origin)) return jobs;
+
+  return jobs.map((job) => {
+    const label = getJobDistanceLabel(job, origin);
+    if (!label) return job;
+    return { ...job, distance: label };
+  });
 }
 
 
@@ -391,9 +397,35 @@ export function mapShiftTabStatus(apiJobStatus, shiftStatus) {
   return 'new';
 }
 
-function pickDistanceLabel(item = {}) {
-  const raw = item?.distanceInKM ?? item?.distanceInKm ?? item?.distanceINKM;
+function pickRawDistance(source = {}) {
+  if (!source || typeof source !== 'object') return undefined;
+
+  const named = ['distance', 'distanceKm', 'distanceInKm', 'distanceInKM', 'distanceINKM', 'distance_km', 'km', 'distanceAway'];
+  for (const key of named) {
+    if (source[key] != null && source[key] !== '') return source[key];
+  }
+
+  const matched = Object.keys(source).find((key) => {
+    const normalized = key.toLowerCase().replace(/_/g, '');
+    return normalized === 'distanceinkm' || normalized === 'distancekm' || normalized === 'distance';
+  });
+  if (matched && source[matched] != null && source[matched] !== '') return source[matched];
+  return undefined;
+}
+
+function pickDistanceLabel(item = {}, location = {}) {
+  const raw = pickRawDistance(item) ?? pickRawDistance(location);
   if (raw == null || raw === '') return '';
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (/km|mi|away/i.test(trimmed)) return trimmed;
+    const num = Number(trimmed);
+    if (!Number.isNaN(num)) return formatDistanceAway(num);
+    return trimmed;
+  }
+
   return formatDistanceAway(raw);
 }
 
@@ -474,7 +506,7 @@ export function resolveSupplierBookingAction(bookingId, bookingStatus) {
   return 'assigned';
 }
 
-export function mapAgencyJobFromApi(item = {}) {
+export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
   const id = String(item._id || item.id || '');
   const location = item.location || {};
   const jobPoint = extractLatLng(item, { allowZero: true }) || { latitude: null, longitude: null };
@@ -505,7 +537,18 @@ export function mapAgencyJobFromApi(item = {}) {
   const rating = pickNumber(item.averageRating, ratingObj?.averageRating, user.averageRating, typeof item.rating === 'number' ? item.rating : null);
   const reviewCount = pickNumber(item.totalReviews, ratingObj?.totalReviews, user.totalReviews, item.reviewCount, item.reviewsCount);
 
-  const distance = pickDistanceLabel(item);
+  let distance = pickDistanceLabel(item, location);
+  if (!distance) {
+    distance = getJobDistanceLabel(
+      {
+        location,
+        latitude: jobPoint.latitude,
+        longitude: jobPoint.longitude,
+        branch,
+      },
+      origin || null
+    );
+  }
 
   const bookingId = String(
     refId(item.myBooking) ||

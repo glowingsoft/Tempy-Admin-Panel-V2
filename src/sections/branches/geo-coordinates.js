@@ -1,4 +1,14 @@
-/** WGS84 helpers. Backend + mobile store coordinates as [latitude, longitude]. */
+/** WGS84 helpers. Backend coordinate arrays are [longitude, latitude]. */
+
+export function readApiLate(source) {
+  if (!source || typeof source !== 'object') return undefined;
+  return source.lat ?? source.latitude;
+}
+
+export function readApiLong(source) {
+  if (!source || typeof source !== 'object') return undefined;
+  return source.long ?? source.lng ?? source.lon ?? source.longitude;
+}
 
 export function isValidLongitude(lng) {
   const value = Number(lng);
@@ -14,32 +24,16 @@ export function isValidLngLat(lng, lat) {
   return isValidLongitude(lng) && isValidLatitude(lat);
 }
 
-/** Payload order used by backend and mobile apps. */
+/** Payload order: [longitude, latitude]. */
 export function toApiCoordinates(latitude, longitude) {
-  return [Number(latitude) || 0, Number(longitude) || 0];
+  return [Number(longitude) || 0, Number(latitude) || 0];
 }
 
-/**
- * Read API / stored coordinates.
- * Prefer [lat, lng]. If index 0 is outside ±90, treat as legacy GeoJSON [lng, lat].
- */
+/** Read API coordinates as [longitude, latitude]. */
 export function parseCoordinates(coords) {
   if (!Array.isArray(coords) || coords.length < 2) return null;
-  const first = Number(coords[0]);
-  const second = Number(coords[1]);
-  if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
-
-  let latitude;
-  let longitude;
-
-  if (Math.abs(first) > 90 && isValidLongitude(first) && isValidLatitude(second)) {
-    longitude = first;
-    latitude = second;
-  } else {
-    latitude = first;
-    longitude = second;
-  }
-
+  const longitude = Number(coords[0]);
+  const latitude = Number(coords[1]);
   if (!isValidLngLat(longitude, latitude)) return null;
   return { longitude, latitude };
 }

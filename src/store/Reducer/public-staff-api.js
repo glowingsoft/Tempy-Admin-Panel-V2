@@ -1,5 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
+import { toApiCoordinates } from 'src/sections/branches/geo-coordinates';
+
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
@@ -19,7 +21,7 @@ export function buildPublicStaffLocation(place, addressLabel = '') {
 
   return {
     title,
-    coordinates: [Number.isFinite(lat) ? lat : 0, Number.isFinite(lng) ? lng : 0],
+    coordinates: toApiCoordinates(Number.isFinite(lat) ? lat : 0, Number.isFinite(lng) ? lng : 0),
     fullAddress,
     city: String(place?.city || '').trim(),
     country: String(place?.country || '').trim(),

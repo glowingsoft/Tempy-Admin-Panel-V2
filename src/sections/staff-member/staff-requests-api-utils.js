@@ -1,3 +1,6 @@
+import { getStaffSpecialtyLabel } from 'src/_mock/_staff';
+import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
+
 function pickId(...values) {
   for (const value of values) {
     if (value == null || value === '') continue;
@@ -13,10 +16,53 @@ function pickId(...values) {
 
 function pickText(...values) {
   for (const value of values) {
-    const text = String(value ?? '').trim();
+    if (value == null || typeof value === 'object') continue;
+    const text = String(value).trim();
     if (text) return text;
   }
   return '';
+}
+
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null || value === '') return [];
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+  return [value];
+}
+
+function collectSpecialties(...sources) {
+  const values = [];
+
+  sources.forEach((source) => {
+    asList(source).forEach((entry) => {
+      if (entry && typeof entry === 'object') {
+        const text = pickText(entry.label, entry.name, entry.value, entry.speciality, entry.specialty);
+        if (text) values.push(text);
+        return;
+      }
+
+      const text = pickText(entry);
+      if (text) values.push(text);
+    });
+  });
+
+  return [...new Set(values)];
+}
+
+function formatAddress(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value !== 'object') return '';
+
+  return [value.address, value.line1, value.street, value.city, value.state, value.country, value.postalCode, value.postcode]
+    .map((part) => String(part ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function extractStaffRequestsList(response) {
@@ -60,13 +106,41 @@ export function mapStaffRequestFromApi(item = {}) {
     item.companyName,
     'Agency'
   );
+  const specialties = collectSpecialties(
+    item.speciality,
+    item.specialty,
+    item.specialities,
+    agency.speciality,
+    agency.specialty,
+    agency.specialities
+  );
+  const specialtyLabel = specialties.map((value) => getStaffSpecialtyLabel(value)).filter(Boolean).join(', ');
+  const email = pickText(agency.email, item.email, item.agencyEmail);
+  const phone = pickText(agency.phone, agency.phoneNumber, agency.mobile, item.phone, item.phoneNumber);
+  const companyName = pickText(agency.companyName, agency.businessName, item.companyName);
+  const address = formatAddress(agency.address || agency.location || item.address || item.location);
+  const profileIcon = [
+    agency.profileIcon,
+    agency.profileIconUrl,
+    agency.avatar,
+    agency.avatarUrl,
+    item.profileIcon,
+    item.avatarUrl,
+  ].find((value) => value != null && value !== '');
 
   return {
     id,
+    agencyId: pickId(agency._id, agency.id, item.agencyId),
     agencyName,
-    specialty: pickText(item.speciality, item.specialty, agency.speciality, ''),
-    ratePerHour: item.ratePerHour ?? item.rate ?? null,
-    platformPercent: item.platformPercent ?? null,
+    email,
+    phone,
+    companyName: companyName && companyName !== agencyName ? companyName : '',
+    address,
+    avatarUrl: resolveProfileAssetUrl(profileIcon),
+    specialty: specialtyLabel,
+    specialtyLabel,
+    ratePerHour: item.ratePerHour ?? item.rate ?? agency.ratePerHour ?? null,
+    platformPercent: item.platformPercent ?? agency.platformPercent ?? null,
     status,
     canRespond: status === 'pending',
     canAccept: status === 'pending',
