@@ -1,20 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { io } from 'socket.io-client';
 
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { readPersistedAuthToken } from 'src/auth/utils/auth-token-storage';
-
-function resolveSocketUrl() {
-  const fromEnv = String(import.meta.env.VITE_SOCKET_URL || '').trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
-
-  const apiBase = String(import.meta.env.VITE_BASE_URL || '').trim().replace(/\/$/, '');
-  if (!apiBase) return '';
-
-  const host = apiBase.replace(/\/api\/v\d+$/i, '');
-  return `${host}/chat`;
-}
+import {
+  getAppSocket,
+  onAppSocket,
+  onAppSocketReplaced,
+  setAppSocketObjectId,
+} from 'src/realtime/app-socket';
 
 function resolveChatSubjectId(user, impersonation) {
   if (impersonation?.isActive && impersonation?.targetId) {
@@ -120,9 +114,6 @@ export function useConversationsSocket({
 
     if (!enabled || !normalizedSubjectId || !normalizedObjectId) return undefined;
 
-    const socketUrl = resolveSocketUrl();
-    if (!socketUrl) return undefined;
-
     const token =
       user?.token ||
       readPersistedAuthToken() ||
@@ -130,21 +121,8 @@ export function useConversationsSocket({
 
     if (!token) return undefined;
 
-    const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      auth: { token },
-      query: {
-        subjectId: normalizedSubjectId,
-        objectId: normalizedObjectId,
-        token,
-      },
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
-
-    socketRef.current = socket;
+    setAppSocketObjectId(normalizedObjectId);
+    socketRef.current = getAppSocket();
 
     const routeDeletePayload = (payload, source) => {
       if (!isDeleteAction(payload)) return false;
@@ -197,49 +175,42 @@ export function useConversationsSocket({
 
     const handleVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      if (!socket.connected) socket.connect();
+      const current = getAppSocket();
+      if (current && !current.connected) current.connect();
     };
 
-    socket.on('connect', handleConnect);
-    socket.on('receiveMessage', handleReceiveMessage);
-    socket.on('newMessage', handleReceiveMessage);
-    socket.on('message', handleReceiveMessage);
-    socket.on('messageReceived', handleReceiveMessage);
-    socket.on('chatUpdated', handleChatUpdated);
-    socket.on('messageDeleted', handleMessageDeleted);
-    socket.on('deleteMessage', handleMessageDeleted);
-    socket.on('messagesDeleted', handleMessageDeleted);
-    socket.on('conversationDeleted', handleConversationDeleted);
-    socket.on('chatDeleted', handleConversationDeleted);
-    socket.on('deleteConversation', handleConversationDeleted);
-    socket.on('userOnline', handleUserOnline);
-    socket.on('userOffline', handleUserOffline);
-    socket.on('onlineStatus', handleOnlineStatus);
-    socket.on('presenceUpdate', handleOnlineStatus);
+    const offs = [
+      onAppSocket('connect', handleConnect),
+      onAppSocket('receiveMessage', handleReceiveMessage),
+      onAppSocket('newMessage', handleReceiveMessage),
+      onAppSocket('message', handleReceiveMessage),
+      onAppSocket('messageReceived', handleReceiveMessage),
+      onAppSocket('chatUpdated', handleChatUpdated),
+      onAppSocket('messageDeleted', handleMessageDeleted),
+      onAppSocket('deleteMessage', handleMessageDeleted),
+      onAppSocket('messagesDeleted', handleMessageDeleted),
+      onAppSocket('conversationDeleted', handleConversationDeleted),
+      onAppSocket('chatDeleted', handleConversationDeleted),
+      onAppSocket('deleteConversation', handleConversationDeleted),
+      onAppSocket('userOnline', handleUserOnline),
+      onAppSocket('userOffline', handleUserOffline),
+      onAppSocket('onlineStatus', handleOnlineStatus),
+      onAppSocket('presenceUpdate', handleOnlineStatus),
+      onAppSocketReplaced((nextSocket) => {
+        socketRef.current = nextSocket;
+      }),
+    ];
     document.addEventListener('visibilitychange', handleVisible);
     window.addEventListener('online', handleVisible);
+
+    if (getAppSocket()?.connected) handleConnect();
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisible);
       window.removeEventListener('online', handleVisible);
-      socket.off('connect', handleConnect);
-      socket.off('receiveMessage', handleReceiveMessage);
-      socket.off('newMessage', handleReceiveMessage);
-      socket.off('message', handleReceiveMessage);
-      socket.off('messageReceived', handleReceiveMessage);
-      socket.off('chatUpdated', handleChatUpdated);
-      socket.off('messageDeleted', handleMessageDeleted);
-      socket.off('deleteMessage', handleMessageDeleted);
-      socket.off('messagesDeleted', handleMessageDeleted);
-      socket.off('conversationDeleted', handleConversationDeleted);
-      socket.off('chatDeleted', handleConversationDeleted);
-      socket.off('deleteConversation', handleConversationDeleted);
-      socket.off('userOnline', handleUserOnline);
-      socket.off('userOffline', handleUserOffline);
-      socket.off('onlineStatus', handleOnlineStatus);
-      socket.off('presenceUpdate', handleOnlineStatus);
-      socket.disconnect();
-      socketRef.current = null;
+      offs.forEach((off) => off());
+      setAppSocketObjectId('');
+      socketRef.current = getAppSocket();
     };
   }, [
     enabled,
