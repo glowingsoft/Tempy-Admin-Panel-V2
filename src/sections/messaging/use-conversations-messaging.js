@@ -92,7 +92,6 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
   const [localConversations, setLocalConversations] = useState([]);
   const [selectedObjectId, setSelectedObjectId] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState('');
-  /** Optimistic bubbles keyed by participant/object id — shown instantly like WhatsApp. */
   const [pendingByObjectId, setPendingByObjectId] = useState({});
   const [sendBusy, setSendBusy] = useState(false);
   const skipSocketRefreshRef = useRef(false);
@@ -168,7 +167,6 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
         };
       });
 
-      // Keep draft chats that are not yet present in API list (deep-link / new contact).
       const orphanDrafts = prev.filter((conversation) => {
         const id = String(conversation.id || '');
         if (!id.startsWith('draft-')) return false;
@@ -180,7 +178,6 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     });
   }, [conversationsData?.data, filterVisibleMessages, selectedObjectId]);
 
-  // When a draft is upgraded to a real API conversation, keep selection on that peer.
   useEffect(() => {
     if (!selectedObjectId) return;
     if (!String(selectedConversationId || '').startsWith('draft-')) return;
@@ -196,7 +193,6 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
   }, [localConversations, selectedConversationId, selectedObjectId]);
 
   useEffect(() => {
-    // Don't steal selection while a deep-linked participant chat is being opened.
     if (preferredParticipantId) return;
     if (selectedObjectId || !localConversations.length) return;
     const first = localConversations[0];

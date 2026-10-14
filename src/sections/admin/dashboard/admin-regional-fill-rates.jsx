@@ -56,11 +56,7 @@ export function AdminRegionalFillRates({
             return (
               <Box key={`${label}-${index}`}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
-                  <Typography
-                    variant="body2"
-                    noWrap
-                    sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }}
-                  >
+                  <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }}>
                     {String(label || '').trim() || '—'}
                   </Typography>
                   <Typography variant="subtitle2" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>

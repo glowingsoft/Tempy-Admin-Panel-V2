@@ -48,8 +48,9 @@ import {
 import { StaffMemberPersonalSummaryField } from 'src/sections/staff-member/profile/staff-member-personal-summary-field';
 import { resolveProfileAssetUrl, resolveUploadedAssetUrl } from 'src/store/Reducer/upload-api';
 import { getDashboardRootPath } from 'src/auth/utils/dashboard-path-utils';
+import { isValidLngLat } from 'src/sections/branches/geo-coordinates';
+import { geocodeAddress } from 'src/sections/tempy-home/standalone-address-input';
 
-// ----------------------------------------------------------------------
 
 export const UpdateUserSchema = zod.object({
   displayName: zod.string().min(1, { message: 'Name is required!' }),
@@ -60,8 +61,7 @@ export const UpdateUserSchema = zod.object({
   photoURL: zod.any().optional().nullable(),
   phoneNumber: zod.string().optional().nullable(),
   country: zod.string().optional().nullable(),
-  // Address optional so photo / name-only saves still hit the API
-  address: zod.string().optional().nullable(),
+  address: zod.string().min(1, { message: 'Address is required!' }),
   state: zod.string().optional().nullable(),
   city: zod.string().optional().nullable(),
   zipCode: zod.string().optional().nullable(),
@@ -152,7 +152,8 @@ export function AccountGeneral() {
   const {
     reset,
     handleSubmit,
-    formState: { isSubmitting },
+    setValue,
+    formState: { isSubmitting, dirtyFields },
   } = methods;
 
   useEffect(() => {
@@ -179,7 +180,57 @@ export function AccountGeneral() {
       }
 
       try {
-        const payload = buildUpdateProfilePayload(data);
+        const address = String(data.address || '').trim();
+        const longitude = Number(data.longitude);
+        const latitude = Number(data.latitude);
+        const missingCoordinates =
+          !isValidLngLat(longitude, latitude) || (longitude === 0 && latitude === 0);
+
+        let profileData = data;
+
+        if (dirtyFields.address || missingCoordinates) {
+          const geocoded = await geocodeAddress(address);
+          const geoLatitude = Number(geocoded?.latitude);
+          const geoLongitude = Number(geocoded?.longitude);
+
+          if (
+            !geocoded ||
+            !isValidLngLat(geoLongitude, geoLatitude) ||
+            (geoLongitude === 0 && geoLatitude === 0)
+          ) {
+            toast.error('Could not find this address on the map. Pick a suggestion from the list.');
+            return;
+          }
+
+          setValue('latitude', geoLatitude, { shouldDirty: true });
+          setValue('longitude', geoLongitude, { shouldDirty: true });
+
+          const city = String(data.city || '').trim() || geocoded.city || '';
+          const state = String(data.state || '').trim() || geocoded.state || '';
+          const country = String(data.country || '').trim() || geocoded.country || '';
+          const zipCode = String(data.zipCode || '').trim() || geocoded.postalCode || '';
+
+          if (!String(data.city || '').trim() && city) setValue('city', city, { shouldDirty: true });
+          if (!String(data.state || '').trim() && state) setValue('state', state, { shouldDirty: true });
+          if (!String(data.country || '').trim() && country) {
+            setValue('country', country, { shouldDirty: true });
+          }
+          if (!String(data.zipCode || '').trim() && zipCode) {
+            setValue('zipCode', zipCode, { shouldDirty: true });
+          }
+
+          profileData = {
+            ...data,
+            latitude: geoLatitude,
+            longitude: geoLongitude,
+            city,
+            state,
+            country,
+            zipCode,
+          };
+        }
+
+        const payload = buildUpdateProfilePayload(profileData);
         const updated = await updateUser({ id: userId, ...payload }).unwrap();
 
         const updatedName = updated.name || payload.name;
@@ -309,7 +360,7 @@ export function AccountGeneral() {
                 <Field.Text name="displayName" label="Name" />
                 <Field.Text name="email" label="Email address" disabled />
                 <Field.Phone name="phoneNumber" label="Phone number (optional)" />
-                <Field.GoogleAddress name="address" label="Address (optional)" />
+                <Field.GoogleAddress name="address" label="Address" />
                 <Field.Text name="country" label="Country" />
                 <Field.Text name="state" label="State/region" />
                 <Field.Text name="city" label="City" />
@@ -322,7 +373,6 @@ export function AccountGeneral() {
                 ) : null}
               </Box>
 
-              {/* Admin viewing the account sees the profile but cannot save or delete it. */}
               <Stack
                 spacing={3}
                 alignItems="flex-end"

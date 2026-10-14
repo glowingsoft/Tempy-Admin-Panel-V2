@@ -81,7 +81,7 @@ export function DashboardActivityList({ title, items = [], onItemClick }) {
                   <Iconify icon={item.icon} width={22} />
                 </Box>
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                  <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
                     {item.label}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.disabled' }}>

@@ -96,8 +96,10 @@ function Item({ item, lastItem, ...other }) {
         {lastItem ? null : <TimelineConnector />}
       </TimelineSeparator>
 
-      <TimelineContent>
-        <Typography variant="subtitle2">{item.title}</Typography>
+      <TimelineContent sx={{ minWidth: 0 }}>
+        <Typography variant="subtitle2" sx={{ overflowWrap: 'break-word' }}>
+          {item.title}
+        </Typography>
 
         <Typography variant="caption" sx={{ color: 'text.disabled' }}>
           {fDateTime(item.time)}

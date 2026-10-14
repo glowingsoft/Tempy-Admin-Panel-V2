@@ -8,7 +8,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { SocialIcon } from 'src/components/iconify';
 
-// ----------------------------------------------------------------------
 
 const GOOGLE_BUTTON_SX = {
   py: 1.5,
@@ -39,7 +38,6 @@ const GOOGLE_BUTTON_SX = {
   },
 };
 
-// ----------------------------------------------------------------------
 
 export function AuthSocialProviders({
   onGoogleClick,

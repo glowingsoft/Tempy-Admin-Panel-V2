@@ -36,7 +36,7 @@ function pointKey(point, index) {
 
 export function AdminRegionalHeatMap({
   title = 'Regional heat map',
-  subheader = 'Same rows as GET /admin/dashboard regionalHeatMap',
+  subheader = 'Bookings by location',
   points: pointsProp = [],
 }) {
   const theme = useTheme();
@@ -77,8 +77,8 @@ export function AdminRegionalHeatMap({
                 style={{ height: '100%', width: '100%' }}
               >
                 <TileLayer
-                  attribution="&copy; OpenStreetMap"
-                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                  attribution="Tiles &copy; Esri"
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
                 />
                 {mapPoints.map((point, index) => {
                   const total = toCount(point.total);
@@ -128,7 +128,7 @@ export function AdminRegionalHeatMap({
               return (
                 <Box key={pointKey(row, index)}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                    <Typography variant="body2" noWrap sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }}>
+                    <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }}>
                       {row.label || 'Unknown'}
                     </Typography>
                     <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>
@@ -137,8 +137,8 @@ export function AdminRegionalHeatMap({
                   </Stack>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
                     Pending {toCount(row.pending)} · Active {toCount(row.active)} · In progress{' '}
-                    {toCount(row.inProgress)} · Completed {toCount(row.completed)} · Intensity{' '}
-                    {intensity}
+                    {toCount(row.inProgress)} · Completed {toCount(row.completed)} · Cancelled{' '}
+                    {toCount(row.cancelled)} · Intensity {intensity}
                   </Typography>
                   <Box
                     sx={{

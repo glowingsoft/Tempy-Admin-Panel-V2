@@ -86,7 +86,7 @@ export function AdminUsersByType({ title = 'Users by account type', list = [] })
                       bgcolor: barColor,
                     }}
                   />
-                  <Typography variant="body2" noWrap sx={{ flexGrow: 1, fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500, overflowWrap: 'break-word' }}>
                     {item.label}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>

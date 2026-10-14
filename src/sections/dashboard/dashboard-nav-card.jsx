@@ -69,7 +69,7 @@ export function DashboardNavCard({
 
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3 }} noWrap>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3, minWidth: 0 }}>
             {title}
           </Typography>
           {value != null && value !== '' && (
@@ -88,7 +88,7 @@ export function DashboardNavCard({
               readOnly
               sx={{ color: 'warning.main' }}
             />
-            <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
+            <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 0 }}>
               {description || '1–5 stars'}
             </Typography>
           </Stack>
@@ -96,7 +96,6 @@ export function DashboardNavCard({
           <Typography
             variant="body2"
             sx={{ mt: 0.25, color: 'text.secondary', opacity: 0.85 }}
-            noWrap
           >
             {description}
           </Typography>

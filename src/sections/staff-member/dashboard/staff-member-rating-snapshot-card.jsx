@@ -67,7 +67,7 @@ export function StaffRatingSnapshotCard() {
               </Typography>
 
               <Stack spacing={0.5} sx={{ minWidth: 0, flexGrow: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ flexWrap: 'nowrap' }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   <Rating
                     value={overallAverage}
                     precision={0.1}
@@ -75,7 +75,7 @@ export function StaffRatingSnapshotCard() {
                     readOnly
                     sx={{ color: 'warning.main', flexShrink: 0 }}
                   />
-                  <Typography variant="body2" color="text.secondary" noWrap>
+                  <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'break-word' }}>
                     {reviewSummary}
                   </Typography>
                 </Stack>
@@ -89,8 +89,7 @@ export function StaffRatingSnapshotCard() {
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      noWrap
-                      sx={{ width: 112, flexShrink: 0 }}
+                      sx={{ width: { xs: 1, sm: 112 }, flexShrink: 0, overflowWrap: 'break-word' }}
                     >
                       {item.label}
                     </Typography>

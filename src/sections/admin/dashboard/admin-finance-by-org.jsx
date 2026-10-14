@@ -134,7 +134,7 @@ function RoleCard({ row }) {
         >
           <Iconify icon={meta.icon} width={18} />
         </Box>
-        <Typography variant="subtitle2" noWrap sx={{ minWidth: 0 }}>
+        <Typography variant="subtitle2" sx={{ minWidth: 0, overflowWrap: 'break-word' }}>
           {row.label}
         </Typography>
       </Stack>

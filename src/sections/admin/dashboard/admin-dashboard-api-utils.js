@@ -54,12 +54,48 @@ function mapSpendEarned(source) {
     .filter((row) => row.label);
 }
 
+function humanizeKey(key) {
+  const spaced = String(key)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  if (!spaced) return '';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function isSkippedCountKey(key) {
+  return (
+    key === 'total' ||
+    key === 'activeAgency' ||
+    key === 'activeHomeCareCompany' ||
+    /rate|percent/i.test(key)
+  );
+}
+
+function extraStatusRows(source, usedKeys) {
+  const used = new Set(usedKeys);
+  return Object.entries(source || {})
+    .filter(([key, value]) => {
+      if (used.has(key) || isSkippedCountKey(key)) return false;
+      if (value && typeof value === 'object') return false;
+      return Number.isFinite(Number(value));
+    })
+    .map(([key, value]) => ({
+      label: humanizeKey(key),
+      value: toCount(value),
+      colorKey: 'default',
+    }))
+    .filter((item) => item.label);
+}
+
 function statusSeries(source = {}, keys = []) {
-  return keys.map(({ key, label, colorKey }) => ({
+  const known = keys.map(({ key, label, colorKey }) => ({
     label,
     value: toCount(source[key]),
     colorKey: colorKey || undefined,
   }));
+
+  return [...known, ...extraStatusRows(source, keys.map((item) => item.key))];
 }
 
 function monthlySeries(source) {

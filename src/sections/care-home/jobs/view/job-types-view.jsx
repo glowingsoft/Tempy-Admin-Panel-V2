@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -11,11 +11,10 @@ import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
 import Alert from '@mui/material/Alert';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 
@@ -26,6 +25,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { fCurrency } from 'src/utils/format-number';
 
+import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -46,6 +46,8 @@ import {
   ADMIN_JOB_ROLE_STATUSES,
   buildAdminJobRolePayload,
 } from 'src/sections/admin/job-types/admin-job-roles-api-utils';
+
+import { DashboardStatCard } from 'src/sections/dashboard/dashboard-stat-card';
 
 import { JobTypesProvider, useJobTypes } from '../context/job-types-provider';
 import { JobTypeFormDialog } from '../job-type-form-dialog';
@@ -96,14 +98,27 @@ function AdminJobTypesViewContent() {
   const table = useTable({ defaultRowsPerPage: 10 });
 
   const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [editingJobType, setEditingJobType] = useState(null);
   const [jobTypeToDelete, setJobTypeToDelete] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    const next = search.trim();
+    if (next === keyword) return undefined;
+
+    const timer = setTimeout(() => {
+      setKeyword(next);
+      table.onResetPage();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [keyword, search, table.onResetPage]);
+
   const {
     data,
     isLoading,
-    isFetching,
     isError,
     error,
     refetch,
@@ -111,6 +126,7 @@ function AdminJobTypesViewContent() {
     {
       page: table.page,
       limit: table.rowsPerPage,
+      keyword,
       status: statusFilter === 'all' ? '' : statusFilter,
     },
     { refetchOnMountOrArgChange: true }
@@ -208,14 +224,13 @@ function AdminJobTypesViewContent() {
 
   return (
     <>
-      <DashboardContent maxWidth="lg">
+      <DashboardContent maxWidth="xl">
         <CustomBreadcrumbs
           heading="Job types & role earnings"
           links={[
             { name: 'Dashboard', href: paths.adminDashboard.root },
             { name: 'Job Types' },
           ]}
-          slotProps={{ heading: { mb: 0.75 } }}
           action={
             <Button
               variant="contained"
@@ -225,77 +240,95 @@ function AdminJobTypesViewContent() {
               Add type
             </Button>
           }
-          sx={{ mb: 2 }}
+          sx={{ mb: { xs: 3, md: 5 } }}
         />
 
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-          justifyContent="space-between"
-          spacing={2}
-          sx={{ mb: 2 }}
-        >
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 1.5,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 180px)' },
-            }}
-          >
-            {[
-              { label: 'Job types', value: insight.types },
-              { label: 'Departments', value: insight.departments },
-              { label: 'Earning (all roles)', value: formatMoneyOrDash(insight.totalEarned) },
-            ].map((item) => (
-              <Card key={item.label} sx={{ px: 2, py: 1.5 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {item.label}
-                </Typography>
-                <Typography variant="h6">{item.value}</Typography>
-              </Card>
-            ))}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <DashboardStatCard
+              title="Job types"
+              total={insight.types}
+              icon="solar:case-round-bold-duotone"
+              color="primary"
+            />
           </Box>
-
-          <TextField
-            select
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
-              table.onChangePage(null, 0);
-            }}
-            sx={{ minWidth: 160, alignSelf: { xs: 'stretch', sm: 'center' } }}
-            InputLabelProps={{ shrink: true }}
-          >
-            {ADMIN_JOB_TYPE_STATUS_FILTERS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <DashboardStatCard
+              title="Departments"
+              total={insight.departments}
+              icon="solar:buildings-2-bold-duotone"
+              color="info"
+            />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <DashboardStatCard
+              title="Earning (all roles)"
+              total={formatMoneyOrDash(insight.totalEarned)}
+              icon="solar:wallet-money-bold-duotone"
+              color="success"
+            />
+          </Box>
         </Stack>
 
-        {isError && (
-          <Alert
-            severity="error"
-            sx={{ mb: 2 }}
-            action={
-              <Button color="inherit" size="small" onClick={() => refetch()}>
-                Retry
-              </Button>
-            }
+        <Card sx={{ width: 1, minWidth: 0, overflow: 'hidden' }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ p: 2.5, alignItems: { md: 'center' } }}
           >
-            {handleApiError(error) || 'Failed to load job types'}
-          </Alert>
-        )}
+            <TextField
+              fullWidth
+              size="small"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search department or title"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-        <Card>
-          {isLoading ? <ModuleLoading /> : isFetching ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+            <TextField
+              select
+              size="small"
+              label="Status"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                table.onResetPage();
+              }}
+              sx={{ minWidth: { md: 220 } }}
+            >
+              {ADMIN_JOB_TYPE_STATUS_FILTERS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
 
-          {!isLoading ? (
-            <Scrollbar>
-              <Table sx={{ minWidth: 960 }}>
+          {isError ? (
+            <Alert
+              severity="error"
+              sx={{ mx: 2.5, mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetch()}>
+                  Retry
+                </Button>
+              }
+            >
+              {handleApiError(error) || 'Failed to load job types'}
+            </Alert>
+          ) : null}
+
+          {isLoading ? (
+            <ModuleLoading />
+          ) : (
+            <Scrollbar sx={{ width: 1 }}>
+              <Table size="small" sx={{ minWidth: 960 }}>
                 <TableHeadCustom headLabel={ADMIN_TABLE_HEAD} rowCount={jobTypes.length} />
 
                 <TableBody>
@@ -305,50 +338,47 @@ function AdminJobTypesViewContent() {
                       ADMIN_JOB_ROLE_STATUSES[0];
 
                     return (
-                    <TableRow key={jobType.id} hover>
-                      <TableCell>
-                        <Typography variant="subtitle2">{jobType.label}</Typography>
-                      </TableCell>
+                      <TableRow key={jobType.id} hover>
+                        <TableCell>
+                          <Typography variant="subtitle2">{jobType.label}</Typography>
+                        </TableCell>
 
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{jobType.category || '—'}</TableCell>
+                        <TableCell>{jobType.category || '—'}</TableCell>
 
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{jobType.name || '—'}</TableCell>
+                        <TableCell>{jobType.name || '—'}</TableCell>
 
-                      <TableCell sx={{ maxWidth: 320, whiteSpace: 'normal' }}>
-                        {jobType.description || '—'}
-                      </TableCell>
+                        <TableCell sx={{ maxWidth: 320, whiteSpace: 'normal' }}>
+                          {jobType.description || '—'}
+                        </TableCell>
 
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={statusMeta.label}
-                          color={statusMeta.color}
-                          variant="soft"
-                        />
-                      </TableCell>
+                        <TableCell>
+                          <Label color={statusMeta.color} variant="soft">
+                            {statusMeta.label}
+                          </Label>
+                        </TableCell>
 
-                      <TableCell align="center">{formatMoneyOrDash(jobType.earned)}</TableCell>
+                        <TableCell align="center">{formatMoneyOrDash(jobType.earned)}</TableCell>
 
-                      <TableCell align="right">
-                        <Stack direction="row" justifyContent="flex-end" spacing={0.25}>
-                          <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => handleOpenEdit(jobType)}>
-                              <Iconify icon="solar:pen-bold" width={18} />
-                            </IconButton>
-                          </Tooltip>
+                        <TableCell align="right">
+                          <Stack direction="row" justifyContent="flex-end" spacing={0.25}>
+                            <Tooltip title="Edit">
+                              <IconButton size="small" onClick={() => handleOpenEdit(jobType)}>
+                                <Iconify icon="solar:pen-bold" width={18} />
+                              </IconButton>
+                            </Tooltip>
 
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteClick(jobType)}
-                            >
-                              <Iconify icon="solar:trash-bin-trash-bold" width={18} />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteClick(jobType)}
+                              >
+                                <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
 
@@ -356,15 +386,17 @@ function AdminJobTypesViewContent() {
                 </TableBody>
               </Table>
             </Scrollbar>
-          ) : null}
+          )}
 
-          <TablePaginationCustom
-            count={totalCount}
-            page={table.page}
-            rowsPerPage={table.rowsPerPage}
-            onPageChange={table.onChangePage}
-            onRowsPerPageChange={table.onChangeRowsPerPage}
-          />
+          {!isLoading ? (
+            <TablePaginationCustom
+              count={totalCount}
+              page={table.page}
+              rowsPerPage={table.rowsPerPage}
+              onPageChange={table.onChangePage}
+              onRowsPerPageChange={table.onChangeRowsPerPage}
+            />
+          ) : null}
         </Card>
       </DashboardContent>
 

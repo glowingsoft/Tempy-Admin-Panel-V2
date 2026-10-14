@@ -183,11 +183,11 @@ export function StaffMemberDashboardView() {
             ))}
           </DashboardQuickAccess>
 
-          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
             <StaffRatingSnapshotCard />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardActivityList
               title="Recent activity"
               items={dashboard.recentActivity}

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
 import Alert from '@mui/material/Alert';
@@ -10,7 +10,6 @@ import { paths } from 'src/routes/paths';
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { useGetAgencyDashboardQuery } from 'src/store/Reducer/agency-dashboard-api';
-import { useGetAgencyJobsQuery } from 'src/store/Reducer/agency-jobs-api';
 import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 
 import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
@@ -24,12 +23,6 @@ import {
   DASHBOARD_LINK_MAPS,
   withDashboardLinks,
 } from 'src/sections/dashboard/dashboard-links';
-import { SupplierJobDetailsDialog } from 'src/sections/agency/jobs/supplier-job-details-dialog';
-import { SupplierUpcomingJobsCard } from 'src/sections/agency/jobs/supplier-upcoming-jobs-card';
-import {
-  findSupplierJobById,
-  pickUpcomingSupplierJobs,
-} from 'src/sections/agency/jobs/supplier-job-dashboard-utils';
 import { ModuleLoading } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
@@ -85,32 +78,13 @@ export function AgencyDashboardView() {
   const { user } = useSelector((state) => state.user);
   const scopeUserId = useScopedUserId();
   const displayName = user?.basicInfo?.name || 'Agency';
-  const [selectedJob, setSelectedJob] = useState(null);
   const { data, isLoading, isError, error } = useGetAgencyDashboardQuery(
     { userId: scopeUserId },
     { skip: !scopeUserId }
   );
-  const { data: jobsResponse, isLoading: jobsLoading } = useGetAgencyJobsQuery({
-    page: 0,
-    limit: 200,
-  });
-  const jobs = jobsResponse?.data || [];
   const dashboard = useMemo(
     () => withDashboardLinks(data || EMPTY_DASHBOARD, DASHBOARD_LINK_MAPS.agency),
     [data]
-  );
-  const upcomingJobs = useMemo(() => pickUpcomingSupplierJobs(jobs, { limit: 3 }), [jobs]);
-
-  const openJobDetails = useCallback((job) => {
-    if (job) setSelectedJob(job);
-  }, []);
-
-  const handleActivityClick = useCallback(
-    (item) => {
-      const job = findSupplierJobById(jobs, item?.entityId);
-      if (job) openJobDetails(job);
-    },
-    [jobs, openJobDetails]
   );
 
   return (
@@ -131,7 +105,7 @@ export function AgencyDashboardView() {
           <Grid xs={12}>
             <DashboardOverviewHeader
               title={`Welcome back 👋\n${displayName}`}
-              description="Here's what's happening across your agency today. Tap an upcoming job or job activity for details."
+              description="Here's what's happening across your agency today."
               stats={dashboard.stats}
             />
           </Grid>
@@ -144,11 +118,17 @@ export function AgencyDashboardView() {
           </Grid>
 
           <DashboardQuickAccess description="Jump into live sections">
-            {MODULES.map((module) => (
+            {MODULES.map((module, index) => {
+              const columns = 3;
+              const remainder = MODULES.length % columns || columns;
+              const inLastRow = index >= MODULES.length - remainder;
+
+              return (
               <Grid
                 key={module.title}
                 xs={12}
-                sm={6}
+                sm={MODULES.length % 2 === 1 && index === MODULES.length - 1 ? 12 : 6}
+                md={inLastRow ? 12 / remainder : 12 / columns}
                 sx={{ display: 'flex', flexDirection: 'column' }}
               >
                 <DashboardNavCard
@@ -156,10 +136,11 @@ export function AgencyDashboardView() {
                   value={dashboard.moduleValues[module.title]}
                 />
               </Grid>
-            ))}
+              );
+            })}
           </DashboardQuickAccess>
 
-          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardOverviewChart
               title="Agency activity"
               subheader="Bookings and bids over the last 12 months"
@@ -167,20 +148,10 @@ export function AgencyDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardActivityList
               title="Recent activity"
               items={dashboard.recentActivity}
-              onItemClick={handleActivityClick}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <SupplierUpcomingJobsCard
-              jobsHref={paths.dashboard.jobs.find}
-              jobs={upcomingJobs}
-              loading={jobsLoading}
-              onJobClick={openJobDetails}
             />
           </Grid>
 
@@ -203,12 +174,6 @@ export function AgencyDashboardView() {
 
         </Grid>
       )}
-
-      <SupplierJobDetailsDialog
-        open={Boolean(selectedJob)}
-        job={selectedJob}
-        onClose={() => setSelectedJob(null)}
-      />
     </DashboardContent>
   );
 }
