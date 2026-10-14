@@ -33,7 +33,7 @@ export function LayoutSection({
     <>
       {inputGlobalStyles}
 
-      <Box id="root__layout" className={layoutClasses.root} sx={sx}>
+      <Box id="root__layout" className={layoutClasses.root} sx={{ overflowX: 'hidden', ...sx }}>
         {sidebarSection ? (
           <>
             {sidebarSection}
@@ -42,6 +42,7 @@ export function LayoutSection({
               flex="1 1 auto"
               flexDirection="column"
               className={layoutClasses.hasSidebar}
+              sx={{ minWidth: 0, width: 1, maxWidth: 1, overflowX: 'hidden' }}
             >
               {headerSection}
               {children}

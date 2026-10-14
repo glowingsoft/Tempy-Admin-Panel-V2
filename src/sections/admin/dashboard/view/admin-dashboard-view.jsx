@@ -34,6 +34,7 @@ import { AdminTopPerformers } from '../admin-top-performers';
 import { AdminUsersByType } from '../admin-users-by-type';
 import { AdminScoreList } from '../admin-score-list';
 import { AdminRegionalFillRates } from '../admin-regional-fill-rates';
+import { AdminRegionalHeatMap } from '../admin-regional-heat-map';
 import { AdminFinanceByOrg } from '../admin-finance-by-org';
 import { AdminRecruitmentOverview } from 'src/sections/admin/recruitment/admin-recruitment-overview';
 import { AdminAllegationsOverview } from 'src/sections/admin/allegations/admin-allegations-overview';
@@ -236,7 +237,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AnalyticsCurrentVisits
               title="Bids by status"
               subheader={`${dashboard.bidsTotal} bids in total`}
@@ -254,7 +255,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AdminUsersByType list={dashboard.usersByType} />
           </Grid>
 
@@ -268,13 +269,7 @@ export function AdminDashboardView() {
           </Grid>
 
           <Grid xs={12}>
-            <DashboardOverviewChart
-              title="Regional heat map"
-              subheader="Bookings by location from the dashboard API"
-              emptyMessage="No regional heat map data yet"
-              chart={dashboard.heatMapChart}
-              sx={{ height: { md: 480 }, minHeight: { md: 480 } }}
-            />
+            <AdminRegionalHeatMap points={dashboard.regionalHeatMap} />
           </Grid>
 
           <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -333,11 +328,11 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AdminScoreList title="Platform health" items={dashboard.healthRows} suffix="%" />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AnalyticsOrderTimeline
               title="Platform timeline"
               emptyMessage="No timeline events yet"
@@ -345,7 +340,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <AdminTopPerformers
               title="Top performers"
               emptyMessage="No top performers yet"
@@ -353,7 +348,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardOverviewChart
               title="Customers & suppliers growth"
               subheader="Registrations over the last 12 months"
@@ -362,7 +357,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardActivityList
               title="Recent platform activity"
               items={dashboard.recentActivity}

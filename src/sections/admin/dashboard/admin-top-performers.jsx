@@ -56,13 +56,12 @@ export function AdminTopPerformers({
             <Stack
               key={item.id}
               direction="row"
-              alignItems="center"
-              spacing={2}
+              alignItems="flex-start"
+              spacing={1.5}
               sx={{
                 p: 1.5,
                 borderRadius: 1.5,
                 bgcolor: 'background.neutral',
-                overflow: 'visible',
               }}
             >
               <Avatar
@@ -81,17 +80,23 @@ export function AdminTopPerformers({
               </Avatar>
 
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <Typography variant="subtitle2" noWrap>
+                <Typography variant="subtitle2" sx={{ overflowWrap: 'anywhere' }}>
                   {item.name}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'text.secondary', display: 'block', overflowWrap: 'anywhere' }}
+                >
                   {item.subtitle}
                 </Typography>
+                <Label
+                  variant="soft"
+                  color={RANK_COLOR[item.rank] || 'default'}
+                  sx={{ mt: 0.75 }}
+                >
+                  {item.metric}
+                </Label>
               </Box>
-
-              <Label variant="soft" color={RANK_COLOR[item.rank] || 'default'} sx={{ flexShrink: 0 }}>
-                {item.metric}
-              </Label>
             </Stack>
           ))}
         </Stack>

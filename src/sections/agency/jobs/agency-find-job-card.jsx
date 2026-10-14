@@ -43,7 +43,6 @@ function hasSupplierWorkAction(job) {
   return ['assignStaff', 'assigned', 'reassign', 'awaitingWorker', 'viewStaff'].includes(job?.actionType);
 }
 
-/** Active-tab Assign / Assigned / Check In, also on All and Completed for the same jobs. */
 function shouldUseActiveJobActions(variant, mode, job) {
   if (variant === 'active' && job?.status === 'active') return true;
   if (variant !== 'all' && variant !== 'completed') return false;
@@ -82,7 +81,6 @@ function hasShiftEnded(row, job) {
 
 const SHIFT_ENDED_AFTER_MS = 48 * 60 * 60 * 1000;
 
-/** When the shift finished. End time first, then start, so a missing end still has a reference. */
 function shiftPassedAtMs(row, job) {
   if (Number.isFinite(row?.endsAt)) return row.endsAt;
   const end = getStaffShiftEnd(row?.endTime || row?.date ? row : job);
@@ -152,7 +150,6 @@ function getShiftRows(job) {
 
   return [];
 }
-
 function hasJobDistance(job) {
   return job?.distance != null && job.distance !== '';
 }

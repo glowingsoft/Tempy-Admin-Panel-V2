@@ -87,7 +87,10 @@ export function StaffUpcomingShiftsCard({ jobs = [], loading = false, onJobClick
                 <ListItemText
                   primary={job.title || 'Accepted job'}
                   secondary={[parts.time || job.schedule, job.address].filter(Boolean).join(' · ')}
-                  primaryTypographyProps={{ typography: 'subtitle2', noWrap: true }}
+                  primaryTypographyProps={{
+                    typography: 'subtitle2',
+                    sx: { overflowWrap: 'break-word', whiteSpace: 'normal' },
+                  }}
                   secondaryTypographyProps={{ component: 'span', typography: 'caption' }}
                 />
                 <Iconify

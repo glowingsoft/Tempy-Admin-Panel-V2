@@ -241,7 +241,6 @@ export function useConversationsSocket({
       isDeleted: true,
     };
 
-    // Tempy mobile/web primarily listen on these room events.
     socket.emit('chatUpdated', body);
     socket.emit('receiveMessage', body);
     socket.emit('deleteMessage', body);

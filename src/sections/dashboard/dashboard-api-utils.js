@@ -14,14 +14,46 @@ function lastPoints(data, size = 7) {
   return [...Array(size - list.length).fill(0), ...list];
 }
 
+function humanizeKey(key) {
+  const spaced = String(key)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  if (!spaced) return '';
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function isSkippedCountKey(key) {
+  return key === 'total' || /rate|percent/i.test(key);
+}
+
+/** Keep every numeric status the API sends, not only the known labels. */
+function extraStatusRows(source, usedKeys) {
+  const used = new Set(usedKeys);
+  return Object.entries(source || {})
+    .filter(([key, value]) => {
+      if (used.has(key) || isSkippedCountKey(key)) return false;
+      if (value && typeof value === 'object') return false;
+      return Number.isFinite(Number(value));
+    })
+    .map(([key, value]) => ({
+      label: humanizeKey(key),
+      value: toCount(value),
+      colorKey: getWorkflowStatusColorKey(key) || 'default',
+    }))
+    .filter((item) => item.label);
+}
+
 function statusSeries(source = {}, keys = []) {
-  return keys
+  const known = keys
     .map(({ key, label, colorKey }) => ({
       label,
       value: toCount(source[key]),
       colorKey: colorKey || getWorkflowStatusColorKey(key) || getWorkflowStatusColorKey(label),
     }))
     .filter((item) => item.label);
+
+  return [...known, ...extraStatusRows(source, keys.map((item) => item.key))];
 }
 
 const ACTIVITY_ICONS = {
@@ -177,11 +209,38 @@ export function mapCustomerDashboardFromApi(response) {
       'Created Jobs': String(toCount(jobs.total)),
       'Add Job': String(toCount(jobs.active)),
       'Job Bids': String(toCount(bids.total)),
+      ...(data.contracts?.total != null
+        ? { Contracts: String(toCount(data.contracts.total)) }
+        : {}),
     },
   };
 }
 
 export const mapCareHomeDashboardFromApi = mapCustomerDashboardFromApi;
+
+/** `{ amount, formatted, hours, bookings }` blocks such as dashboard `upcoming`. */
+function mapMoneyBlock(block) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return null;
+
+  const amount = Number(block.amount);
+  const hours = Number(block.hours);
+  const bookings = Number(block.bookings);
+  const formatted = String(block.formatted || '').trim();
+  if (!Number.isFinite(amount) && !formatted && !Number.isFinite(bookings)) return null;
+
+  return {
+    amount: Number.isFinite(amount) ? amount : 0,
+    formatted,
+    hours: Number.isFinite(hours) ? hours : 0,
+    bookings: Number.isFinite(bookings) ? bookings : 0,
+  };
+}
+
+function readUpcomingBlock(data) {
+  const earnings = data.earnings && typeof data.earnings === 'object' ? data.earnings : {};
+  const graph = data.earningsGraph && typeof data.earningsGraph === 'object' ? data.earningsGraph : {};
+  return mapMoneyBlock(data.upcoming || earnings.upcoming || graph.upcoming);
+}
 
 /** Supplier `earningsGraph`: last 12 months of completed-booking earnings, oldest month first. */
 function mapEarningsGraph(graph) {
@@ -213,9 +272,12 @@ export function mapAgencyDashboardFromApi(response) {
   const staff = data.staff && typeof data.staff === 'object' ? data.staff : {};
   const bids = data.bids && typeof data.bids === 'object' ? data.bids : {};
 
+  const earningsGraph = mapEarningsGraph(data.earningsGraph);
+  const upcoming = readUpcomingBlock(data);
+
   return {
     ...mapped,
-    earningsGraph: mapEarningsGraph(data.earningsGraph),
+    earningsGraph: upcoming ? { ...earningsGraph, upcoming } : earningsGraph,
     stats: [
       {
         title: 'New jobs',
@@ -247,6 +309,9 @@ export function mapAgencyDashboardFromApi(response) {
       Staff: String(toCount(staff.total)),
       Jobs: String(toCount(summary.newJobs) || toCount(jobs.total)),
       Bids: String(toCount(bids.total)),
+      ...(data.agreements?.total != null
+        ? { Agreements: String(toCount(data.agreements.total)) }
+        : {}),
     },
   };
 }

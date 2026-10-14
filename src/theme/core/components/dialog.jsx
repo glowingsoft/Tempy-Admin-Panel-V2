@@ -93,7 +93,12 @@ const MuiDialogTitle = {
   /** **************************************
    * STYLE
    *************************************** */
-  styleOverrides: { root: ({ theme }) => ({ padding: theme.spacing(3) }) },
+  styleOverrides: {
+    root: ({ theme }) => ({
+      padding: theme.spacing(3),
+      paddingRight: theme.spacing(6),
+    }),
+  },
 };
 
 const MuiDialogContent = {

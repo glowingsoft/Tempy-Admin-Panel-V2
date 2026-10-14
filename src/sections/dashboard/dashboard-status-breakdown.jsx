@@ -181,7 +181,7 @@ export function DashboardStatusBreakdown({
                   bgcolor: row.color,
                 }}
               />
-              <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }} noWrap>
+              <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500, overflowWrap: 'break-word' }}>
                 {row.label}
               </Typography>
               <Typography variant="subtitle2" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>

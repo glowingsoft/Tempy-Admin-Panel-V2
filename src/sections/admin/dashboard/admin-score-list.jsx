@@ -58,7 +58,7 @@ export function AdminScoreList({
             return (
               <Box key={item.label}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
-                  <Typography variant="body2" noWrap sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, fontWeight: 500, overflowWrap: 'break-word' }}>
                     {item.label}
                   </Typography>
                   <Typography variant="subtitle2" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>

@@ -269,7 +269,7 @@ export function AdminEntityListView({
           </Alert>
         )}
 
-        <Card>
+        <Card sx={{ width: 1, minWidth: 0, overflow: 'hidden' }}>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
@@ -313,7 +313,7 @@ export function AdminEntityListView({
             {showLoading ? (
               <ModuleLoading />
             ) : (
-              <Scrollbar>
+              <Scrollbar sx={{ width: 1 }}>
                 <Table size="medium" sx={{ minWidth: 960 }}>
                   <TableHeadCustom headLabel={resolvedTableHead} rowCount={dataFiltered.length} />
 
