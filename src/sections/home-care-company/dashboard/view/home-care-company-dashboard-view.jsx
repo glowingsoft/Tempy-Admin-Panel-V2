@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo } from 'react';
 
 import Alert from '@mui/material/Alert';
 import Grid from '@mui/material/Unstable_Grid2';
@@ -11,7 +11,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { useSelector } from 'react-redux';
 
 import { useGetHomeCareCompanyDashboardQuery } from 'src/store/Reducer/home-care-company-dashboard-api';
-import { useGetHomeCareCompanyJobsQuery } from 'src/store/Reducer/home-care-company-jobs-api';
 import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 
 import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
@@ -25,12 +24,6 @@ import {
   DASHBOARD_LINK_MAPS,
   withDashboardLinks,
 } from 'src/sections/dashboard/dashboard-links';
-import { SupplierJobDetailsDialog } from 'src/sections/agency/jobs/supplier-job-details-dialog';
-import { SupplierUpcomingJobsCard } from 'src/sections/agency/jobs/supplier-upcoming-jobs-card';
-import {
-  findSupplierJobById,
-  pickUpcomingSupplierJobs,
-} from 'src/sections/agency/jobs/supplier-job-dashboard-utils';
 import { ModuleLoading } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
@@ -81,32 +74,13 @@ export function HomeCareCompanyDashboardView() {
   const { user } = useSelector((state) => state.user);
   const scopeUserId = useScopedUserId();
   const displayName = user?.basicInfo?.name || 'Home Care Company';
-  const [selectedJob, setSelectedJob] = useState(null);
   const { data, isLoading, isError, error } = useGetHomeCareCompanyDashboardQuery(
     { userId: scopeUserId },
     { skip: !scopeUserId }
   );
-  const { data: jobsResponse, isLoading: jobsLoading } = useGetHomeCareCompanyJobsQuery({
-    page: 0,
-    limit: 200,
-  });
-  const jobs = jobsResponse?.data || [];
   const dashboard = useMemo(
     () => withDashboardLinks(data || EMPTY_DASHBOARD, DASHBOARD_LINK_MAPS.homeCareCompany),
     [data]
-  );
-  const upcomingJobs = useMemo(() => pickUpcomingSupplierJobs(jobs, { limit: 3 }), [jobs]);
-
-  const openJobDetails = useCallback((job) => {
-    if (job) setSelectedJob(job);
-  }, []);
-
-  const handleActivityClick = useCallback(
-    (item) => {
-      const job = findSupplierJobById(jobs, item?.entityId);
-      if (job) openJobDetails(job);
-    },
-    [jobs, openJobDetails]
   );
 
   return (
@@ -127,7 +101,7 @@ export function HomeCareCompanyDashboardView() {
           <Grid xs={12}>
             <DashboardOverviewHeader
               title={`Welcome back 👋\n${displayName}`}
-              description="Here's what's happening across your company today. Tap an upcoming job or job activity for details."
+              description="Here's what's happening across your company today."
               stats={dashboard.stats}
             />
           </Grid>
@@ -167,16 +141,6 @@ export function HomeCareCompanyDashboardView() {
             <DashboardActivityList
               title="Recent activity"
               items={dashboard.recentActivity}
-              onItemClick={handleActivityClick}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <SupplierUpcomingJobsCard
-              jobsHref={ROOT.jobs}
-              jobs={upcomingJobs}
-              loading={jobsLoading}
-              onJobClick={openJobDetails}
             />
           </Grid>
 
@@ -199,12 +163,6 @@ export function HomeCareCompanyDashboardView() {
 
         </Grid>
       )}
-
-      <SupplierJobDetailsDialog
-        open={Boolean(selectedJob)}
-        job={selectedJob}
-        onClose={() => setSelectedJob(null)}
-      />
     </DashboardContent>
   );
 }

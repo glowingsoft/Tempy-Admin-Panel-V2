@@ -36,11 +36,9 @@ import { AdminScoreList } from '../admin-score-list';
 import { AdminRegionalFillRates } from '../admin-regional-fill-rates';
 import { AdminRegionalHeatMap } from '../admin-regional-heat-map';
 import { AdminFinanceByOrg } from '../admin-finance-by-org';
-import { AdminRecruitmentOverview } from 'src/sections/admin/recruitment/admin-recruitment-overview';
 import { AdminAllegationsOverview } from 'src/sections/admin/allegations/admin-allegations-overview';
 import { ModuleLoading } from 'src/components/loading-screen';
 
-// ----------------------------------------------------------------------
 
 const MODULES = [
   {
@@ -190,10 +188,6 @@ export function AdminDashboardView() {
 
           <Grid xs={12}>
             <AdminAllegationsOverview />
-          </Grid>
-
-          <Grid xs={12}>
-            <AdminRecruitmentOverview />
           </Grid>
 
           {dashboard.extraStats.map((stat) => (
