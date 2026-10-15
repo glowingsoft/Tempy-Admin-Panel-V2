@@ -119,7 +119,7 @@ export function useSupplierAgreedRates({ open, job, shiftRow = null, rateApiBase
 
   const { data: agreedRates = [], isFetching: agreedRatesLoading, isError: agreedRatesError } = useGetCurrentAgreedRateQuery(
     { base: apiBase, customer: customerId, jobType: jobTypeId },
-    { skip: !canCheckAgreedRate, refetchOnMountOrArgChange: true }
+    { skip: !canCheckAgreedRate, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const rateOptions = isAgreed && Array.isArray(agreedRates) ? agreedRates : [];

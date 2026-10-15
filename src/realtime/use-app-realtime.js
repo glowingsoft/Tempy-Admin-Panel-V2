@@ -15,6 +15,26 @@ function resolveSubjectId(user, impersonation) {
   return String(getProfileUserId(user) || '').trim();
 }
 
+function queueFromPayload(payload) {
+  const changes = readDataChanges(payload);
+  if (changes.length) {
+    changes.forEach((change) => {
+      queueModelRefetch(
+        change?.model ||
+          change?.Model ||
+          change?.entity ||
+          change?.entityType ||
+          change?.collection ||
+          change
+      );
+    });
+    return;
+  }
+
+  if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
+    ['job', 'booking', 'bid', 'notification', 'staff'].forEach(queueModelRefetch);
+  }
+}
 
 export function useAppRealtime() {
   const { user } = useSelector((state) => state.user);
@@ -43,14 +63,21 @@ export function useAppRealtime() {
     });
 
     const handleDataChanged = (payload) => {
-      readDataChanges(payload).forEach((change) => queueModelRefetch(change?.model));
+      queueFromPayload(payload);
     };
 
     const offDataChanged = onAppSocket('dataChanged', handleDataChanged);
+    const offDataChangedAlt = onAppSocket('data-changed', handleDataChanged);
+    const offDataUpdate = onAppSocket('dataUpdate', handleDataChanged);
+    const offDataUpdated = onAppSocket('dataUpdated', handleDataChanged);
+
     const offReconnect = onAppSocketReconnect(refetchMainLists);
 
     return () => {
       offDataChanged();
+      offDataChangedAlt();
+      offDataUpdate();
+      offDataUpdated();
       offReconnect();
     };
   }, [subjectId, token]);

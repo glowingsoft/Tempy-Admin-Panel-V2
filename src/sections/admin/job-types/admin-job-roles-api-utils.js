@@ -12,13 +12,39 @@ function pickId(...values) {
   return '';
 }
 
-function staticEarningForRole(seed) {
-  const text = String(seed || 'role');
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+/** API may send `earnings: { amount, formatted, hours, bookings }` or a bare number. */
+function pickMoney(...values) {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    if (typeof value === 'object') {
+      const nested = pickMoney(
+        value.amount,
+        value.total,
+        value.value,
+        value.earned,
+        value.earnings
+      );
+      if (nested != null) return nested;
+      continue;
+    }
+    const n = Number(String(value).replace(/[^0-9.-]/g, ''));
+    if (Number.isFinite(n)) return n;
   }
-  return 12500 + (hash % 355) * 100;
+  return null;
+}
+
+function pickCount(...values) {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    if (typeof value === 'object') {
+      const nested = pickCount(value.bookings, value.count, value.total, value.hours);
+      if (nested != null) return nested;
+      continue;
+    }
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 export function buildJobRoleLabel(department, title) {
@@ -32,19 +58,28 @@ export function mapAdminJobRoleFromApi(item = {}) {
   const id = pickId(item._id, item.id);
   const department = String(item.department || item.category || '').trim();
   const title = String(item.title || item.name || '').trim();
+  const earningsBlock =
+    item.earnings && typeof item.earnings === 'object' ? item.earnings : null;
 
-  const jobsCount = Number(
-    item.jobsCount ?? item.jobCount ?? item.totalJobs ?? item.bookingsCount ?? 0
-  );
-  const billed = Number(item.billed ?? item.billedAmount ?? item.totalBilled ?? 0);
-  const earnedFromApi = Number(item.earned ?? item.earnedAmount ?? item.totalEarned ?? item.earnings ?? 0);
-  const avgRate = Number(
-    item.avgHourlyRate ?? item.averageRate ?? item.hourlyRate ?? item.ratePerHour ?? 0
-  );
+  const jobsCount =
+    pickCount(
+      item.jobsCount,
+      item.jobCount,
+      item.totalJobs,
+      item.bookingsCount,
+      earningsBlock?.bookings
+    ) ?? 0;
+  const billed = pickMoney(item.billed, item.billedAmount, item.totalBilled) ?? 0;
   const earned =
-    Number.isFinite(earnedFromApi) && earnedFromApi > 0
-      ? earnedFromApi
-      : staticEarningForRole(id || `${department}-${title}`);
+    pickMoney(item.earned, item.earnedAmount, item.totalEarned, item.earnings, earningsBlock) ?? 0;
+  const avgRate =
+    pickMoney(
+      item.avgHourlyRate,
+      item.averageRate,
+      item.hourlyRate,
+      item.ratePerHour
+    ) ?? 0;
+  const hours = pickCount(earningsBlock?.hours, item.hours, item.totalHours) ?? 0;
 
   return {
     id,
@@ -55,10 +90,11 @@ export function mapAdminJobRoleFromApi(item = {}) {
     title,
     description: String(item.description || '').trim(),
     status: normalizeAdminJobRoleStatus(item.status),
-    jobsCount: Number.isFinite(jobsCount) ? jobsCount : 0,
-    billed: Number.isFinite(billed) ? billed : 0,
+    jobsCount,
+    billed,
     earned,
-    avgRate: Number.isFinite(avgRate) ? avgRate : 0,
+    hours,
+    avgRate,
     createdAt: item.createdAt || '',
     updatedAt: item.updatedAt || '',
     raw: item,

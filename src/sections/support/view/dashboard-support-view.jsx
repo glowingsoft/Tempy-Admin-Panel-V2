@@ -9,7 +9,6 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 
@@ -57,12 +56,11 @@ export function DashboardSupportView() {
   const {
     data: supportData,
     isLoading,
-    isFetching,
     isError,
     error,
   } = useGetSupportTicketsQuery(
     { accountKey },
-    { skip: !accountKey, refetchOnMountOrArgChange: true }
+    { skip: !accountKey, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const [createSupportTicket, { isLoading: isSubmitting }] = useCreateSupportTicketMutation();
@@ -173,7 +171,7 @@ export function DashboardSupportView() {
 
       <Stack spacing={2}>
         <Typography variant="subtitle1">Your requests</Typography>
-        {isLoading ? <ModuleLoading /> : isFetching ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+        {isLoading ? <ModuleLoading /> : null}
 
         {isError ? (
           <Stack

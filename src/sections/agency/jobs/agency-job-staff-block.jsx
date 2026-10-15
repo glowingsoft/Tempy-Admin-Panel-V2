@@ -12,7 +12,6 @@ import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { hideScrollX } from 'src/theme/styles/mixins';
 
 import {
-  ASSIGN_STAFF,
   STAFF_CONFLICTS,
   STAFF_OTHER_ASSIGNMENTS,
   withStaffDistances,
@@ -246,7 +245,7 @@ export function AgencyJobStaffBlock({
 
   const visibleStaff = useMemo(
     () =>
-      withStaffDistances(staffList?.length ? staffList : ASSIGN_STAFF, {
+      withStaffDistances(staffList?.length ? staffList : [], {
         latitude: jobItem.latitude,
         longitude: jobItem.longitude,
       }),

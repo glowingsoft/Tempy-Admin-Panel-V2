@@ -17,7 +17,6 @@ import { getJobDateParts } from 'src/components/jobs/job-date-filters';
 
 import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
 
-// ----------------------------------------------------------------------
 
 export function StaffUpcomingShiftsCard({ jobs = [], loading = false, onJobClick }) {
   return (

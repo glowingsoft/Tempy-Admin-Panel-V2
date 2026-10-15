@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 
@@ -21,10 +20,10 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import StatusTabsFilter from 'src/components/filters/status-tabs-filter';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import { toast } from 'src/components/snackbar';
 import {
-  TableEmptyRows,
   TableHeadCustom,
   TableNoData,
   TablePaginationCustom,
@@ -87,7 +86,6 @@ export function CategoryListView({ categoryType }) {
   const {
     data: responseData,
     isLoading,
-    isFetching,
   } = useGetWalletsQuery(
     {
       page: currentPage,
@@ -245,8 +243,8 @@ export function CategoryListView({ categoryType }) {
 
   // Check if no data found
   const notFound = useMemo(
-    () => !isLoading && !isFetching && sortedData.length === 0,
-    [isLoading, isFetching, sortedData.length]
+    () => !isLoading && sortedData.length === 0,
+    [isLoading, sortedData.length]
   );
 
   // Calculate status counts for tabs
@@ -307,17 +305,7 @@ export function CategoryListView({ categoryType }) {
           )}
 
           <Box sx={{ position: 'relative' }}>
-            {isFetching && (
-              <LinearProgress
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 9,
-                }}
-              />
-            )}
+            {isLoading && !sortedData.length ? <ModuleLoading /> : null}
 
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -330,9 +318,7 @@ export function CategoryListView({ categoryType }) {
                 />
 
                 <TableBody>
-                  {!isLoading &&
-                    !isFetching &&
-                    sortedData.map((row, index) => (
+                  {sortedData.map((row, index) => (
                       <WalletTableRow
                         key={row._id}
                         row={row}
@@ -340,10 +326,6 @@ export function CategoryListView({ categoryType }) {
                         onDeleteRow={() => handleDeleteRow(row._id, row.name)}
                       />
                     ))}
-
-                  {(isLoading || isFetching) && (
-                    <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={itemsPerPage} />
-                  )}
 
                   <TableNoData
                     notFound={notFound}

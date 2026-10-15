@@ -70,6 +70,53 @@ const ACTIVITY_COLORS = {
   staff: 'success',
 };
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function parseMonthIndex(label) {
+  const raw = String(label || '').trim();
+  if (!raw) return -1;
+
+  // "2025-11" / "2025-11-01"
+  const iso = raw.match(/^(\d{4})-(\d{1,2})/);
+  if (iso) {
+    const month = Number(iso[2]);
+    return month >= 1 && month <= 12 ? month - 1 : -1;
+  }
+
+  const short = raw.slice(0, 3).toLowerCase();
+  return SHORT_MONTHS.findIndex((m) => m.toLowerCase() === short);
+}
+
+/**
+ * Keep Jan → Dec left-to-right (API sometimes sends rolling Nov…Oct).
+ * Reorders categories + each series.data by calendar month index.
+ */
+function toCalendarJanFirst(categories = [], series = [], extraRows = []) {
+  if (!Array.isArray(categories) || categories.length < 2) {
+    return { categories, series, extraRows };
+  }
+
+  const stamped = categories.map((label, index) => ({
+    index,
+    monthIdx: parseMonthIndex(label),
+  }));
+  if (stamped.some((row) => row.monthIdx < 0)) {
+    return { categories, series, extraRows };
+  }
+
+  stamped.sort((a, b) => a.monthIdx - b.monthIdx || a.index - b.index);
+  const order = stamped.map((row) => row.index);
+
+  return {
+    categories: order.map((i) => categories[i]),
+    series: (Array.isArray(series) ? series : []).map((item) => ({
+      ...item,
+      data: order.map((i) => toCount(item?.data?.[i])),
+    })),
+    extraRows: Array.isArray(extraRows) ? order.map((i) => extraRows[i]) : extraRows,
+  };
+}
+
 export function mapCustomerDashboardFromApi(response) {
   const data = response?.data && typeof response.data === 'object' ? response.data : response || {};
   const summary = data.summary && typeof data.summary === 'object' ? data.summary : {};
@@ -80,16 +127,21 @@ export function mapCustomerDashboardFromApi(response) {
   const monthly =
     data.monthlyActivity && typeof data.monthlyActivity === 'object' ? data.monthlyActivity : {};
 
-  const monthlyCategories = Array.isArray(monthly.categories) ? monthly.categories : [];
-  const monthlySeries = Array.isArray(monthly.series)
+  const rawCategories = Array.isArray(monthly.categories) ? monthly.categories : [];
+  const rawSeries = Array.isArray(monthly.series)
     ? monthly.series.map((item) => ({
         name: item?.name || 'Series',
-        data: Array.isArray(item?.data) ? item.data.map(toCount) : monthlyCategories.map(() => 0),
+        data: Array.isArray(item?.data) ? item.data.map(toCount) : rawCategories.map(() => 0),
       }))
     : [
-        { name: 'Jobs', data: monthlyCategories.map(() => 0) },
-        { name: 'Bids', data: monthlyCategories.map(() => 0) },
+        { name: 'Jobs', data: rawCategories.map(() => 0) },
+        { name: 'Bids', data: rawCategories.map(() => 0) },
       ];
+
+  const { categories: monthlyCategories, series: monthlySeries } = toCalendarJanFirst(
+    rawCategories,
+    rawSeries
+  );
 
   const jobsMonthly = monthlySeries.find((item) => String(item.name).toLowerCase() === 'jobs');
   const bidsMonthly = monthlySeries.find((item) => String(item.name).toLowerCase() === 'bids');
@@ -242,24 +294,37 @@ function readUpcomingBlock(data) {
   return mapMoneyBlock(data.upcoming || earnings.upcoming || graph.upcoming);
 }
 
-/** Supplier `earningsGraph`: last 12 months of completed-booking earnings, oldest month first. */
+/** Supplier `earningsGraph`: completed-booking earnings by month (shown Jan → Dec). */
 function mapEarningsGraph(graph) {
   const source = graph && typeof graph === 'object' ? graph : {};
-  const categories = Array.isArray(source.categories) ? source.categories.map(String) : [];
+  const rawCategories = Array.isArray(source.categories) ? source.categories.map(String) : [];
   const firstSeries = Array.isArray(source.series) ? source.series[0] : null;
   const seriesData = Array.isArray(firstSeries?.data) ? firstSeries.data : [];
-  const points = Array.isArray(source.points) ? source.points : [];
-  const data = categories.map((_, index) => toCount(seriesData[index]));
+  const rawPoints = Array.isArray(source.points) ? source.points : [];
+  const rawSeries = [
+    {
+      name: firstSeries?.name || 'Earnings',
+      data: rawCategories.map((_, index) => toCount(seriesData[index])),
+    },
+  ];
+  const rawExtra = rawCategories.map((_, index) => ({
+    month: String(rawPoints[index]?.month || ''),
+    hours: toCount(rawPoints[index]?.hours),
+    bookings: toCount(rawPoints[index]?.bookings),
+  }));
+
+  const { categories, series, extraRows: points } = toCalendarJanFirst(
+    rawCategories,
+    rawSeries,
+    rawExtra
+  );
+  const data = series[0]?.data || [];
 
   return {
     categories,
-    series: [{ name: firstSeries?.name || 'Earnings', data }],
+    series,
     total: source.total != null ? toCount(source.total) : data.reduce((sum, v) => sum + v, 0),
-    points: categories.map((_, index) => ({
-      month: String(points[index]?.month || ''),
-      hours: toCount(points[index]?.hours),
-      bookings: toCount(points[index]?.bookings),
-    })),
+    points,
   };
 }
 

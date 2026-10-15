@@ -16,7 +16,7 @@ export function useStaffCancellationStats() {
   // Refetch on mount so strikes cleared by an admin show up without a reload.
   const { data: profile } = useGetUserByIdQuery(scopeUserId, {
     skip: !scopeUserId,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60, refetchOnFocus: false,
   });
 
   return useMemo(() => {

@@ -111,7 +111,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
         : createCareHomeJob;
 
   const branchListArgs = useMemo(() => ({ page: 0, limit: 100, status: '' }), []);
-  const branchQueryOptions = { refetchOnMountOrArgChange: true };
+  const branchQueryOptions = { refetchOnMountOrArgChange: 60, refetchOnFocus: false };
 
   const careHomeBranchesQuery = useGetCareHomeBranchesQuery(branchListArgs, {
     skip: skipCareHome,

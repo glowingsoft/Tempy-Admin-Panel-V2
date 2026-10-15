@@ -1,4 +1,4 @@
-import { Component, useMemo, useCallback, useState, useEffect } from 'react';
+import { Component, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
 import Box from '@mui/material/Box';
@@ -126,6 +126,8 @@ import {
 } from 'src/sections/staff-member/jobs/staff-member-attendance';
 import { StaffMemberAttendanceDialog } from 'src/sections/staff-member/jobs/staff-member-attendance-dialog';
 import { JobAttendanceDialog } from 'src/sections/staff-member/jobs/job-attendance-dialog';
+import { useLazyGetJobAttendanceBookingsQuery } from 'src/store/Reducer/job-attendance-api';
+import { onRealtimeModels } from 'src/realtime/refetch-for-model';
 import {
   buildCheckInOutBody,
   compressImageDataUrl,
@@ -398,6 +400,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   const [uploadAwsFile] = useUploadAwsFileMutation();
   const [fetchNurseBookingLogs] = useLazyGetNurseBookingLogsQuery();
   const [fetchNurseBookings] = useLazyGetNurseBookingsQuery();
+  const [fetchJobAttendanceBookings] = useLazyGetJobAttendanceBookingsQuery();
   const nurseBookingsQuery = useGetNurseBookingsQuery(
     { page: 0, limit: 200 },
     { skip: !isStaffMember }
@@ -465,19 +468,21 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
   const agencyJobsQuery = useGetAgencyJobsQuery(jobsQueryArgs, {
     skip: !useAgencyApis,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
 
   const hccJobsQuery = useGetHomeCareCompanyJobsQuery(jobsQueryArgs, {
     skip: !isHomeCareCompany,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
 
   const nurseJobsQuery = useGetNurseJobsQuery(jobsQueryArgs, {
     skip: !isStaffMember,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
 
   const jobsResponse = isStaffMember
@@ -535,8 +540,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     },
     {
       skip: !useAgencyApis || !scopeUserId,
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
     }
   );
@@ -550,8 +555,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     },
     {
       skip: !isHomeCareCompany || !scopeUserId,
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
     }
   );
@@ -565,8 +570,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     },
     {
       skip: !isStaffMember || !scopeUserId,
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
     }
   );
@@ -911,7 +916,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return applyJobDistances([...incoming, ...apiJobs], userOrigin);
   }, [isStaffMember, jobsResponse?.data, userOrigin, directRequests]);
 
-  const listLoading = jobsLoading || jobsFetching;
+  // Full-page loader only on first load. Socket/background refetch keeps the list visible.
+  const listLoading = jobsLoading;
 
   const jobsRootPath = isStaffMember
     ? paths.dashboard.staffMember.root
@@ -1754,6 +1760,15 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
     setAttendanceMap((prev) => {
       const merged = keys.reduce((acc, key) => mergeAttendance(prev[key], acc), attendance);
+      const unchanged = keys.every(
+        (key) =>
+          prev[key]?.checkInAt === merged.checkInAt &&
+          prev[key]?.checkOutAt === merged.checkOutAt &&
+          prev[key]?.bookingStatus === merged.bookingStatus &&
+          prev[key]?.autoCheckedOut === merged.autoCheckedOut
+      );
+      if (unchanged) return prev;
+
       const next = { ...prev };
       keys.forEach((key) => {
         next[key] = merged;
@@ -1761,6 +1776,88 @@ export function AgencyJobsView({ mode = 'agency' }) {
       return next;
     });
   }, []);
+
+  // Agency / HCC: load booking attendance so "Not checked in" clears after the worker checks in.
+  const activeSupplierJobIdsKey = useMemo(
+    () =>
+      isSupplierJobs && tabs.value === 'active'
+        ? [...new Set(tabJobs.map((job) => String(job?.id || '').trim()).filter(Boolean))]
+            .sort()
+            .join(',')
+        : '',
+    [isSupplierJobs, tabJobs, tabs.value]
+  );
+
+  const [attendanceRealtimeTick, setAttendanceRealtimeTick] = useState(0);
+  const tabJobsRef = useRef(tabJobs);
+  tabJobsRef.current = tabJobs;
+
+  useEffect(() => {
+    if (!isSupplierJobs) return undefined;
+    return onRealtimeModels((models) => {
+      if (models.includes('booking') || models.includes('job')) {
+        setAttendanceRealtimeTick((n) => n + 1);
+      }
+    });
+  }, [isSupplierJobs]);
+
+  useEffect(() => {
+    if (!activeSupplierJobIdsKey) return undefined;
+
+    const jobIds = activeSupplierJobIdsKey.split(',').filter(Boolean);
+    let cancelled = false;
+
+    jobIds.forEach(async (jobId) => {
+      try {
+        const rows = await fetchJobAttendanceBookings({ mode, jobId, limit: 50 }).unwrap();
+        if (cancelled || !Array.isArray(rows) || !rows.length) return;
+
+        const job = tabJobsRef.current.find((row) => String(row.id) === String(jobId));
+        if (!job) return;
+
+        rows.forEach((row) => {
+          const attendance = mapAttendanceBlock(row.attendance);
+          if (!row.id) return;
+          if (!attendance?.checkInAt && !attendance?.checkOutAt && !row.status) return;
+
+          applyAttendance(job, row.id, {
+            ...(attendance || EMPTY_ATTENDANCE),
+            bookingStatus: normalizeBookingStatus(row.status),
+          });
+        });
+      } catch {
+        // Booking attendance is optional for the label; ignore failures.
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSupplierJobIdsKey,
+    applyAttendance,
+    attendanceRealtimeTick,
+    fetchJobAttendanceBookings,
+    mode,
+  ]);
+
+  const supplierAttendanceJobRef = useRef(supplierAttendanceJob);
+  supplierAttendanceJobRef.current = supplierAttendanceJob;
+
+  const handleSupplierAttendanceLoaded = useCallback(
+    (records) => {
+      const job = supplierAttendanceJobRef.current;
+      if (!job || !Array.isArray(records)) return;
+      records.forEach((record) => {
+        if (!record?.id) return;
+        applyAttendance(job, record.id, {
+          ...(record.attendance || EMPTY_ATTENDANCE),
+          bookingStatus: record.bookingStatus || '',
+        });
+      });
+    },
+    [applyAttendance]
+  );
 
   const uploadCheckInAsset = useCallback(
     async (dataUrl, filename) => {
@@ -2542,9 +2639,11 @@ export function AgencyJobsView({ mode = 'agency' }) {
         fallbackAttendance={
           supplierAttendanceJob ? resolveJobAttendance(supplierAttendanceJob, null) : null
         }
+        onAttendanceLoaded={handleSupplierAttendanceLoaded}
         onClose={() => setSupplierAttendanceJob(null)}
       />
 
+      {/* Check In / Out is staff-only — agency / home care only assign. */}
       {isStaffMember && (
         <>
           <StaffMemberCheckInDialog
@@ -2553,6 +2652,13 @@ export function AgencyJobsView({ mode = 'agency' }) {
             onClose={() => setCheckInJob(null)}
             onConfirm={handleConfirmCheckIn}
             mode="checkin"
+          />
+          <StaffMemberCheckInDialog
+            open={Boolean(checkOutJob)}
+            job={checkOutJob}
+            onClose={() => setCheckOutJob(null)}
+            onConfirm={handleConfirmCheckOut}
+            mode="checkout"
           />
           <StaffMemberMissedCheckoutDialog
             bookingId={blockingBookingId}
@@ -2573,14 +2679,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
             }
             loading={attendanceLoading}
             onClose={() => setAttendanceJob(null)}
-          />
-
-          <StaffMemberCheckInDialog
-            open={Boolean(checkOutJob)}
-            job={checkOutJob}
-            onClose={() => setCheckOutJob(null)}
-            onConfirm={handleConfirmCheckOut}
-            mode="checkout"
           />
         </>
       )}

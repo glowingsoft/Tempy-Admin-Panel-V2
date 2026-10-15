@@ -36,6 +36,22 @@ export function getStaffStatusLabel(status) {
   return STAFF_STATUS_LABEL[key] || status || 'Pending';
 }
 
+/** Short hover text for the staff list status chip. */
+export const STAFF_STATUS_HINT = {
+  pending: 'Not accepted yet',
+  active: 'Accepted',
+  accepted: 'Accepted',
+  inactive: 'Not active',
+  suspended: 'Suspended',
+  left: 'This staff member has left',
+  deleted: 'Removed',
+};
+
+export function getStaffStatusHint(status) {
+  const key = String(status || 'pending').toLowerCase();
+  return STAFF_STATUS_HINT[key] || getStaffStatusLabel(status);
+}
+
 export const AGENCY_STAFF_STATUS_TABS = [
   { value: 'all', label: 'All', color: 'default' },
   { value: 'pending', label: 'Pending', color: 'warning' },

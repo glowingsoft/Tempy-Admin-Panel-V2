@@ -13,9 +13,9 @@ import IconButton from '@mui/material/IconButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
 import { getJobDateParts } from 'src/components/jobs/job-date-filters';
 
@@ -269,7 +269,7 @@ export function StaffMemberAttendanceDialog({ open, job, attendance, loading = f
           </IconButton>
         </DialogTitle>
 
-        {loading ? <LinearProgress /> : null}
+        {loading && !hasRecord ? <ModuleLoading sx={{ py: 4 }} /> : null}
 
         <DialogContent dividers>
           {!hasRecord && !loading ? (

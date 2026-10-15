@@ -49,8 +49,8 @@ function getErrorMessage(error, fallback) {
  */
 export function SupplierJobRolesForm({ role }) {
   const viewOnly = useViewOnly();
-  const choicesQuery = useGetSupplierJobRoleChoicesQuery({ role }, { refetchOnMountOrArgChange: true });
-  const mineQuery = useGetMySupplierJobRolesQuery({ role }, { refetchOnMountOrArgChange: true });
+  const choicesQuery = useGetSupplierJobRoleChoicesQuery({ role }, { refetchOnMountOrArgChange: 60, refetchOnFocus: false });
+  const mineQuery = useGetMySupplierJobRolesQuery({ role }, { refetchOnMountOrArgChange: 60, refetchOnFocus: false });
   const [saveJobRoles, { isLoading: saving }] = useUpdateMySupplierJobRolesMutation();
 
   const choices = useMemo(() => choicesQuery.data || [], [choicesQuery.data]);

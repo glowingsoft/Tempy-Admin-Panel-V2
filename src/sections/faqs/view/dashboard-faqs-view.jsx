@@ -37,7 +37,7 @@ export function DashboardFaqsView() {
     setPage(0);
   }, [accountKey]);
 
-  const { data: faqsData, isLoading, isFetching, isError, error, refetch } = useGetFaqsQuery({ accountKey, page: page + 1, limit: rowsPerPage }, { skip: !accountKey });
+  const { data: faqsData, isLoading, isError, error, refetch } = useGetFaqsQuery({ accountKey, page: page + 1, limit: rowsPerPage }, { skip: !accountKey });
 
   const allFaqs = faqsData?.data || [];
   const clientPaged = allFaqs.length > rowsPerPage;
@@ -57,7 +57,7 @@ export function DashboardFaqsView() {
   }, [faqs[0]?.id]);
 
   const dashboardRoot = getDashboardRootPath(permission, accountType);
-  const listLoading = isLoading || isFetching;
+  const listLoading = isLoading;
   const listErrorMessage = error?.data?.message || error?.error || 'Something went wrong while fetching FAQs.';
 
   const handleAccordionChange = useCallback(
@@ -88,7 +88,7 @@ export function DashboardFaqsView() {
         </Stack>
       ) : listLoading ? (
         <ModuleLoading />
-      ) : isError ? (
+      ) : isError && !faqs.length ? (
         <Stack spacing={1.5} alignItems="center" justifyContent="center" sx={{ py: 8, borderRadius: 2, bgcolor: 'background.neutral' }}>
           <Iconify icon="solar:danger-triangle-bold" width={40} sx={{ color: 'error.main' }} />
           <Typography variant="subtitle1">Could not load FAQs</Typography>

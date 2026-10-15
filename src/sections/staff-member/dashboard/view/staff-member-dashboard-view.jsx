@@ -26,7 +26,6 @@ import {
 } from 'src/sections/dashboard/dashboard-links';
 import { ModuleLoading } from 'src/components/loading-screen';
 
-// ----------------------------------------------------------------------
 
 const MODULES = [
   {

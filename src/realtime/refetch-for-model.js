@@ -16,6 +16,9 @@ import { bookingPaymentsApi } from 'src/store/Reducer/booking-payments-api';
 import { careHomeBranchesApi } from 'src/store/Reducer/care-home-branches-api';
 import { careHomeDashboardApi } from 'src/store/Reducer/care-home-dashboard-api';
 import { careHomeJobsApi } from 'src/store/Reducer/care-home-jobs-api';
+import { careTutorApi } from 'src/store/Reducer/care-tutor-api';
+import { categoriesApi } from 'src/store/Reducer/categories-api';
+import { conversationsApi } from 'src/store/Reducer/conversations-api';
 import { dashboardSettingsApi } from 'src/store/Reducer/dashboard-settings-api';
 import { earningsApi } from 'src/store/Reducer/earnings-api';
 import { faqsApi } from 'src/store/Reducer/faqs-api';
@@ -59,6 +62,177 @@ const DEBOUNCE_MS = 300;
 const pendingModels = new Set();
 let debounceTimer = null;
 
+/** UI subscribers (local state that RTK invalidate alone cannot refresh). */
+const modelListeners = new Set();
+
+/** Backend may emit PascalCase, snake_case, plural, or role-prefixed model names. */
+const MODEL_ALIASES = {
+  jobs: 'job',
+  jobpost: 'job',
+  jobposts: 'job',
+  shiftjob: 'job',
+  agencyjob: 'job',
+  agencyjobs: 'job',
+  homecarecompanyjob: 'job',
+  homecarecompanyjobs: 'job',
+  nursejob: 'job',
+  nursejobs: 'job',
+  carehomejob: 'job',
+  carehomejobs: 'job',
+  hospitaljob: 'job',
+  hospitaljobs: 'job',
+  localauthorityjob: 'job',
+  localauthorityjobs: 'job',
+  userjob: 'job',
+  userjobs: 'job',
+
+  bookings: 'booking',
+  book: 'booking',
+  assignment: 'booking',
+  assignments: 'booking',
+  attendance: 'booking',
+  checkin: 'booking',
+  checkout: 'booking',
+  agencybooking: 'booking',
+  agencybookings: 'booking',
+  nursebooking: 'booking',
+  nursebookings: 'booking',
+  homecarecompanybooking: 'booking',
+  carehomebooking: 'booking',
+  hospitalbooking: 'booking',
+  localauthoritybooking: 'booking',
+  userbooking: 'booking',
+
+  bids: 'bid',
+  offer: 'bid',
+  offers: 'bid',
+  agencybid: 'bid',
+  agencybids: 'bid',
+  nursebid: 'bid',
+  nursebids: 'bid',
+  homecarecompanybid: 'bid',
+  carehomejobbid: 'bid',
+  hospitaljobbid: 'bid',
+  userjobbid: 'bid',
+  localauthorityjobbid: 'bid',
+
+  agencystaff: 'staff',
+  homecarecompanystaff: 'staff',
+  nursestaff: 'staff',
+  staffmember: 'staff',
+  staffmembers: 'staff',
+  staffs: 'staff',
+  staffrequest: 'staff',
+  staffrequests: 'staff',
+  nursestaffrequest: 'staff',
+  nursestaffrequests: 'staff',
+  worker: 'staff',
+  workers: 'staff',
+  nurse: 'staff',
+  nurses: 'staff',
+
+  branch: 'branches',
+  branches: 'branches',
+  agencybranch: 'branches',
+  carehomebranch: 'branches',
+  hospitalbranch: 'branches',
+  localauthoritybranch: 'branches',
+  homecarecompanybranch: 'branches',
+  nursebranch: 'branches',
+  userbranch: 'branches',
+  location: 'branches',
+  locations: 'branches',
+
+  leave: 'availability',
+  leaves: 'availability',
+  busy: 'availability',
+  shift: 'availability',
+  shifts: 'availability',
+  rota: 'availability',
+  calendar: 'availability',
+  agencyavailability: 'availability',
+  nurseavailability: 'availability',
+  homecarecompanyavailability: 'availability',
+
+  notifications: 'notification',
+  users: 'user',
+  profile: 'user',
+  account: 'user',
+  accountstate: 'user',
+
+  agreedrates: 'agreedrate',
+  rate: 'agreedrate',
+  rates: 'agreedrate',
+  permanenthires: 'permanenthire',
+  temptoperm: 'permanenthire',
+  favorites: 'favorite',
+  reviews: 'review',
+  rating: 'review',
+  ratings: 'review',
+
+  allegations: 'allegation',
+  jobroles: 'jobrole',
+  jobtype: 'jobrole',
+  jobtypes: 'jobrole',
+  faqs: 'faq',
+  settings: 'adminsettings',
+  setting: 'adminsettings',
+  legal: 'adminsettings',
+  terms: 'adminsettings',
+  privacy: 'adminsettings',
+  about: 'adminsettings',
+
+  support: 'supportrequest',
+  supportrequests: 'supportrequest',
+  supportticket: 'supportrequest',
+  supporttickets: 'supportrequest',
+  ticket: 'supportrequest',
+  tickets: 'supportrequest',
+  contact: 'contactus',
+  contacts: 'contactus',
+
+  chat: 'conversation',
+  chats: 'conversation',
+  conversations: 'conversation',
+  message: 'conversation',
+  messages: 'conversation',
+
+  training: 'caretutor',
+  trainings: 'caretutor',
+  caretutortraining: 'caretutor',
+  caretutors: 'caretutor',
+
+  categories: 'category',
+  wallet: 'usersstripeaccounts',
+  wallets: 'usersstripeaccounts',
+  stripe: 'usersstripeaccounts',
+  stripeaccount: 'usersstripeaccounts',
+  payment: 'usersstripeaccounts',
+  payments: 'usersstripeaccounts',
+  transaction: 'usersstripeaccounts',
+  transactions: 'usersstripeaccounts',
+  payout: 'gocardlessmandate',
+  payouts: 'gocardlessmandate',
+  mandate: 'gocardlessmandate',
+  mandates: 'gocardlessmandate',
+  gocardless: 'gocardlessmandate',
+
+  earning: 'earnings',
+  earnings: 'earnings',
+  finance: 'earnings',
+
+  contract: 'supplierrelationship',
+  contracts: 'supplierrelationship',
+  supplierrelationships: 'supplierrelationship',
+
+  language: 'adminsettings',
+  languages: 'adminsettings',
+};
+
+/** Strip role prefixes so "AgencyJob" / "NurseBooking" still map. */
+const ROLE_PREFIX =
+  /^(agency|homecarecompany|nurse|carehome|hospital|localauthority|user|admin)+/;
+
 function touch(api, tags) {
   store.dispatch(api.util.invalidateTags(tags));
 }
@@ -74,6 +248,10 @@ function touchDashboards() {
   touch(userDashboardApi, ['UserDashboard']);
 }
 
+function touchSidebar() {
+  touch(sidebarCountsApi, ['SidebarCounts']);
+}
+
 function touchJobs() {
   touch(agencyJobsApi, ['AgencyJob']);
   touch(homeCareCompanyJobsApi, ['HomeCareCompanyJob']);
@@ -82,7 +260,7 @@ function touchJobs() {
   touch(hospitalJobsApi, ['HospitalJob', 'HospitalJobType']);
   touch(userJobsApi, ['UserJob', 'UserJobType']);
   touch(localAuthorityJobsApi, ['LocalAuthorityJob', 'LocalAuthorityJobType']);
-  touch(sidebarCountsApi, ['SidebarCounts']);
+  touchSidebar();
   touchDashboards();
 }
 
@@ -98,7 +276,7 @@ function touchBookings() {
   touch(localAuthorityJobsApi, ['LocalAuthorityBookingCalendar']);
   touch(bookingPaymentsApi, ['BookingPayments']);
   touch(earningsApi, ['Earnings']);
-  touch(sidebarCountsApi, ['SidebarCounts']);
+  touchSidebar();
   touchDashboards();
 }
 
@@ -110,7 +288,7 @@ function touchBids() {
   touch(hospitalJobsApi, ['HospitalJobBid']);
   touch(userJobsApi, ['UserJobBid']);
   touch(localAuthorityJobsApi, ['LocalAuthorityJobBid']);
-  touch(sidebarCountsApi, ['SidebarCounts']);
+  touchSidebar();
   touchDashboards();
 }
 
@@ -120,15 +298,67 @@ function touchUsers() {
   touch(authApi, ['profile']);
 }
 
+function touchStaff() {
+  touch(staffApi, ['DashboardStaff', 'AvailableStaff']);
+  touch(agencyStaffApi, ['AgencyStaff', 'AgencyNurse']);
+  touch(homeCareCompanyStaffApi, ['HomeCareCompanyStaff', 'HomeCareCompanyNurse']);
+  touch(nurseStaffRequestsApi, ['NurseStaffRequest']);
+  touchSidebar();
+}
+
+function touchAvailability() {
+  touch(agencyAvailabilityApi, ['AgencyAvailability', 'AgencyJobType', 'AgencyBookingCalendar']);
+  touch(nurseAvailabilityApi, ['NurseAvailability', 'NurseJobType', 'NurseBookingCalendar']);
+  touch(homeCareCompanyAvailabilityApi, [
+    'HomeCareCompanyAvailability',
+    'HomeCareCompanyJobType',
+    'HomeCareCompanyBookingCalendar',
+  ]);
+  touchSidebar();
+}
+
+function touchBranches() {
+  touch(agencyBranchesApi, ['AgencyBranch']);
+  touch(careHomeBranchesApi, ['CareHomeBranch']);
+  touch(hospitalBranchesApi, ['HospitalBranch']);
+  touch(localAuthorityBranchesApi, ['LocalAuthorityBranch']);
+  touch(homeCareCompanyBranchesApi, ['HomeCareCompanyBranch']);
+  touch(nurseBranchesApi, ['NurseBranch']);
+  touch(userBranchesApi, ['UserBranch']);
+}
+
+function touchPayments() {
+  touch(walletsApi, ['Wallet']);
+  touch(adminTransactionsApi, ['AdminTransaction', 'AdminPlatformFee']);
+  touch(bookingPaymentsApi, ['BookingPayments']);
+  touch(earningsApi, ['Earnings']);
+  touch(gocardlessApi, ['GoCardlessMandate', 'AdminPayout']);
+  touchDashboards();
+}
+
 const MODEL_REFETCH = {
-  job: touchJobs,
-  booking: touchBookings,
-  bid: touchBids,
-  agreedrate: () => touch(supplierRelationshipsApi, ['AgreedRate']),
+  // Buttons / status chips come from jobs + bids (+ booking fields on those lists).
+  job: () => {
+    touchJobs();
+    touchBids();
+    touchBookings();
+  },
+  booking: () => {
+    touchBookings();
+    touchJobs();
+    touchBids();
+  },
+  bid: () => {
+    touchBids();
+    touchJobs();
+  },
+  agreedrate: () => {
+    touch(supplierRelationshipsApi, ['AgreedRate']);
+    touchJobs();
+  },
   availability: () => {
-    touch(agencyAvailabilityApi, ['AgencyAvailability', 'AgencyJobType']);
-    touch(nurseAvailabilityApi, ['NurseAvailability', 'NurseJobType']);
-    touch(homeCareCompanyAvailabilityApi, ['HomeCareCompanyAvailability', 'HomeCareCompanyJobType']);
+    touchAvailability();
+    touchBookings();
   },
   permanenthire: () => {
     touch(supplierRelationshipsApi, ['PermanentHire']);
@@ -136,62 +366,117 @@ const MODEL_REFETCH = {
   },
   user: touchUsers,
   staff: () => {
-    touch(staffApi, ['DashboardStaff', 'AvailableStaff']);
-    touch(agencyStaffApi, ['AgencyStaff', 'AgencyNurse']);
-    touch(homeCareCompanyStaffApi, ['HomeCareCompanyStaff', 'HomeCareCompanyNurse']);
-    touch(nurseStaffRequestsApi, ['NurseStaffRequest']);
+    touchStaff();
+    // Assign-staff pickers / rota often show staff status on open job screens.
+    touchAvailability();
   },
-  branches: () => {
-    touch(agencyBranchesApi, ['AgencyBranch']);
-    touch(careHomeBranchesApi, ['CareHomeBranch']);
-    touch(hospitalBranchesApi, ['HospitalBranch']);
-    touch(localAuthorityBranchesApi, ['LocalAuthorityBranch']);
-    touch(homeCareCompanyBranchesApi, ['HomeCareCompanyBranch']);
-    touch(nurseBranchesApi, ['NurseBranch']);
-    touch(userBranchesApi, ['UserBranch']);
-  },
+  branches: touchBranches,
   address: () => touch(userBranchesApi, ['UserBranch']),
   supplierrelationship: () => touch(supplierRelationshipsApi, ['Contract']),
   favorite: () => touch(favoritesApi, ['Favorite']),
-  review: () => touch(reviewsApi, ['Review']),
+  review: () => {
+    touch(reviewsApi, ['Review']);
+    touchUsers();
+  },
   verification: touchUsers,
   allegation: () => touch(adminAllegationsApi, ['AdminAllegation']),
   jobrole: () => {
     touch(adminJobRolesApi, ['AdminJobRole']);
     touch(supplierJobRolesApi, ['SupplierJobRoleChoices', 'SupplierJobRolesMine']);
+    touch(agencyAvailabilityApi, ['AgencyJobType']);
+    touch(nurseAvailabilityApi, ['NurseJobType']);
+    touch(homeCareCompanyAvailabilityApi, ['HomeCareCompanyJobType']);
+    touch(careHomeJobsApi, ['CareHomeJobType']);
+    touch(hospitalJobsApi, ['HospitalJobType']);
+    touch(userJobsApi, ['UserJobType']);
+    touch(localAuthorityJobsApi, ['LocalAuthorityJobType']);
   },
   faq: () => touch(faqsApi, ['Faq', 'AdminFaq']),
-  adminsettings: () => touch(dashboardSettingsApi, ['SettingsContent', 'AdminLegal', 'TermsStatus']),
-  supportrequest: () => touch(supportApi, ['Support', 'AdminSupport']),
-  contactus: () => touch(supportApi, ['Support', 'AdminSupport']),
+  adminsettings: () =>
+    touch(dashboardSettingsApi, ['SettingsContent', 'AdminLegal', 'TermsStatus']),
+  supportrequest: () => {
+    touch(supportApi, ['Support', 'AdminSupport']);
+    touchSidebar();
+  },
+  contactus: () => {
+    touch(supportApi, ['Support', 'AdminSupport']);
+    touchSidebar();
+  },
   notificationpreferences: () => {
     touch(notificationsApi, ['Notification']);
     touchUsers();
   },
   notification: () => {
     touch(notificationsApi, ['Notification']);
-    touch(sidebarCountsApi, ['SidebarCounts']);
+    touchSidebar();
   },
-  usersstripeaccounts: () => {
-    touch(walletsApi, ['Wallet']);
-    touch(adminTransactionsApi, ['AdminTransaction', 'AdminPlatformFee']);
-    touch(bookingPaymentsApi, ['BookingPayments']);
+  usersstripeaccounts: touchPayments,
+  gocardlessmandate: () => {
+    touch(gocardlessApi, ['GoCardlessMandate', 'AdminPayout']);
+    touchDashboards();
   },
-  gocardlessmandate: () => touch(gocardlessApi, ['GoCardlessMandate', 'AdminPayout']),
   usergoogleintegration: touchUsers,
+  conversation: () => touch(conversationsApi, ['Conversation', 'ConversationMessage']),
+  caretutor: () => touch(careTutorApi, ['CareTutorTraining', 'CareTutorSettings']),
+  category: () => touch(categoriesApi, ['category']),
+  earnings: () => {
+    touch(earningsApi, ['Earnings']);
+    touchDashboards();
+  },
 };
 
 function normalizeModel(model) {
-  return String(model || '')
+  const key = String(model || '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+  if (!key) return '';
+  if (MODEL_ALIASES[key]) return MODEL_ALIASES[key];
+  if (MODEL_REFETCH[key]) return key;
+
+  const stripped = key.replace(ROLE_PREFIX, '');
+  if (stripped && stripped !== key) {
+    if (MODEL_ALIASES[stripped]) return MODEL_ALIASES[stripped];
+    if (MODEL_REFETCH[stripped]) return stripped;
+  }
+  return key;
+}
+
+function pickModelName(entry) {
+  if (entry == null) return '';
+  if (typeof entry === 'string') return entry;
+  if (typeof entry !== 'object') return '';
+  return (
+    entry.model ||
+    entry.Model ||
+    entry.entity ||
+    entry.Entity ||
+    entry.entityType ||
+    entry.collection ||
+    entry.name ||
+    entry.type ||
+    ''
+  );
 }
 
 export function readDataChanges(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.changes)) return payload.changes;
-  if (payload?.model) return [payload];
+  if (payload == null) return [];
+  if (typeof payload === 'string') return [{ model: payload }];
+  if (Array.isArray(payload)) {
+    return payload.map((row) => (typeof row === 'string' ? { model: row } : row)).filter(Boolean);
+  }
+  if (typeof payload !== 'object') return [];
+
+  if (Array.isArray(payload.changes)) return payload.changes;
+  if (Array.isArray(payload.data?.changes)) return payload.data.changes;
+  if (Array.isArray(payload.models)) {
+    return payload.models.map((model) => ({ model }));
+  }
+  if (Array.isArray(payload.data) && (payload.data[0]?.model || typeof payload.data[0] === 'string')) {
+    return payload.data.map((row) => (typeof row === 'string' ? { model: row } : row));
+  }
+  if (pickModelName(payload)) return [payload];
+  if (payload.data && pickModelName(payload.data)) return [payload.data];
   return [];
 }
 
@@ -200,18 +485,68 @@ export function refetchForModel(model) {
   if (run) run();
 }
 
+function flushPendingModels() {
+  const models = [...pendingModels];
+  pendingModels.clear();
+  models.forEach((key) => {
+    const run = MODEL_REFETCH[key];
+    if (run) run();
+  });
+  if (models.length) {
+    modelListeners.forEach((listener) => {
+      try {
+        listener(models);
+      } catch {
+        // Subscriber errors must not break realtime.
+      }
+    });
+  }
+}
+
 export function queueModelRefetch(model) {
-  const key = normalizeModel(model);
-  if (!key || !MODEL_REFETCH[key]) return;
-  pendingModels.add(key);
+  const raw = typeof model === 'string' ? model : pickModelName(model);
+  const key = normalizeModel(raw);
+  if (!key) return;
+
+  if (!MODEL_REFETCH[key]) {
+    // Unknown model — still refresh the lists that drive buttons/status/data on screen.
+    [
+      'job',
+      'booking',
+      'bid',
+      'notification',
+      'user',
+      'staff',
+      'branches',
+      'availability',
+    ].forEach((fallback) => pendingModels.add(fallback));
+  } else {
+    pendingModels.add(key);
+  }
+
   window.clearTimeout(debounceTimer);
-  debounceTimer = window.setTimeout(() => {
-    const models = [...pendingModels];
-    pendingModels.clear();
-    models.forEach(refetchForModel);
-  }, DEBOUNCE_MS);
+  debounceTimer = window.setTimeout(flushPendingModels, DEBOUNCE_MS);
+}
+
+/** Subscribe to flushed realtime model keys (e.g. clear local attendance caches). */
+export function onRealtimeModels(listener) {
+  if (typeof listener !== 'function') return () => {};
+  modelListeners.add(listener);
+  return () => modelListeners.delete(listener);
 }
 
 export function refetchMainLists() {
-  ['Job', 'Booking', 'Bid', 'Notification', 'User'].forEach(queueModelRefetch);
+  [
+    'Job',
+    'Booking',
+    'Bid',
+    'Notification',
+    'User',
+    'Staff',
+    'Branches',
+    'Availability',
+    'SupportRequest',
+    'Earnings',
+    'UsersStripeAccounts',
+  ].forEach(queueModelRefetch);
 }

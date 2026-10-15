@@ -18,7 +18,6 @@ import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { fNumber, fCurrency } from 'src/utils/format-number';
 
@@ -123,7 +122,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
     paymentStatus: statusFilter,
   };
 
-  const { data, isLoading, isFetching, isError, error } = useGetEarningsQuery(
+  const { data, isLoading, isError, error } = useGetEarningsQuery(
     { ...filterArgs, page: page + 1, limit: rowsPerPage },
     { skip: !userId }
   );
@@ -429,7 +428,6 @@ export function AgencyEarningsView({ role = 'agency' }) {
           Newest first, with payment status
         </Typography>
       </Box>
-      {isFetching && <LinearProgress sx={{ height: 2 }} />}
       {history.length ? (
         <>
           <Scrollbar>

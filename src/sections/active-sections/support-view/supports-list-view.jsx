@@ -9,7 +9,6 @@ import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
-import LinearProgress from '@mui/material/LinearProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -34,6 +33,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { Field, Form } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Label } from 'src/components/label';
 import { Scrollbar } from 'src/components/scrollbar';
 import { toast } from 'src/components/snackbar';
@@ -201,7 +201,7 @@ export function SupportListView() {
   } = useGetAdminSupportTicketsQuery(ADMIN_SUPPORT_LIST_ARGS, {
     skip: isRateLimited,
     // Pick up new user Contact/Support tickets when opening this page.
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: false,
   });
@@ -421,8 +421,8 @@ export function SupportListView() {
             />
           </Stack>
 
-          {isLoading ? (
-            <LinearProgress sx={{ borderRadius: 0, height: 2 }} />
+          {isLoading && !filteredItems.length ? (
+            <ModuleLoading />
           ) : (
             <Scrollbar>
               <Table size="medium" sx={{ minWidth: 960 }}>

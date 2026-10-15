@@ -205,4 +205,19 @@ export const store = configureStore({
 
 export const persistor = persistStore(store);
 
-setupListeners(store.dispatch);
+setupListeners(store.dispatch, (dispatch, { onOnline, onOffline }) => {
+  const handleOnline = () => dispatch(onOnline());
+  const handleOffline = () => dispatch(onOffline());
+
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('online', handleOnline, false);
+    window.addEventListener('offline', handleOffline, false);
+  }
+
+  return () => {
+    if (typeof window !== 'undefined' && window.removeEventListener) {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    }
+  };
+});

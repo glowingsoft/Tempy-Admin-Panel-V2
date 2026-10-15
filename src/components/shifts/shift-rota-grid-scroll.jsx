@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+
+import { Iconify } from 'src/components/iconify';
 
 const SCROLL_AREA_SX = {
   flex: 1,
@@ -51,8 +54,6 @@ export function useDragScroll(ref) {
     (event) => {
       if (event.button !== 0) return;
 
-      // Don't start a pan when pressing interactive controls (buttons, inputs,
-      // selects, links, shift cells). Otherwise a tiny mouse move swallows the click.
       if (
         event.target.closest(
           'button, a, input, select, textarea, [role="button"], [data-date-header], [data-shift-cell], .MuiIconButton-root, .MuiButtonBase-root, .MuiSelect-select'
@@ -121,11 +122,25 @@ export function ShiftRotaGridScroll({
   gridLine,
   isPanning,
   onGridMouseDown,
-  /** Sticky staff column width — left fade must start after this so names/shift cards stay visible */
   stickyLeftWidth = 0,
   children,
 }) {
   const [scrollHints, setScrollHints] = useState({ left: false, right: false, canScrollX: false });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setIsFullscreen(document.fullscreenElement === gridRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, [gridRef]);
+
+  const exitFullscreen = (event) => {
+    event.stopPropagation();
+    document.exitFullscreen?.();
+  };
 
   const updateScrollHints = useCallback(() => {
     setScrollHints(getScrollHints(gridRef.current));
@@ -151,8 +166,7 @@ export function ShiftRotaGridScroll({
   }, [gridContentWidth, gridRef, updateScrollHints]);
 
   const fadeBottom = scrollHints.canScrollX ? 12 : 0;
-  // Sticky staff column already clips scrolled day cells — a left fade on top of it
-  // washes out Vacant / names and half of shift cards. Only use left fade when there is no sticky col.
+
   const showLeftFade = scrollHints.left && !(Number(stickyLeftWidth) > 0);
 
   return (
@@ -164,7 +178,6 @@ export function ShiftRotaGridScroll({
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
-        // Visible pane width for empty states pinned with 100cqw (grid itself is wider).
         containerType: 'inline-size',
       }}
     >
@@ -211,6 +224,24 @@ export function ShiftRotaGridScroll({
           userSelect: isPanning ? 'none' : 'auto',
         }}
       >
+        {isFullscreen ? (
+          <IconButton
+            aria-label="Exit fullscreen"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={exitFullscreen}
+            sx={{
+              position: 'fixed',
+              top: 16,
+              right: 16,
+              zIndex: 20,
+              bgcolor: 'background.paper',
+              boxShadow: 3,
+              '&:hover': { bgcolor: 'background.paper' },
+            }}
+          >
+            <Iconify icon="mingcute:close-line" width={20} />
+          </IconButton>
+        ) : null}
         <Box
           sx={{
             width: gridContentWidth,

@@ -10,7 +10,6 @@ import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import LinearProgress from '@mui/material/LinearProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { fCurrency } from 'src/utils/format-number';
@@ -22,6 +21,7 @@ import { useViewOnly } from 'src/hooks/use-view-only';
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { varHover } from 'src/components/animate';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
@@ -65,7 +65,8 @@ export function StaffRequestsDrawer({ sx, ...other }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetNurseStaffRequestsQuery(undefined, {
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
   const [respond, respondState] = useRespondNurseStaffRequestMutation();
   const [activeAction, setActiveAction] = useState(null);
@@ -121,7 +122,7 @@ export function StaffRequestsDrawer({ sx, ...other }) {
   const renderList = (
     <Scrollbar>
       {isLoading ? (
-        <LinearProgress sx={{ borderRadius: 0, height: 2 }} />
+        <ModuleLoading sx={{ py: 6 }} />
       ) : isError ? (
         <EmptyContent
           filled

@@ -254,3 +254,15 @@ export function getAgencyBranchLocationLabel(branch) {
   }
   return branch?.locationName || '—';
 }
+
+/** Staff Location dropdown label — same for Add and Edit; avoid "Name — Name". */
+export function getAgencyStaffLocationOptionLabel(branch) {
+  const name = String(branch?.name || branch?.branchName || '').trim();
+  const locationLabel = String(getAgencyBranchLocationLabel(branch) || '').trim();
+
+  if (!locationLabel || locationLabel === '—') return name || String(branch?.id || 'Location');
+  if (!name) return locationLabel;
+  if (name.toLowerCase() === locationLabel.toLowerCase()) return name;
+
+  return `${name} — ${locationLabel}`;
+}

@@ -5,8 +5,6 @@ import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
-
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
@@ -79,19 +77,6 @@ export function CalendarToolbar({
           </IconButton>
         </Stack>
 
-        {loading && (
-          <LinearProgress
-            color="inherit"
-            sx={{
-              left: 0,
-              width: 1,
-              height: 2,
-              bottom: 0,
-              borderRadius: 0,
-              position: 'absolute',
-            }}
-          />
-        )}
       </Stack>
 
       <CustomPopover

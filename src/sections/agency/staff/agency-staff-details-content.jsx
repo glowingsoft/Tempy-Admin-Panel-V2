@@ -23,7 +23,7 @@ import { varAlpha } from 'src/theme/styles';
 import { Iconify } from 'src/components/iconify';
 import { CustomTabs } from 'src/components/custom-tabs';
 
-import { getAgencyBranchLocationLabel } from 'src/sections/branches/agency-branch-utils';
+import { getAgencyStaffLocationOptionLabel } from 'src/sections/branches/agency-branch-utils';
 
 import { useGetAgencyBranchesQuery } from 'src/store/Reducer/agency-branches-api';
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
@@ -60,12 +60,7 @@ function resolveBranchLabel(staff, branches = []) {
   const matched = branches.find((branch) => String(branch.id) === branchId);
   if (!matched) return branchId;
 
-  const locationLabel = getAgencyBranchLocationLabel(matched);
-  if (locationLabel && locationLabel !== '—') {
-    return `${matched.name || 'Location'} — ${locationLabel}`;
-  }
-
-  return matched.name || branchId;
+  return getAgencyStaffLocationOptionLabel(matched);
 }
 
 function ProfileCard({ staff, branchLabel, onToggleFavorite }) {
@@ -366,7 +361,15 @@ export function AgencyStaffDetailsContent({ staff }) {
   const { user } = useSelector((state) => state.user);
   const orgId = useMemo(() => getProfileUserId(user), [user]);
 
-  const { data: branchesData } = useGetAgencyBranchesQuery({ page: 0, limit: 100 });
+  const { data: branchesData } = useGetAgencyBranchesQuery(
+    { page: 0, limit: 100 },
+    {
+      // Layout ActiveBranchProvider already loads the same list — reuse cache.
+      skip: Boolean(staff?.branchName),
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
+  );
   const branchLabel = useMemo(
     () => resolveBranchLabel(staff, branchesData?.data || []),
     [branchesData?.data, staff]
@@ -392,7 +395,6 @@ export function AgencyStaffDetailsContent({ staff }) {
               staffId={String(staff.id || staff._id || '')}
               staffName={staff.name}
               compact
-              showDemoActions
             />
             <Card sx={{ p: 3, borderRadius: 2, height: 1 }}>
               <Typography variant="h6" sx={{ mb: 2.5 }}>

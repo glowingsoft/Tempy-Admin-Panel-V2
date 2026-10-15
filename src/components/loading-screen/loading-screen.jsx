@@ -33,8 +33,8 @@ export function LoadingScreen({ portal, sx, ...other }) {
 
 /**
  * In-page module loader: the same animated logo, padded to sit inside page content.
- * Use it when a module has nothing to show yet; use a thin LinearProgress for
- * refreshes over visible content and inside drawers / dialogs.
+ * Use it when a module has nothing to show yet. Background refetches and socket
+ * refreshes should stay silent and leave existing content visible.
  */
 export function ModuleLoading({ sx, ...other }) {
   return <LoadingScreen role="status" aria-label="Loading" sx={{ py: 8, ...sx }} {...other} />;

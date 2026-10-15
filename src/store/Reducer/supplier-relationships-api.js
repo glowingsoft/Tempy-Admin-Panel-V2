@@ -57,8 +57,8 @@ function mapList(mapItem) {
 export const supplierRelationshipsApi = createApi({
   reducerPath: 'supplierRelationshipsApi',
   baseQuery: createCustomFetchBaseQuery(),
-  keepUnusedDataFor: 0,
-  refetchOnMountOrArgChange: true,
+  keepUnusedDataFor: 60,
+  refetchOnMountOrArgChange: 60,
   tagTypes: ['Contract', 'AgreedRate', 'PermanentHire'],
 
   endpoints: (builder) => ({

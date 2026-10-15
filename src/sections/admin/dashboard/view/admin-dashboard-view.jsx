@@ -13,8 +13,6 @@ import { useSelector } from 'react-redux';
 
 import { useGetAdminDashboardQuery } from 'src/store/Reducer/admin-dashboard-api';
 
-import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
-import { DashboardQuickAccess } from 'src/sections/dashboard/dashboard-quick-access';
 import { DashboardStatCard } from 'src/sections/dashboard/dashboard-stat-card';
 import { DashboardActivityList } from 'src/sections/dashboard/dashboard-activity-list';
 import { DashboardOverviewChart } from 'src/sections/dashboard/dashboard-overview-chart';
@@ -38,73 +36,6 @@ import { AdminRegionalHeatMap } from '../admin-regional-heat-map';
 import { AdminFinanceByOrg } from '../admin-finance-by-org';
 import { AdminAllegationsOverview } from 'src/sections/admin/allegations/admin-allegations-overview';
 import { ModuleLoading } from 'src/components/loading-screen';
-
-
-const MODULES = [
-  {
-    title: 'Care Homes',
-    description: 'Customers · Manage',
-    icon: 'solar:home-smile-bold-duotone',
-    color: 'primary',
-    href: paths.adminDashboard.careHomes,
-  },
-  {
-    title: 'Agencies',
-    description: 'Suppliers · Manage',
-    icon: 'solar:buildings-bold-duotone',
-    color: 'info',
-    href: paths.adminDashboard.agencies,
-  },
-  {
-    title: 'Staff Members',
-    description: 'Workers · Profiles',
-    icon: 'solar:user-id-bold-duotone',
-    color: 'secondary',
-    href: paths.adminDashboard.staffMembers,
-  },
-  {
-    title: 'Job Types',
-    description: 'Platform · Config',
-    icon: 'solar:case-round-bold-duotone',
-    color: 'warning',
-    href: paths.adminDashboard.jobTypes,
-  },
-  {
-    title: 'Allegations',
-    description: 'Suspend & re-allocate',
-    icon: 'solar:danger-triangle-bold-duotone',
-    color: 'error',
-    href: paths.adminDashboard.allegations,
-  },
-  {
-    title: 'Permanent hire',
-    description: 'Temp to permanent',
-    icon: 'solar:user-check-rounded-bold-duotone',
-    color: 'primary',
-    href: paths.adminDashboard.recruitment,
-  },
-  {
-    title: 'Transactions',
-    description: 'Customer payments',
-    icon: 'solar:card-transfer-bold-duotone',
-    color: 'success',
-    href: paths.adminDashboard.transactions,
-  },
-  {
-    title: 'Payouts',
-    description: 'Supplier bank transfers',
-    icon: 'solar:wallet-money-bold-duotone',
-    color: 'info',
-    href: paths.adminDashboard.payouts,
-  },
-  {
-    title: 'Support',
-    description: 'Help · Requests',
-    icon: 'solar:chat-round-dots-bold-duotone',
-    color: 'error',
-    href: paths.adminDashboard.content.support,
-  },
-];
 
 const EMPTY_DASHBOARD = {
   stats: [],
@@ -144,7 +75,10 @@ export function AdminDashboardView() {
   );
 
   return (
-    <DashboardContent maxWidth="xl">
+    <DashboardContent
+      maxWidth="xl"
+      sx={{ minWidth: 0, overflowX: 'hidden', width: 1 }}
+    >
       <Typography variant="h4" sx={{ mb: { xs: 3, md: 5 } }}>
         Admin Dashboard
       </Typography>
@@ -156,8 +90,8 @@ export function AdminDashboardView() {
           {error?.data?.message || error?.error || 'Could not load dashboard'}
         </Alert>
       ) : (
-        <Grid container spacing={3}>
-          <Grid xs={12}>
+        <Grid container spacing={3} sx={{ width: 1, minWidth: 0 }}>
+          <Grid xs={12} sx={{ minWidth: 0 }}>
             <DashboardOverviewHeader
               title={`Welcome back 👋\n${displayName}`}
               description="Here's what's happening across your platform today."
@@ -165,33 +99,19 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AdminFinanceByOrg
               list={dashboard.moneyByOrg}
-              subheader="Spend and earnings by user type"
+              subheader="Platform totals"
             />
           </Grid>
 
-          <DashboardQuickAccess description="Jump into live sections">
-            {MODULES.map((module) => (
-              <Grid
-                key={module.title}
-                xs={12}
-                sm={6}
-                md={4}
-                sx={{ display: 'flex', flexDirection: 'column' }}
-              >
-                <DashboardNavCard {...module} />
-              </Grid>
-            ))}
-          </DashboardQuickAccess>
-
-          <Grid xs={12}>
+          <Grid xs={12} sx={{ minWidth: 0 }}>
             <AdminAllegationsOverview />
           </Grid>
 
           {dashboard.extraStats.map((stat) => (
-            <Grid key={stat.title} xs={12} sm={6} md={3}>
+            <Grid key={stat.title} xs={12} sm={6} md={3} sx={{ minWidth: 0 }}>
               <DashboardStatCard
                 title={stat.title}
                 total={stat.total}
@@ -202,11 +122,11 @@ export function AdminDashboardView() {
             </Grid>
           ))}
 
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AppCurrentDownload
               title="Job status mix"
               emptyMessage="No job status data yet"
-              sx={{ minHeight: 360 }}
+              sx={{ minHeight: 360, minWidth: 0 }}
               chart={{
                 colors: [
                   theme.palette.info.main,
@@ -218,12 +138,12 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AppCurrentDownload
               title="Customers & suppliers"
               subheader="Registered accounts"
               emptyMessage="No customer or supplier totals yet"
-              sx={{ minHeight: 360 }}
+              sx={{ minHeight: 360, minWidth: 0 }}
               chart={{
                 colors: [theme.palette.primary.main, theme.palette.info.main],
                 series: dashboard.customerSupplier,
@@ -231,12 +151,12 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AnalyticsCurrentVisits
               title="Bids by status"
               subheader={`${dashboard.bidsTotal} bids in total`}
               emptyMessage="No bid data yet"
-              sx={{ height: 1, minHeight: 360 }}
+              sx={{ height: 1, minHeight: 360, minWidth: 0 }}
               chart={{
                 series: dashboard.bidsStatus,
                 colors: [
@@ -249,11 +169,11 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AdminUsersByType list={dashboard.usersByType} />
           </Grid>
 
-          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardOverviewChart
               title="Platform activity"
               subheader="Jobs, bids & filled shifts over the last 12 months"
@@ -262,11 +182,11 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12}>
+          <Grid xs={12} sx={{ minWidth: 0 }}>
             <AdminRegionalHeatMap points={dashboard.regionalHeatMap} />
           </Grid>
 
-          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardStatusBreakdown
               title="Permanent hires"
               series={dashboard.permanentHires.series}
@@ -276,7 +196,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardStatusBreakdown
               title="Allegations"
               series={dashboard.allegations.series}
@@ -286,7 +206,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardStatusBreakdown
               title="Allegation sources"
               series={dashboard.allegationFeeds.series}
@@ -302,7 +222,7 @@ export function AdminDashboardView() {
               xs={12}
               sm={6}
               md={3}
-              sx={{ display: 'flex', flexDirection: 'column' }}
+              sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}
             >
               <DashboardStatusBreakdown
                 title={item.title}
@@ -314,7 +234,7 @@ export function AdminDashboardView() {
             </Grid>
           ))}
 
-          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AdminRegionalFillRates
               title="Regional fill rates"
               subheader={`Fill rate ${dashboard.fillRate}% · Completion ${dashboard.completionRate}%`}
@@ -322,11 +242,11 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AdminScoreList title="Platform health" items={dashboard.healthRows} suffix="%" />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} md={6} lg={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AnalyticsOrderTimeline
               title="Platform timeline"
               emptyMessage="No timeline events yet"
@@ -334,7 +254,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <AdminTopPerformers
               title="Top performers"
               emptyMessage="No top performers yet"
@@ -342,7 +262,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardOverviewChart
               title="Customers & suppliers growth"
               subheader="Registrations over the last 12 months"
@@ -351,7 +271,7 @@ export function AdminDashboardView() {
             />
           </Grid>
 
-          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <DashboardActivityList
               title="Recent platform activity"
               items={dashboard.recentActivity}

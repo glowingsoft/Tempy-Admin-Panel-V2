@@ -51,7 +51,6 @@ import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import LinearProgress from '@mui/material/LinearProgress';
 import { useTheme } from '@mui/material/styles';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -65,6 +64,7 @@ import {
 } from 'src/sections/staff/company-roster-store';
 
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { ShiftTimePickerPill } from 'src/components/shift-time-picker-pill';
 import { ShiftDayHeaderCell } from 'src/components/shifts/shift-day-header-cell';
@@ -208,10 +208,8 @@ const SHIFT_CARD_MENU = [
   { id: 'cancelBooking', label: 'Cancel booking' },
 ];
 
-/** (shift, member) → the client's existing review for that shift's booking/worker, or null. */
 const ShiftReviewLookupContext = createContext(() => null);
 
-/** (shift, member) → opens the cancel-booking confirm; null when this role cannot cancel bookings. */
 const ShiftCancelBookingContext = createContext(null);
 
 function resolveShiftJobId(shift) {
@@ -225,7 +223,6 @@ function shiftAllowsViewBids(card, shift, member) {
   return !filled;
 }
 
-/** Client: no bids yet → employer can increase the job rate (unfilled / open shift). */
 function shiftAllowsIncreaseRate(card, shift, member) {
   return shiftAllowsViewBids(card, shift, member) && Boolean(resolveShiftJobId(shift));
 }
@@ -247,7 +244,6 @@ function isRotaShiftCompleted(shift) {
   }
 }
 
-/** Client: click completed shifts and rate the worker. */
 function shiftAllowsRateWorker(card, shift, member) {
   if (!shift) return false;
   const filled = typeof card?.filled === 'boolean' ? card.filled : isRotaShiftFilled(shift, member);
@@ -266,7 +262,6 @@ const CLOSED_BOOKING_STATUSES = [
   'completed',
 ];
 
-/** Client: a created booking that has not started, finished or been cancelled can be cancelled. */
 function shiftAllowsCancelBooking(shift) {
   if (!shift || shift.cancelled) return false;
   if (!String(shift.bookingId || '').trim()) return false;
@@ -314,7 +309,6 @@ const CARD = {
   nameText: '#263238',
   pillBorder: '#cfd8dc',
   gridBorder: '#e8e8e8',
-  /** Posted shift fill status — client: red=unfilled, green/blue=filled */
   filledBg: '#c8e6c9',
   filledBorder: '#66bb6a',
   filledBadgeBg: '#81c784',
@@ -333,7 +327,6 @@ function isRotaShiftFilled(shift, member) {
   if (!shift) return false;
   if (member?.isVacant) return false;
 
-  // Open for bids = unfilled (client: click to view bids)
   if (shift.receivingBids === true || shift.isBiddingAllowed === true) return false;
 
   const status = String(shift.status || '')
@@ -360,12 +353,10 @@ function isRotaShiftFilled(shift, member) {
     return false;
   }
 
-  // Posted job on calendar without an assignee → unfilled (view bids)
   if (shift.fromJob || resolveShiftJobId(shift)) {
     return false;
   }
 
-  // Role/job title used as display name (not a person) → unfilled
   const roleLabel = String(shift.jobType || shift.roleCode || member?.role || '')
     .trim()
     .toLowerCase();
@@ -382,7 +373,6 @@ function isRotaShiftFilled(shift, member) {
     return false;
   }
 
-  // Classic rota: timed shift on a named staff row = covered
   if (member && !member.isVacant && shift.startTime && shift.endTime) return true;
 
   return false;
@@ -2494,7 +2484,6 @@ function TeamGroup({
     0
   );
 
-  // Prefer API role totals when present (backend already applies break rules, etc.)
   const apiTotals = team.totals && typeof team.totals === 'object' ? team.totals : null;
   const shiftCount =
     apiTotals && Number.isFinite(Number(apiTotals.totalShifts))
@@ -2999,7 +2988,6 @@ function saveTeamOrder(storageKey, order) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(order.map(String)));
   } catch {
-    // ignore
   }
 }
 
@@ -3028,12 +3016,9 @@ export function ShiftsView({
   enableBookingCalendar = false,
   apiRole = 'careHome',
 } = {}) {
-  // When booking calendar is enabled, always hit the role API (care-home / hospital / user / LA).
-  // Do not let mock rotaConfig.teams disable live calendar — that silently broke user shifts.
   const useCalendarApi = Boolean(enableBookingCalendar);
   applyRotaConfig(rotaConfig);
 
-  // Never flash mock CARE_HOME_TEAMS while booking calendar is the data source
   if (useCalendarApi) {
     TEAMS = [];
     ALL_STAFF = [];
@@ -3069,12 +3054,8 @@ function ShiftsViewContent({
   apiRole = 'careHome',
 }) {
   const viewOnly = useViewOnly();
-  // Keep individual (or role) rota locked on every render — shared module state must not
-  // fall back to care-home teams when Add Job dialog or other UI re-renders this view.
   applyRotaConfig(rotaConfig);
 
-  // When booking calendar is enabled, always hit the role API (care-home / hospital / user / LA).
-  // Do not let mock rotaConfig.teams disable live calendar — that silently broke user shifts.
   const useCalendarApi = Boolean(enableBookingCalendar);
   const isCareHomeApi = apiRole === 'careHome';
   const isHospitalApi = apiRole === 'hospital';
@@ -3089,7 +3070,6 @@ function ShiftsViewContent({
   const [rosterVersion, setRosterVersion] = useState(0);
   const rosterAccountKey = resolveRosterAccountKey(apiRole);
 
-  // Re-read imported company roster when returning to this page
   useEffect(() => {
     const bump = () => setRosterVersion((value) => value + 1);
     window.addEventListener('focus', bump);
@@ -3101,7 +3081,6 @@ function ShiftsViewContent({
     [useCalendarApi, rosterAccountKey, rosterVersion]
   );
 
-  // Calendar mode: company staff roles only — never mock CARE_HOME_TEAMS
   if (useCalendarApi) {
     const apiTeams = calendarSynced && Array.isArray(calendarTeams) ? calendarTeams : [];
     TEAMS = apiTeams.length > 0 ? apiTeams : companyRosterTeams;
@@ -3151,16 +3130,20 @@ function ShiftsViewContent({
   const [postJobIntent, setPostJobIntent] = useState('bookShift');
 
   const careHomeBranchesQuery = useGetCareHomeBranchesQuery(
-    { page: 0, limit: 100, status: '' },
-    { skip: !useCalendarApi || !isCareHomeApi, refetchOnMountOrArgChange: true }
+    { page: 0, limit: 100 },
+    { skip: !useCalendarApi || !isCareHomeApi, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
   const hospitalBranchesQuery = useGetHospitalBranchesQuery(
-    { page: 0, limit: 100, status: '' },
-    { skip: !useCalendarApi || !isHospitalApi, refetchOnMountOrArgChange: true }
+    { page: 0, limit: 100 },
+    { skip: !useCalendarApi || !isHospitalApi, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
   const localAuthorityBranchesQuery = useGetLocalAuthorityBranchesQuery(
-    { page: 0, limit: 100, status: '' },
-    { skip: !useCalendarApi || !isLocalAuthorityApi, refetchOnMountOrArgChange: true }
+    { page: 0, limit: 100 },
+    {
+      skip: !useCalendarApi || !isLocalAuthorityApi,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
   );
   const userId = isUserApi ? getProfileUserId(user) : '';
   const userProfileQuery = useGetUserByIdQuery(userId, { skip: !isUserApi || !userId });
@@ -3263,8 +3246,7 @@ function ShiftsViewContent({
     useCalendarApi ? ROSTER_SCOPE.ALL : ROSTER_SCOPE.CURRENT
   );
   const [lockToggled, setIsLocked] = useState(false);
-  // Admin viewing the account: the rota is always locked — no add, edit, paste or cancel —
-  // and there is nothing to unlock, so no "unlock to make changes" nudge either.
+
   const isLocked = lockToggled || viewOnly;
   const notifyLocked = () => {
     if (!viewOnly) toast.warning('Rota is locked — unlock to make changes');
@@ -3385,8 +3367,7 @@ function ShiftsViewContent({
   }, [reviewsData?.data]);
 
   const resolveDirectRequestTargetId = useCallback((context = {}, staff = null) => {
-    // Agency Find Jobs only receives the request when we target the **agency** id.
-    // Prefer agency over individual worker id (Huzaifa alone will not appear on agency Find).
+
     const agencyCandidates = [context.agencyId, staff?.agencyId];
     for (const value of agencyCandidates) {
       const id = String(value || '').trim();
@@ -3458,7 +3439,6 @@ function ShiftsViewContent({
 
   const handleSubmitJob = useCallback(
     async (draft) => {
-      // Only care-home shifts calendar uses live POST; other rota configs keep local draft flow.
       if (!useCalendarApi) {
         const createdJob = createCareHomeJobFromDraft(draft);
         setJobs((prev) => [createdJob, ...prev]);
@@ -3543,7 +3523,6 @@ function ShiftsViewContent({
         if (!isJobCreateSoftError(err)) throw err;
       }
 
-      // Optimistic rota paint until calendar refetch lands
       const clickedStaffId =
         postJobContext?.staffId || selectedStaff?.id || allStaff.find((s) => !s.isVacant)?.id;
       const { staffId: targetStaffId, teamMatched, team: matchedTeam } = resolveStaffIdForJobType(
@@ -3703,9 +3682,6 @@ function ShiftsViewContent({
     return getCareHomeUserLatLng(user) || getFirstCareHomeBranchLatLng(branches) || null;
   }, [location, branches, user]);
 
-  // Wait for a real origin (user/branch) before calling calendar — avoids 0.1→5,5 double fetch.
-  // User role has no branches API — ready once we have profile coords or after home fallback attempt.
-  // Only fall back to 0.1 after branches request has settled with no coords.
   const calendarOriginReady = Boolean(
     calendarOrigin ||
     isUserApi ||
@@ -3721,7 +3697,6 @@ function ShiftsViewContent({
       startDate: calendarRange.startDate,
       endDate: calendarRange.endDate,
     };
-    // Individual user has no branches — never send branch filter (same as nurse)
     if (!isUserApi && location && location !== ALL_LOCATIONS_ID) {
       args.branch = location;
     }
@@ -3760,6 +3735,13 @@ function ShiftsViewContent({
       : isLocalAuthorityApi
         ? localAuthorityCalendarQuery.data
         : careHomeCalendarQuery.data;
+  const isCalendarLoading = isHospitalApi
+    ? hospitalCalendarQuery.isLoading
+    : isUserApi
+      ? userCalendarQuery.isLoading
+      : isLocalAuthorityApi
+        ? localAuthorityCalendarQuery.isLoading
+        : careHomeCalendarQuery.isLoading;
   const isCalendarFetching = isHospitalApi
     ? hospitalCalendarQuery.isFetching
     : isUserApi
@@ -4817,9 +4799,15 @@ function ShiftsViewContent({
             position: 'relative',
           }}
         >
-          {(useCalendarApi && isCalendarFetching) || postedJobsLoading ? (
-            <LinearProgress
-              sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3, height: 2 }}
+          {((useCalendarApi && isCalendarLoading && !calendarSynced) ||
+            (postedJobsLoading && !postedJobs?.length)) ? (
+            <ModuleLoading
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 3,
+                bgcolor: 'background.paper',
+              }}
             />
           ) : null}
           <Box sx={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>

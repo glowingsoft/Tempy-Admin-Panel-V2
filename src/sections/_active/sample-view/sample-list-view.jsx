@@ -2,7 +2,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import { memo, useCallback, useMemo } from 'react';
@@ -15,6 +14,7 @@ import { WALLET_STATUS_OPTIONS } from 'src/_mock';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import {
   TableEmptyRows,
@@ -129,7 +129,6 @@ const DEFAULT_FILTERS = WALLET_FILTER_FIELDS.reduce((acc, field) => {
 // Memoized Table Content Component
 const TableContent = memo(({
   isLoading,
-  isFetching,
   sortedData,
   currentPage,
   itemsPerPage,
@@ -137,9 +136,7 @@ const TableContent = memo(({
   table,
 }) => (
   <TableBody>
-    {!isLoading &&
-      !isFetching &&
-      sortedData.map((row, index) => (
+    {sortedData.map((row, index) => (
         // DUMMYDATA.map((row, index) => (
         <SampleTableRow
           key={row._id}
@@ -149,11 +146,7 @@ const TableContent = memo(({
         />
       ))}
 
-    {(isLoading || isFetching) && (
-      <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={itemsPerPage} />
-    )}
-
-    <TableNoData notFound={!isLoading && !isFetching && sortedData.length === 0} />
+    <TableNoData notFound={!isLoading && sortedData.length === 0} />
 
     {/* TODO: Comment this when real data come! */}
     {/* <TableNoData notFound={!isLoading && !isFetching && DUMMYDATA.length === 0} /> */}
@@ -175,7 +168,6 @@ export function SampleListView() {
     totalRecords,
     meta,
     isLoading,
-    isFetching,
     canReset,
     activeFilters,
     handleSearchChange,
@@ -283,18 +275,7 @@ export function SampleListView() {
           )}
 
           <Box sx={{ position: 'relative' }}>
-            {/* Loading Indicator */}
-            {isFetching && (
-              <LinearProgress
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 9,
-                }}
-              />
-            )}
+            {isLoading && !sortedData.length ? <ModuleLoading /> : null}
 
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -308,7 +289,6 @@ export function SampleListView() {
 
                 <TableContent
                   isLoading={isLoading}
-                  isFetching={isFetching}
                   sortedData={sortedData}
                   currentPage={currentPage}
                   itemsPerPage={itemsPerPage}

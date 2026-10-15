@@ -25,8 +25,6 @@ import { AssignStaffPopover } from '../agency-assign-staff-popover';
 import { AGENCY_JOB_TABS } from 'src/_mock/_agency-jobs';
 import {
   ASSIGN_AGENCIES,
-  ASSIGN_JOB_META,
-  ASSIGN_STAFF,
   SHIFT_LEGEND,
   getCategoriesForJob,
   getDaysForJob,
@@ -34,7 +32,6 @@ import {
   getShiftConfig,
   getStaffById,
   getStatsForAgency,
-  getAssignedStaffIds,
   formatDayRangeLabel,
   formatDistanceKm,
   getDistanceKm,
@@ -237,11 +234,9 @@ function JobCategorySection({
 export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTabChange }) {
   const screenMode = useMemo(() => resolveAssignScreenMode(job), [job]);
   const isViewOnly = screenMode === 'viewStaff';
-  const assignedStaffIds = useMemo(() => getAssignedStaffIds(job), [job]);
-  const viewStaffList = useMemo(
-    () => ASSIGN_STAFF.filter((member) => assignedStaffIds.includes(member.id)),
-    [assignedStaffIds]
-  );
+  // Real agency staff list is not wired into this screen yet — never fall back to mock roster.
+  const viewStaffList = useMemo(() => [], []);
+  const assignStaffList = useMemo(() => [], []);
 
   const [viewMode, setViewMode] = useState(() => resolveAssignViewMode(job));
   const [dayOffset, setDayOffset] = useState(0);
@@ -252,16 +247,16 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
   const jobMeta = useMemo(
     () => ({
       image: job?.image || '',
-      address: job?.address || ASSIGN_JOB_META.address,
-      latitude: job?.latitude ?? ASSIGN_JOB_META.latitude,
-      longitude: job?.longitude ?? ASSIGN_JOB_META.longitude,
-      gender: job?.gender || ASSIGN_JOB_META.gender,
-      postedBy: job?.postedBy || ASSIGN_JOB_META.postedBy,
-      rating: job?.rating ?? ASSIGN_JOB_META.rating,
-      reviewCount: job?.reviewCount ?? ASSIGN_JOB_META.reviewCount,
-      totalPay: job?.totalPay ?? ASSIGN_JOB_META.totalPay,
-      hourlyRate: job?.hourlyRate ?? ASSIGN_JOB_META.hourlyRate,
-      postedDate: job?.schedule || ASSIGN_JOB_META.postedDate,
+      address: job?.address || '',
+      latitude: job?.latitude ?? null,
+      longitude: job?.longitude ?? null,
+      gender: job?.gender || '',
+      postedBy: job?.postedBy || null,
+      rating: job?.rating ?? 0,
+      reviewCount: job?.reviewCount ?? 0,
+      totalPay: job?.totalPay ?? 0,
+      hourlyRate: job?.hourlyRate ?? 0,
+      postedDate: job?.schedule || '',
     }),
     [job]
   );
@@ -308,11 +303,11 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
 
   const nearestStaffList = useMemo(
     () =>
-      withStaffDistances(ASSIGN_STAFF, {
+      withStaffDistances(assignStaffList, {
         latitude: jobMeta.latitude,
         longitude: jobMeta.longitude,
       }),
-    [jobMeta.latitude, jobMeta.longitude]
+    [assignStaffList, jobMeta.latitude, jobMeta.longitude]
   );
 
   const toggleCategory = useCallback((id) => {
@@ -359,8 +354,8 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
       duration: shiftId === '02p-06p' || shiftId === '03a-06p' ? '4h' : '8h',
       break: '30m',
       totalCost: shiftId === '02p-06p' || shiftId === '03a-06p' ? 60 : 120,
-      hourlyRate: job?.hourlyRate || 20,
-      earning: job?.totalPay || 160,
+      hourlyRate: job?.hourlyRate || 0,
+      earning: job?.totalPay || 0,
       status: isViewOnly ? 'Assigned Shift' : 'Upcoming Shift',
       assignedStaffId: staffId,
     });
@@ -378,8 +373,8 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
       duration: shiftId === '02p-06p' || shiftId === '03a-06p' ? '4h' : '8h',
       break: '30m',
       totalCost: shiftId === '02p-06p' || shiftId === '03a-06p' ? 60 : 120,
-      hourlyRate: job?.hourlyRate || 20,
-      earning: job?.totalPay || 160,
+      hourlyRate: job?.hourlyRate || 0,
+      earning: job?.totalPay || 0,
       status: getShiftStatusLabel(cell),
       assignedStaffId: cell?.staffId || 1,
     });
@@ -861,7 +856,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                 onCalendarCellClick={handleCalendarCellClick}
                 cellRefs={cellRefs}
                 readOnly={isViewOnly}
-                staffList={isViewOnly ? viewStaffList : ASSIGN_STAFF}
+                staffList={isViewOnly ? viewStaffList : assignStaffList}
               />
             ))}
           </Box>

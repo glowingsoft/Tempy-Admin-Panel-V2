@@ -13,12 +13,12 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { fDate, fDateTime } from 'src/utils/format-time';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 
 import { useGetNurseJobByIdQuery } from 'src/store/Reducer/nurse-jobs-api';
 import {
@@ -51,7 +51,7 @@ export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved
 
   const bookingQuery = useGetNurseBookingByIdQuery(bookingId, {
     skip: !open,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60, refetchOnFocus: false,
   });
   const booking = bookingQuery.data;
   const jobQuery = useGetNurseJobByIdQuery(booking?.jobId, { skip: !open || !booking?.jobId });
@@ -218,7 +218,7 @@ export function StaffMemberMissedCheckoutDialog({ bookingId, onClose, onResolved
 
       <DialogContent dividers>
         {bookingQuery.isLoading ? (
-          <LinearProgress sx={{ my: 2 }} />
+          <ModuleLoading sx={{ py: 4 }} />
         ) : bookingQuery.isError ? (
           <Alert severity="error">Could not load that shift. Please try again.</Alert>
         ) : (
