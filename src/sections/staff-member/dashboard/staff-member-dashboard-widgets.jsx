@@ -12,21 +12,12 @@ import ListItemButton from '@mui/material/ListItemButton';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { fCurrency } from 'src/utils/format-number';
-
 import { Iconify } from 'src/components/iconify';
 import { getJobDateParts } from 'src/components/jobs/job-date-filters';
 
 import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
 
 // ----------------------------------------------------------------------
-
-const EARNINGS_SNAPSHOT = {
-  thisWeek: 468,
-  pending: 312,
-  paidThisMonth: 1874,
-  hoursThisWeek: 24,
-};
 
 export function StaffUpcomingShiftsCard({ jobs = [], loading = false, onJobClick }) {
   return (
@@ -108,52 +99,6 @@ export function StaffUpcomingShiftsCard({ jobs = [], loading = false, onJobClick
           />
         )}
       </Stack>
-    </Card>
-  );
-}
-
-export function StaffEarningsSnapshotCard() {
-  const items = [
-    { label: 'This week', value: fCurrency(EARNINGS_SNAPSHOT.thisWeek) },
-    { label: 'Pending payout', value: fCurrency(EARNINGS_SNAPSHOT.pending) },
-    { label: 'Paid this month', value: fCurrency(EARNINGS_SNAPSHOT.paidThisMonth) },
-    { label: 'Hours this week', value: `${EARNINGS_SNAPSHOT.hoursThisWeek}h` },
-  ];
-
-  return (
-    <Card sx={{ height: 1 }}>
-      <CardHeader
-        title="Earnings"
-        action={
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.staffMember.earnings}
-            size="small"
-            color="inherit"
-            endIcon={<Iconify icon="eva:arrow-ios-forward-fill" width={16} />}
-          >
-            Details
-          </Button>
-        }
-      />
-      <Box
-        sx={{
-          p: 2.5,
-          pt: 1,
-          display: 'grid',
-          gap: 1.5,
-          gridTemplateColumns: 'repeat(2, 1fr)',
-        }}
-      >
-        {items.map((item) => (
-          <Box key={item.label} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-            <Typography variant="caption" color="text.secondary">
-              {item.label}
-            </Typography>
-            <Typography variant="h6">{item.value}</Typography>
-          </Box>
-        ))}
-      </Box>
     </Card>
   );
 }

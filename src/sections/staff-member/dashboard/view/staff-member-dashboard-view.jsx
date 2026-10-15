@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo } from 'react';
 
 import Alert from '@mui/material/Alert';
 import Grid from '@mui/material/Unstable_Grid2';
@@ -11,7 +11,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { useSelector } from 'react-redux';
 
 import { useGetNurseDashboardQuery } from 'src/store/Reducer/nurse-dashboard-api';
-import { useGetNurseJobsQuery } from 'src/store/Reducer/nurse-jobs-api';
 import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 
 import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
@@ -22,21 +21,9 @@ import { DashboardOverviewChart } from 'src/sections/dashboard/dashboard-overvie
 import { DashboardOverviewHeader } from 'src/sections/dashboard/dashboard-overview-header';
 import { DashboardStatusBreakdown } from 'src/sections/dashboard/dashboard-status-breakdown';
 import {
-  StaffUpcomingShiftsCard,
-  StaffEarningsSnapshotCard,
-} from 'src/sections/staff-member/dashboard/staff-member-dashboard-widgets';
-import { StaffRatingSnapshotCard } from 'src/sections/staff-member/dashboard/staff-member-rating-snapshot-card';
-import {
   DASHBOARD_LINK_MAPS,
   withDashboardLinks,
 } from 'src/sections/dashboard/dashboard-links';
-import {
-  findStaffJobById,
-  pickUpcomingStaffJobs,
-} from 'src/sections/staff-member/jobs/staff-member-job-utils';
-import { StaffMemberAcceptedJobDialog } from 'src/sections/staff-member/shifts/staff-member-accepted-job-dialog';
-import { useStaffCancellationStats } from 'src/sections/staff-member/jobs/use-staff-cancellation-stats';
-import { StaffMemberStrikeRuleAlert } from 'src/sections/staff-member/jobs/staff-member-strike-rule-alert';
 import { ModuleLoading } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
@@ -69,7 +56,6 @@ const MODULES = [
     icon: 'solar:star-bold-duotone',
     color: 'warning',
     href: paths.dashboard.staffMember.reviews,
-    showStars: true,
   },
 ];
 
@@ -86,47 +72,14 @@ export function StaffMemberDashboardView() {
   const { user } = useSelector((state) => state.user);
   const scopeUserId = useScopedUserId();
   const displayName = user?.basicInfo?.name || 'Staff Member';
-  const [selectedJob, setSelectedJob] = useState(null);
   const { data, isLoading, isError, error } = useGetNurseDashboardQuery(
     { userId: scopeUserId },
     { skip: !scopeUserId }
   );
-  const { data: jobsResponse, isLoading: jobsLoading, refetch: refetchJobs } = useGetNurseJobsQuery({
-    page: 0,
-    limit: 200,
-  });
-  const jobs = jobsResponse?.data || [];
   const dashboard = useMemo(
     () => withDashboardLinks(data || EMPTY_DASHBOARD, DASHBOARD_LINK_MAPS.staffMember),
     [data]
   );
-  const upcomingJobs = useMemo(() => pickUpcomingStaffJobs(jobs, { limit: 3 }), [jobs]);
-  const cancellationStats = useStaffCancellationStats();
-
-  const openJobDetails = useCallback(
-    (job) => {
-      if (job) {
-        setSelectedJob(job);
-        return;
-      }
-    },
-    []
-  );
-
-  const handleActivityClick = useCallback(
-    (item) => {
-      const job = findStaffJobById(jobs, item?.entityId);
-      if (job) {
-        openJobDetails(job);
-      }
-    },
-    [jobs, openJobDetails]
-  );
-
-  const handleJobCancelled = useCallback(() => {
-    setSelectedJob(null);
-    refetchJobs();
-  }, [refetchJobs]);
 
   return (
     <DashboardContent maxWidth="xl">
@@ -146,25 +99,17 @@ export function StaffMemberDashboardView() {
           <Grid xs={12}>
             <DashboardOverviewHeader
               title={`Welcome back 👋\n${displayName}`}
-              description="Here's what's happening with your shifts and jobs today. Tap an upcoming shift or job activity for details."
+              description="Here's what's happening with your shifts and jobs today."
               stats={dashboard.stats}
             />
           </Grid>
 
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <StaffEarningsSnapshotCard />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardEarningsChart
               title="Your earnings"
               chart={dashboard.earningsGraph}
               href={paths.dashboard.staffMember.earnings}
             />
-          </Grid>
-
-          <Grid xs={12}>
-            <StaffMemberStrikeRuleAlert cancellationStats={cancellationStats} />
           </Grid>
 
           <DashboardQuickAccess description="Jump into live sections">
@@ -184,22 +129,17 @@ export function StaffMemberDashboardView() {
           </DashboardQuickAccess>
 
           <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <StaffRatingSnapshotCard />
+            <DashboardOverviewChart
+              title="Your activity"
+              subheader="Bookings and bids over the last 12 months"
+              chart={dashboard.chart}
+            />
           </Grid>
 
           <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardActivityList
               title="Recent activity"
               items={dashboard.recentActivity}
-              onItemClick={handleActivityClick}
-            />
-          </Grid>
-
-          <Grid xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <StaffUpcomingShiftsCard
-              jobs={upcomingJobs}
-              loading={jobsLoading}
-              onJobClick={openJobDetails}
             />
           </Grid>
 
@@ -219,23 +159,8 @@ export function StaffMemberDashboardView() {
               />
             </Grid>
           ))}
-
-          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <DashboardOverviewChart
-              title="Your activity"
-              subheader="Bookings and bids over the last 12 months"
-              chart={dashboard.chart}
-            />
-          </Grid>
         </Grid>
       )}
-
-      <StaffMemberAcceptedJobDialog
-        open={Boolean(selectedJob)}
-        job={selectedJob}
-        onClose={() => setSelectedJob(null)}
-        onCancelled={handleJobCancelled}
-      />
     </DashboardContent>
   );
 }
