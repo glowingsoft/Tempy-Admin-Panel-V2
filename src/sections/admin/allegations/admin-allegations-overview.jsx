@@ -13,17 +13,23 @@ import { Iconify } from 'src/components/iconify';
 
 export function AdminAllegationsOverview() {
   return (
-    <Card sx={{ p: { xs: 2, md: 3 } }}>
+    <Card sx={{ p: { xs: 2, md: 3 }, minWidth: 0, overflow: 'hidden' }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        alignItems={{ xs: 'stretch', sm: 'center' }}
         justifyContent="space-between"
         spacing={2}
+        sx={{ minWidth: 0 }}
       >
-        <Box>
+        <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
           <Typography variant="h6">Allegations & suspensions</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Raised allegations are nurses only. Other rows come from cancellations, abandoned shifts, suspended accounts, and reports.
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 0.5, overflowWrap: 'anywhere' }}
+          >
+            Raised allegations are nurses only. Other rows come from cancellations, abandoned
+            shifts, suspended accounts, and reports.
           </Typography>
         </Box>
 
@@ -34,6 +40,11 @@ export function AdminAllegationsOverview() {
           size="small"
           color="primary"
           startIcon={<Iconify icon="solar:arrow-right-bold" />}
+          sx={{
+            flexShrink: 0,
+            alignSelf: { xs: 'stretch', sm: 'center' },
+            whiteSpace: 'nowrap',
+          }}
         >
           Manage allegations
         </Button>

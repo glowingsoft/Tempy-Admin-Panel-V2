@@ -60,4 +60,7 @@ export const jobAttendanceApi = createApi({
   }),
 });
 
-export const { useGetJobAttendanceBookingsQuery } = jobAttendanceApi;
+export const {
+  useGetJobAttendanceBookingsQuery,
+  useLazyGetJobAttendanceBookingsQuery,
+} = jobAttendanceApi;

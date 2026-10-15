@@ -203,7 +203,7 @@ export function StaffMemberShiftsView() {
         }
         : {}),
     },
-    { skip: !scopeUserId, refetchOnMountOrArgChange: true }
+    { skip: !scopeUserId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const availabilityQuery = useGetNurseAvailabilityQuery(
@@ -219,7 +219,7 @@ export function StaffMemberShiftsView() {
         }
         : {}),
     },
-    { skip: !scopeUserId, refetchOnMountOrArgChange: true }
+    { skip: !scopeUserId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const allCalendarJobs = useMemo(() => {

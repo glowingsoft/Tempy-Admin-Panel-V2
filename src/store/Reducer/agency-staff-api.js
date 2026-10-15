@@ -109,6 +109,7 @@ export const agencyStaffApi = createApi({
         method: 'PUT',
         body,
       }),
+      // LIST alone refreshes the table once; id refreshes an open detail query.
       invalidatesTags: (result, error, { id }) => [
         { type: 'AgencyStaff', id },
         { type: 'AgencyStaff', id: 'LIST' },

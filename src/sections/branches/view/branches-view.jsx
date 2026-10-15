@@ -14,7 +14,6 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSetState } from 'src/hooks/use-set-state';
 import { useViewOnly } from 'src/hooks/use-view-only';
@@ -31,6 +30,7 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { TableHeadCustom, TableNoData, TablePaginationCustom, useTable } from 'src/components/table';
 
 import {
@@ -295,7 +295,6 @@ export function BranchesView() {
   const {
     data: agencyBranchesData,
     isLoading: loadingAgencyBranches,
-    isFetching: fetchingAgencyBranches,
     error: agencyBranchesError,
     refetch: refetchAgencyBranches,
   } = useGetAgencyBranchesQuery(listQueryArgs, { skip: !agencyMode });
@@ -303,7 +302,6 @@ export function BranchesView() {
   const {
     data: careHomeBranchesData,
     isLoading: loadingCareHomeBranches,
-    isFetching: fetchingCareHomeBranches,
     error: careHomeBranchesError,
     refetch: refetchCareHomeBranches,
   } = useGetCareHomeBranchesQuery(listQueryArgs, { skip: !careHomeMode });
@@ -311,7 +309,6 @@ export function BranchesView() {
   const {
     data: hospitalBranchesData,
     isLoading: loadingHospitalBranches,
-    isFetching: fetchingHospitalBranches,
     error: hospitalBranchesError,
     refetch: refetchHospitalBranches,
   } = useGetHospitalBranchesQuery(listQueryArgs, { skip: !hospitalMode });
@@ -319,7 +316,6 @@ export function BranchesView() {
   const {
     data: localAuthorityBranchesData,
     isLoading: loadingLocalAuthorityBranches,
-    isFetching: fetchingLocalAuthorityBranches,
     error: localAuthorityBranchesError,
     refetch: refetchLocalAuthorityBranches,
   } = useGetLocalAuthorityBranchesQuery(listQueryArgs, { skip: !localAuthorityMode });
@@ -327,7 +323,6 @@ export function BranchesView() {
   const {
     data: homeCareCompanyBranchesData,
     isLoading: loadingHomeCareCompanyBranches,
-    isFetching: fetchingHomeCareCompanyBranches,
     error: homeCareCompanyBranchesError,
     refetch: refetchHomeCareCompanyBranches,
   } = useGetHomeCareCompanyBranchesQuery(listQueryArgs, { skip: !homeCareCompanyMode });
@@ -335,7 +330,6 @@ export function BranchesView() {
   const {
     data: userBranchesData,
     isLoading: loadingUserBranches,
-    isFetching: fetchingUserBranches,
     error: userBranchesError,
     refetch: refetchUserBranches,
   } = useUserAddressesQuery(listQueryArgs, { skip: !userMode });
@@ -460,12 +454,12 @@ export function BranchesView() {
         : API_TABLE_HEAD
     : API_TABLE_HEAD;
   const listLoading =
-    (agencyMode && (loadingAgencyBranches || fetchingAgencyBranches)) ||
-    (careHomeMode && (loadingCareHomeBranches || fetchingCareHomeBranches)) ||
-    (hospitalMode && (loadingHospitalBranches || fetchingHospitalBranches)) ||
-    (localAuthorityMode && (loadingLocalAuthorityBranches || fetchingLocalAuthorityBranches)) ||
-    (homeCareCompanyMode && (loadingHomeCareCompanyBranches || fetchingHomeCareCompanyBranches)) ||
-    (userMode && (loadingUserBranches || fetchingUserBranches));
+    (agencyMode && loadingAgencyBranches) ||
+    (careHomeMode && loadingCareHomeBranches) ||
+    (hospitalMode && loadingHospitalBranches) ||
+    (localAuthorityMode && loadingLocalAuthorityBranches) ||
+    (homeCareCompanyMode && loadingHomeCareCompanyBranches) ||
+    (userMode && loadingUserBranches);
 
   useEffect(() => {
     if (listLoading) return;
@@ -701,7 +695,7 @@ export function BranchesView() {
         />
 
         <Card sx={{ width: 1 }}>
-          {listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+          {listLoading && !visibleBranches.length ? <ModuleLoading /> : null}
 
           <BranchTableToolbar
             filters={filters}

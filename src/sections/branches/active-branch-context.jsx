@@ -8,6 +8,8 @@ import { useGetLocalAuthorityBranchesQuery } from 'src/store/Reducer/local-autho
 import { useGetHomeCareCompanyBranchesQuery } from 'src/store/Reducer/home-care-company-branches-api';
 import { useUserAddressesQuery } from 'src/store/Reducer/user-branches-api';
 
+import { BRANCH_LIST_ARGS } from 'src/store/rtk-query-defaults';
+
 import {
   ALL_SITES_ID,
   getBranchDisplayName,
@@ -22,7 +24,7 @@ import {
 
 const ActiveBranchContext = createContext(null);
 
-const LIST_ARGS = { page: 0, limit: 100 };
+const LIST_ARGS = BRANCH_LIST_ARGS;
 
 export function ActiveBranchProvider({ children }) {
   const { user } = useSelector((state) => state.user);

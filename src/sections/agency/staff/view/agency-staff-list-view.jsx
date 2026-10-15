@@ -7,7 +7,6 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 
@@ -20,6 +19,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { toast } from 'src/components/snackbar';
 import { mergeStatusCounts } from 'src/utils/status-counts';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -109,7 +109,6 @@ export function AgencyStaffListView() {
   const {
     data,
     isLoading,
-    isFetching,
     isError,
     error,
     refetch,
@@ -147,7 +146,7 @@ export function AgencyStaffListView() {
   );
 
   const canReset = !!filters.state.name || filters.state.status !== 'all';
-  const listLoading = isLoading || isFetching;
+  const listLoading = isLoading;
   const notFound =
     (!listLoading && !dataFiltered.length && canReset) || (!listLoading && !dataFiltered.length);
   const formBusy = creatingStaff || updatingStaff;
@@ -206,16 +205,8 @@ export function AgencyStaffListView() {
             throw new Error('Missing staff id');
           }
           await updateAgencyStaff({ id: editId, ...payload }).unwrap();
-          toast.success(
-            payload.status
-              ? `Staff updated (${payload.status})`
-              : 'Staff updated successfully!'
-          );
-          try {
-            await refetch();
-          } catch {
-            // Update already saved — don't keep the edit dialog open
-          }
+          toast.success('Staff updated successfully!');
+          // List refreshes once via invalidatesTags — do not call refetch() again.
         } catch (err) {
           toast.error(err?.data?.message || err?.error || 'Failed to update staff');
           throw err;
@@ -226,17 +217,13 @@ export function AgencyStaffListView() {
       try {
         await createAgencyStaff(payload).unwrap();
         toast.success('Staff added successfully!');
-        try {
-          await refetch();
-        } catch {
-          // Create already saved — dialog can close
-        }
+        // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (err) {
         toast.error(err?.data?.message || err?.error || 'Failed to add staff');
         throw err;
       }
     },
-    [createAgencyStaff, formMode, refetch, selectedStaff, updateAgencyStaff]
+    [createAgencyStaff, formMode, selectedStaff, updateAgencyStaff]
   );
 
   const handleConfirmDelete = useCallback(async () => {
@@ -248,26 +235,19 @@ export function AgencyStaffListView() {
       deleteDialog.onFalse();
       setStaffToDelete(null);
       table.onUpdatePageDeleteRow(dataFiltered.length);
-      await refetch();
+      // List refreshes once via invalidatesTags — do not call refetch() again.
     } catch (err) {
       toast.error(err?.data?.message || err?.error || 'Failed to delete staff');
     }
-  }, [
-    staffToDelete,
-    deleteAgencyStaff,
-    deleteDialog,
-    table,
-    dataFiltered.length,
-    refetch,
-  ]);
+  }, [staffToDelete, deleteAgencyStaff, deleteDialog, table, dataFiltered.length]);
 
   const handleDetailsDeleted = useCallback(
-    async (id) => {
+    (id) => {
       if (selectedStaff?.id === id) setSelectedStaff(null);
       table.onUpdatePageDeleteRow(dataFiltered.length);
-      await refetch();
+      // Delete mutation already invalidates the list tag.
     },
-    [selectedStaff, dataFiltered.length, table, refetch]
+    [selectedStaff, dataFiltered.length, table]
   );
 
   const handleImportStaff = useCallback(
@@ -288,14 +268,14 @@ export function AgencyStaffListView() {
           `Imported ${rows.length} staff · ${teams.size} team${teams.size === 1 ? '' : 's'} for your rota. Open Shifts to review.`
         );
         importDialog.onFalse();
-        await refetch();
+        // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (error) {
         toast.error(error?.data?.message || error?.error || 'Failed to import staff');
       } finally {
         setImporting(false);
       }
     },
-    [importAgencyStaff, importDialog, refetch]
+    [importAgencyStaff, importDialog]
   );
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -349,7 +329,7 @@ export function AgencyStaffListView() {
         />
 
         <Card>
-          {listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+          {listLoading && !staffList.length ? <ModuleLoading /> : null}
 
           <StaffTableToolbar
             filters={filters}

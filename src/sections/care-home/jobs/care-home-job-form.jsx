@@ -393,7 +393,7 @@ export function JobDraftForm({
 
   const branchListArgs = useMemo(() => ({ page: 0, limit: 100, status: '' }), []);
   const branchQueryOptions = useMemo(
-    () => ({ refetchOnMountOrArgChange: true }),
+    () => ({ refetchOnMountOrArgChange: 60, refetchOnFocus: false }),
     []
   );
 

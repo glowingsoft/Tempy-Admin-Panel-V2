@@ -13,7 +13,6 @@ import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency } from 'src/utils/format-number';
 
@@ -30,7 +29,7 @@ import { Label } from 'src/components/label';
 import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom, TablePaginationCustom } from 'src/components/table';
 
-import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
+import { ModuleLoading } from 'src/components/loading-screen';
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: '', label: 'All payment statuses' },
@@ -134,7 +133,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
   const [downloadingId, setDownloadingId] = useState('');
   const [downloadInvoice] = useDownloadBookingPaymentInvoiceMutation();
 
-  const { data, isLoading, isFetching, isError, error } = useGetBookingPaymentsQuery({
+  const { data, isLoading, isError, error } = useGetBookingPaymentsQuery({
     role,
     from,
     paymentStatus,
@@ -275,14 +274,12 @@ export function BookingPaymentsList({ role = 'care-home' }) {
         </Box>
       ) : null}
 
-      {isFetching ? <LinearProgress sx={{ height: 2 }} /> : null}
-
       {isError && !data ? (
         <Alert severity="error" sx={{ mx: 3, mb: 3 }}>
           {handleApiError(error) || 'Could not load payments'}
         </Alert>
       ) : isLoading ? (
-        <DashboardEmptyState message="Loading payments" hint="" minHeight={180} />
+        <ModuleLoading />
       ) : visiblePayments.length ? (
         <>
           <Scrollbar>

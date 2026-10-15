@@ -90,7 +90,6 @@ export function StaffMemberCertificatesForm() {
         orgId={userId}
         staffId={userId}
         staffName={user?.name || user?.fullName || 'You'}
-        showDemoActions={!viewOnly}
       />
 
       <StaffMemberQualificationsList

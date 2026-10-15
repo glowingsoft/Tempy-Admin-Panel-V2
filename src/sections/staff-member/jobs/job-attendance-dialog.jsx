@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
@@ -12,9 +12,9 @@ import IconButton from '@mui/material/IconButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
 
 import { useGetJobAttendanceBookingsQuery } from 'src/store/Reducer/job-attendance-api';
@@ -82,12 +82,13 @@ export function JobAttendanceDialog({
   shiftId = '',
   fallbackAttendance = null,
   onClose,
+  onAttendanceLoaded,
 }) {
   const jobId = String(job?.id || job?._id || '').trim();
 
   const { data = [], isFetching } = useGetJobAttendanceBookingsQuery(
     { mode, jobId },
-    { skip: !open || !jobId, refetchOnMountOrArgChange: true }
+    { skip: !open || !jobId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const records = useMemo(() => {
@@ -110,6 +111,25 @@ export function JobAttendanceDialog({
     }
     return rows;
   }, [bookingId, data, fallbackAttendance, jobId, shiftId]);
+
+  const loadedFingerprintRef = useRef('');
+  useEffect(() => {
+    if (!open || !records.length || typeof onAttendanceLoaded !== 'function') return;
+
+    const fingerprint = records
+      .map(
+        (row) =>
+          `${row.id}:${row.bookingStatus || ''}:${row.attendance?.checkInAt || ''}:${row.attendance?.checkOutAt || ''}`
+      )
+      .join('|');
+    if (fingerprint === loadedFingerprintRef.current) return;
+    loadedFingerprintRef.current = fingerprint;
+    onAttendanceLoaded(records);
+  }, [open, records, onAttendanceLoaded]);
+
+  useEffect(() => {
+    if (!open) loadedFingerprintRef.current = '';
+  }, [open]);
 
   const slides = useMemo(
     () =>
@@ -146,7 +166,7 @@ export function JobAttendanceDialog({
           </IconButton>
         </DialogTitle>
 
-        {isFetching ? <LinearProgress /> : null}
+        {loading ? <ModuleLoading sx={{ py: 4 }} /> : null}
 
         <DialogContent dividers>
           {!records.length && !isFetching ? (

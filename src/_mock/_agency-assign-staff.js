@@ -24,8 +24,9 @@ export const ASSIGN_AGENCY_DATA = {
 
 export const ASSIGN_STATS = ASSIGN_AGENCY_DATA.careplus.stats;
 
-export function getStatsForAgency(agencyId) {
-  return ASSIGN_AGENCY_DATA[agencyId]?.stats || ASSIGN_STATS;
+export function getStatsForAgency(_agencyId) {
+  // Do not invent demo hours/cost/shifts — show empty until a real stats API is wired.
+  return { hours: '—', cost: '—', shifts: '—' };
 }
 
 function toRadians(value) {

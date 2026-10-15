@@ -13,7 +13,6 @@ import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import Typography from '@mui/material/Typography';
 import DialogContent from '@mui/material/DialogContent';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency } from 'src/utils/format-number';
 
@@ -172,8 +171,6 @@ export function AgencyJobBidDialog({
               {submitError}
             </Alert>
           ) : null}
-
-          {checkingAgreedRate ? <LinearProgress /> : null}
 
           <Form methods={methods} onSubmit={handleFormSubmit}>
             <Stack spacing={2.5}>

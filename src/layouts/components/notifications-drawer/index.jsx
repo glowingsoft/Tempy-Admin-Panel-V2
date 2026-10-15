@@ -15,7 +15,6 @@ import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -28,6 +27,7 @@ import { useViewOnly } from 'src/hooks/use-view-only';
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { varHover } from 'src/components/animate';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
@@ -259,7 +259,7 @@ export function NotificationsDrawer({ sx, ...other }) {
   const renderList = (
     <Scrollbar>
       {isLoading ? (
-        <LinearProgress sx={{ borderRadius: 0, height: 2 }} />
+        <ModuleLoading sx={{ py: 6 }} />
       ) : isError ? (
         <EmptyContent
           filled

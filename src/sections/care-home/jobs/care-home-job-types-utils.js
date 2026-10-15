@@ -69,10 +69,11 @@ export function createDefaultJobTypes() {
 export function loadJobTypes() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createDefaultJobTypes();
+    // Empty until the org adds types — do not invent a default catalog.
+    if (!raw) return [];
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) return createDefaultJobTypes();
+    if (!Array.isArray(parsed) || !parsed.length) return [];
 
     return parsed.map((item) =>
       createJobType({
@@ -82,7 +83,7 @@ export function loadJobTypes() {
       })
     );
   } catch {
-    return createDefaultJobTypes();
+    return [];
   }
 }
 

@@ -129,7 +129,7 @@ function AdminJobTypesViewContent() {
       keyword,
       status: statusFilter === 'all' ? '' : statusFilter,
     },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const [createJobRole] = useCreateAdminJobRoleMutation();

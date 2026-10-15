@@ -1,11 +1,7 @@
 import dayjs from 'dayjs';
 
 import { _mock } from 'src/_mock';
-import {
-  _invoices,
-  getInvoiceNumberPrefix,
-  getInvoiceSeedForRole,
-} from 'src/_mock/_invoice';
+import { getInvoiceNumberPrefix } from 'src/_mock/_invoice';
 
 import { fDate } from 'src/utils/format-time';
 
@@ -70,20 +66,15 @@ function parseCsvLine(line) {
   return cells;
 }
 
-export function loadStoredInvoices(roleKey = 'default', defaultInvoices) {
-  const defaults = defaultInvoices || getInvoiceSeedForRole(roleKey);
+export function loadStoredInvoices(roleKey = 'default', _defaultInvoices) {
   const key = storageKeyForRole(roleKey);
 
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) {
-      return defaults.map(reviveInvoice);
-    }
+    if (!raw) return [];
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) {
-      return defaults.map(reviveInvoice);
-    }
+    if (!Array.isArray(parsed) || !parsed.length) return [];
 
     // Old agency-style cache stuck on home-care dashboards — reset when prefix mismatches
     const expectedPrefix = getInvoiceNumberPrefix(roleKey);
@@ -93,22 +84,21 @@ export function loadStoredInvoices(roleKey = 'default', defaultInvoices) {
 
     if (looksWrongRole) {
       localStorage.removeItem(key);
-      return defaults.map(reviveInvoice);
+      return [];
     }
 
-    // Soft check: if every row uses a different product prefix, prefer fresh seed
     if (
       expectedPrefix &&
       parsed.length &&
       parsed.every((invoice) => !String(invoice?.invoiceNumber || '').startsWith(expectedPrefix))
     ) {
       localStorage.removeItem(key);
-      return defaults.map(reviveInvoice);
+      return [];
     }
 
     return parsed.map(reviveInvoice);
   } catch {
-    return defaults.map(reviveInvoice);
+    return [];
   }
 }
 

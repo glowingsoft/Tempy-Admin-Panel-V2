@@ -154,8 +154,8 @@ export const gocardlessApi = createApi({
       providesTags: (result, error, userId) => [
         { type: 'GoCardlessMandate', id: String(userId || 'CURRENT') },
       ],
-      refetchOnFocus: true,
-      refetchOnMountOrArgChange: true,
+      refetchOnFocus: false,
+      refetchOnMountOrArgChange: 60,
     }),
 
     setupGoCardlessMandate: builder.mutation({

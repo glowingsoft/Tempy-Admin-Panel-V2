@@ -12,7 +12,6 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
@@ -159,7 +158,8 @@ export function JobBidsView({ mode = 'careHome' }) {
   );
 
   const bidsQueryOptions = {
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
     placeholderData: (previousData) => previousData,
   };
   const careHomeBidsQuery = useGetCareHomeJobBidsQuery(bidsQueryArgs, {
@@ -184,7 +184,7 @@ export function JobBidsView({ mode = 'careHome' }) {
   // Same request without the status filter — feeds the summary counts so every tile stays
   // accurate while one status is selected. Shares the cache entry when status is "all".
   const countsQueryArgs = useMemo(() => ({ ...bidsQueryArgs, status: '' }), [bidsQueryArgs]);
-  const countsQueryOptions = { refetchOnMountOrArgChange: true };
+  const countsQueryOptions = { refetchOnMountOrArgChange: 60, refetchOnFocus: false };
   const careHomeCountsQuery = useGetCareHomeJobBidsQuery(countsQueryArgs, { skip: skipCareHome, ...countsQueryOptions });
   const hospitalCountsQuery = useGetHospitalJobBidsQuery(countsQueryArgs, { skip: !isHospital, ...countsQueryOptions });
   const userCountsQuery = useGetUserJobBidsQuery(countsQueryArgs, { skip: !isUser, ...countsQueryOptions });
@@ -296,8 +296,7 @@ export function JobBidsView({ mode = 'careHome' }) {
   const { viewMode, setViewMode } = usePersistedViewMode('care-home-job-bids', 'list');
   const [groupMode, setGroupMode] = useState('all'); // 'all' | 'per-job'
 
-  const listLoading = bidsLoading || bidsFetching;
-  const bidsPending = (bidsLoading || bidsFetching) && !bids.length;
+  const bidsPending = bidsLoading && !bids.length;
 
   useEffect(() => {
     setPage(1);
@@ -893,8 +892,6 @@ export function JobBidsView({ mode = 'careHome' }) {
         onClearFilters={handleClearFilters}
         resultCount={filteredBids.length}
       />
-
-      <Box sx={{ height: 2, mb: 1 }}>{listLoading && !bidsPending ? <LinearProgress aria-label="Refreshing bids" sx={{ height: 2 }} /> : null}</Box>
 
       {renderContent()}
 

@@ -80,11 +80,22 @@ function formatPhoneLabel(phone) {
   return '';
 }
 
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 function formatLocationLabel(location) {
   if (!location) return '';
-  if (typeof location === 'string') return location;
+  if (typeof location === 'string') return looksLikeEmail(location) ? '' : location;
   if (typeof location === 'object') {
-    return location.fullAddress || [location.city, location.state, location.country].filter(Boolean).join(', ') || location.title || '';
+    const label =
+      location.fullAddress ||
+      location.name ||
+      location.locationName ||
+      location.title ||
+      [location.city, location.state, location.country].filter(Boolean).join(', ') ||
+      '';
+    return looksLikeEmail(label) ? '' : label;
   }
   return '';
 }
@@ -395,8 +406,6 @@ export function mapAgencyStaffFromApi(item = {}) {
   const branchLocationLabel =
     branchLocation?.fullAddress || [branchLocation?.city, branchLocation?.state, branchLocation?.country].filter(Boolean).join(', ') || branchLocation?.name || '';
 
-  const branchName = (typeof branch === 'object' && (branch?.name || branch?.branchName)) || item.branchName || staff.branchName || '';
-
   // Staff personal address only — never fall back to branch.location (that is the site, e.g. Lahore).
   const locationSource =
     (item.location && typeof item.location === 'object' ? item.location : null) ||
@@ -406,6 +415,18 @@ export function mapAgencyStaffFromApi(item = {}) {
     (item.address && typeof item.address === 'object' ? item.address : null) ||
     (staff.address && typeof staff.address === 'object' ? staff.address : null) ||
     null;
+
+  const locationName =
+    (typeof locationSource === 'object' &&
+      (locationSource?.name || locationSource?.locationName || locationSource?.title)) ||
+    '';
+
+  const branchName =
+    (typeof branch === 'object' && (branch?.name || branch?.branchName)) ||
+    item.branchName ||
+    staff.branchName ||
+    locationName ||
+    '';
   const location = formatLocationLabel(locationSource);
   const coords = Array.isArray(locationSource?.coordinates) ? locationSource.coordinates : [0, 0];
 
@@ -527,8 +548,6 @@ export function buildAgencyStaffUpdatePayload(data) {
     speciality: normalizeSpecialities(data.specialties, data.speciality, data.specialty, 'generalNurse'),
     ratePerHour: Number(data.ratePerHour) || 0,
     platformPercent: Number(data.platformPercent) || 0,
-    // Backend mongoose enum: pending | inactive | active | deleted | left
-    status: resolveAgencyStaffStatusForApi(data.status),
   };
 
   const branch = String(data.branch || data.branchId || '').trim();

@@ -16,7 +16,6 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency } from 'src/utils/format-number';
 
@@ -675,7 +674,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
   const skipCareHome = isHospital || isUser || isLocalAuthority || isHomeCareCompany;
 
   const branchListArgs = useMemo(() => ({ page: 0, limit: 100, status: '' }), []);
-  const branchQueryOptions = { refetchOnMountOrArgChange: true };
+  const branchQueryOptions = { refetchOnMountOrArgChange: 60, refetchOnFocus: false };
 
   const careHomeBranchesQuery = useGetCareHomeBranchesQuery(branchListArgs, {
     skip: skipCareHome,
@@ -749,19 +748,23 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
   const careHomeJobsQuery = useGetCareHomeJobsQuery(jobsQueryArgs, {
     skip: skipCareHome,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
   const hospitalJobsQuery = useGetHospitalJobsQuery(jobsQueryArgs, {
     skip: !isHospital,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
   const userJobsQuery = useGetUserJobsQuery(jobsQueryArgs, {
     skip: !isUser,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
   const localAuthorityJobsQuery = useGetLocalAuthorityJobsQuery(jobsQueryArgs, {
     skip: !isLocalAuthority,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
   });
   const activeJobsQuery = isLocalAuthority
     ? localAuthorityJobsQuery
@@ -853,7 +856,8 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
     'grid'
   );
 
-  const listLoading = isLoading || isFetching;
+  // Initial load vs socket/background refresh (keep cards visible while refetching).
+  const listLoading = isLoading;
 
   useEffect(() => {
     if (openPostOnMount && !viewOnly) {
@@ -1552,7 +1556,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
           </Stack>
         )}
 
-        {listLoading && !displayedJobs.length ? <ModuleLoading /> : listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+        {listLoading && !displayedJobs.length ? <ModuleLoading /> : null}
 
         {listLoading && !displayedJobs.length ? null : displayedJobs.length === 0 ? (
           <EmptyContent

@@ -108,7 +108,7 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     refetch,
   } = useGetConversationsQuery(
     { page: 0, limit: 50, currentUserId },
-    { skip: !currentUserId, refetchOnMountOrArgChange: true }
+    { skip: !currentUserId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const {

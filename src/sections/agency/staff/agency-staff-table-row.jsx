@@ -9,7 +9,12 @@ import IconButton from '@mui/material/IconButton';
 import { fCurrency } from 'src/utils/format-number';
 import { isDeletedStatus } from 'src/utils/status-counts';
 
-import { STAFF_STATUS_COLOR, getStaffSpecialtyLabel, getStaffStatusLabel } from 'src/_mock/_staff';
+import {
+  STAFF_STATUS_COLOR,
+  getStaffSpecialtyLabel,
+  getStaffStatusHint,
+  getStaffStatusLabel,
+} from 'src/_mock/_staff';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -56,9 +61,13 @@ export function AgencyStaffTableRow({ row, onViewRow, onEditRow, onDeleteRow }) 
       <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.addedOn || '—'}</TableCell>
 
       <TableCell sx={{ whiteSpace: 'nowrap' }}>
-        <Label color={STAFF_STATUS_COLOR[row.status] || 'default'} variant="soft">
-          {getStaffStatusLabel(row.status)}
-        </Label>
+        <Tooltip title={getStaffStatusHint(row.status)} placement="top" arrow>
+          <span>
+            <Label color={STAFF_STATUS_COLOR[row.status] || 'default'} variant="soft">
+              {getStaffStatusLabel(row.status)}
+            </Label>
+          </span>
+        </Tooltip>
       </TableCell>
 
       <TableCell align="center" sx={{ whiteSpace: 'nowrap', width: 116 }}>

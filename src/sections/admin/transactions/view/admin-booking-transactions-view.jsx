@@ -16,7 +16,6 @@ import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
-import LinearProgress from '@mui/material/LinearProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -32,6 +31,7 @@ import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { TableHeadCustom, TableNoData, TablePaginationCustom } from 'src/components/table';
 
 import { handleApiError } from 'src/store/handleApiError';
@@ -41,7 +41,6 @@ import {
   useGetAdminTransactionsQuery,
   useUpdateAdminPlatformFeeMutation,
 } from 'src/store/Reducer/admin-transactions-api';
-import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
 
 // ----------------------------------------------------------------------
 
@@ -119,7 +118,7 @@ function DetailItem({ label, children }) {
 }
 
 function TransactionDetailsDialog({ transactionId, onClose }) {
-  const { data, isLoading, isFetching, isError, error } = useGetAdminTransactionByIdQuery(transactionId, {
+  const { data, isLoading, isError, error } = useGetAdminTransactionByIdQuery(transactionId, {
     skip: !transactionId,
   });
   const shiftLine = [data?.time, data?.isBreak ? (data.breakMin ? `${data.breakMin} min break` : 'Break') : ''].filter(Boolean).join(' · ');
@@ -128,11 +127,10 @@ function TransactionDetailsDialog({ transactionId, onClose }) {
     <Dialog open={Boolean(transactionId)} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Transaction</DialogTitle>
       <DialogContent dividers>
-        {isFetching ? <LinearProgress sx={{ mb: 2 }} /> : null}
         {isError ? (
           <Alert severity="error">{handleApiError(error) || 'Could not load this transaction'}</Alert>
         ) : isLoading || !data ? (
-          <DashboardEmptyState message="Loading transaction" hint="" minHeight={160} />
+          <ModuleLoading sx={{ py: 4 }} />
         ) : (
           <Box
             sx={{
@@ -293,7 +291,7 @@ export function AdminBookingTransactionsView() {
     setPage(0);
   }, [keyword, status, rowsPerPage]);
 
-  const { data, isLoading, isFetching, isError, error } = useGetAdminTransactionsQuery({
+  const { data, isLoading, isError, error } = useGetAdminTransactionsQuery({
     page: status ? 1 : page + 1,
     limit: status ? 100 : rowsPerPage,
     keyword,
@@ -362,7 +360,7 @@ export function AdminBookingTransactionsView() {
             </TextField>
           </Stack>
 
-          {isFetching ? <LinearProgress sx={{ height: 2 }} /> : null}
+          {isLoading && !transactions.length ? <ModuleLoading /> : null}
 
           {isError && !data ? (
             <Alert severity="error" sx={{ mx: 3, mb: 3 }}>

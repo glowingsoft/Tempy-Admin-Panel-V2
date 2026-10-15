@@ -7,7 +7,6 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -17,6 +16,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { toast } from 'src/components/snackbar';
 import { mergeStatusCounts } from 'src/utils/status-counts';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -95,7 +95,7 @@ export function HomeCareCompanyStaffListView() {
   const [statusCountCache, setStatusCountCache] = useState({});
   const filters = useSetState({ name: '', status: 'all' });
 
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetHomeCareCompanyStaffQuery({
+  const { data, isLoading, isError, error, refetch } = useGetHomeCareCompanyStaffQuery({
     page: table.page,
     limit: table.rowsPerPage,
     status: filters.state.status,
@@ -128,7 +128,7 @@ export function HomeCareCompanyStaffListView() {
   );
 
   const canReset = !!filters.state.name || filters.state.status !== 'all';
-  const listLoading = isLoading || isFetching;
+  const listLoading = isLoading;
 
   useEffect(() => {
     if (listLoading) return;
@@ -186,15 +186,8 @@ export function HomeCareCompanyStaffListView() {
             throw new Error('Missing staff id');
           }
           await updateStaff({ id: editId, ...payload }).unwrap();
-          toast.success(
-            payload.status
-              ? `Staff updated (${payload.status})`
-              : 'Staff updated successfully!'
-          );
-          try {
-            await refetch();
-          } catch {
-          }
+          toast.success('Staff updated successfully!');
+          // List refreshes once via invalidatesTags — do not call refetch() again.
         } catch (err) {
           toast.error(err?.data?.message || err?.error || 'Failed to update staff');
           throw err;
@@ -205,16 +198,13 @@ export function HomeCareCompanyStaffListView() {
       try {
         await createStaff(payload).unwrap();
         toast.success('Staff added successfully!');
-        try {
-          await refetch();
-        } catch {
-        }
+        // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (err) {
         toast.error(err?.data?.message || err?.error || 'Failed to add staff');
         throw err;
       }
     },
-    [createStaff, formMode, refetch, selectedStaff, updateStaff]
+    [createStaff, formMode, selectedStaff, updateStaff]
   );
 
   const handleConfirmDelete = useCallback(async () => {
@@ -226,11 +216,11 @@ export function HomeCareCompanyStaffListView() {
       deleteDialog.onFalse();
       setStaffToDelete(null);
       table.onUpdatePageDeleteRow(dataFiltered.length);
-      await refetch();
+      // List refreshes once via invalidatesTags — do not call refetch() again.
     } catch (err) {
       toast.error(err?.data?.message || err?.error || 'Failed to delete staff');
     }
-  }, [staffToDelete, deleteStaff, deleteDialog, table, dataFiltered.length, refetch]);
+  }, [staffToDelete, deleteStaff, deleteDialog, table, dataFiltered.length]);
 
   const handleImportStaff = useCallback(
     async (rows, file) => {
@@ -250,14 +240,14 @@ export function HomeCareCompanyStaffListView() {
           `Imported ${rows.length} staff · ${teams.size} team${teams.size === 1 ? '' : 's'} for your rota. Open Shifts to review.`
         );
         importDialog.onFalse();
-        await refetch();
+        // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (error) {
         toast.error(error?.data?.message || error?.error || 'Failed to import staff');
       } finally {
         setImporting(false);
       }
     },
-    [importDialog, importStaff, refetch]
+    [importDialog, importStaff]
   );
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -308,7 +298,7 @@ export function HomeCareCompanyStaffListView() {
         />
 
         <Card>
-          {listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+          {listLoading && !staffList.length ? <ModuleLoading /> : null}
 
           <StaffTableToolbar
             filters={filters}

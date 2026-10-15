@@ -12,7 +12,6 @@ import { I18nProvider } from 'src/locales/i18n-provider';
 import { ThemeProvider } from 'src/theme/theme-provider';
 
 import { Snackbar } from 'src/components/snackbar';
-import { ProgressBar } from 'src/components/progress-bar';
 import { ImagePreviewProvider } from 'src/components/image-preview';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
@@ -49,7 +48,6 @@ export default function App() {
                 <CheckoutProvider>
                   <ImagePreviewProvider>
                     <Snackbar />
-                    <ProgressBar />
                     <SettingsDrawer />
                     <Router />
                   </ImagePreviewProvider>

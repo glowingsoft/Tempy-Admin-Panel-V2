@@ -79,21 +79,21 @@ export default function LegalView({ type = 'about' }) {
 
   const aboutQuery = useGetAdminAboutUsQuery(undefined, {
     skip: type !== 'about',
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: false,
   });
 
   const privacyQuery = useGetAdminPrivacyPolicyQuery(undefined, {
     skip: type !== 'policy',
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: false,
   });
 
   const termsQuery = useGetAdminTermsConditionsQuery(undefined, {
     skip: type !== 'terms',
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: false,
   });

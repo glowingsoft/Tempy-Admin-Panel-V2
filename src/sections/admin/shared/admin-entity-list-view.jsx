@@ -115,7 +115,7 @@ export function AdminEntityListView({
       keyword: debouncedKeyword,
       status: statusFilter,
     },
-    { skip: !useApi, refetchOnMountOrArgChange: true }
+    { skip: !useApi, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const [updateAdminUserStatus] = useUpdateAdminUserStatusMutation();

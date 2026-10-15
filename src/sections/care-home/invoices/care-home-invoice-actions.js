@@ -1,4 +1,4 @@
-import { CARE_HOME_INVOICES, resolveShiftPaymentStatus } from './care-home-invoice-data';
+import { resolveShiftPaymentStatus } from './care-home-invoice-data';
 
 const STORAGE_KEY = 'tempy-employer-shift-payments-v2';
 
@@ -34,14 +34,10 @@ function reviveInvoice(invoice) {
 export function loadCareHomeInvoices() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return CARE_HOME_INVOICES.map(reviveInvoice);
-    }
+    if (!raw) return [];
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) {
-      return CARE_HOME_INVOICES.map(reviveInvoice);
-    }
+    if (!Array.isArray(parsed) || !parsed.length) return [];
 
     const looksLikeShiftPayments = parsed.some(
       (row) =>
@@ -50,13 +46,12 @@ export function loadCareHomeInvoices() {
         row?.paymentStatus === 'scheduled' ||
         row?.paymentStatus === 'paid'
     );
-    if (!looksLikeShiftPayments) {
-      return CARE_HOME_INVOICES.map(reviveInvoice);
-    }
+    // Do not fall back to demo CARE_HOME_INVOICES — empty until real payments exist.
+    if (!looksLikeShiftPayments) return [];
 
     return parsed.map(reviveInvoice);
   } catch {
-    return CARE_HOME_INVOICES.map(reviveInvoice);
+    return [];
   }
 }
 

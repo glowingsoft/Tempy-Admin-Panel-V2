@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import TableBody from '@mui/material/TableBody';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSetState } from 'src/hooks/use-set-state';
@@ -23,6 +22,7 @@ import { mergeStatusCounts } from 'src/utils/status-counts';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ModuleLoading } from 'src/components/loading-screen';
 import {
   useTable,
   emptyRows,
@@ -192,7 +192,7 @@ export function StaffListView() {
         />
 
         <Card>
-          {(isLoading || isFetching) && <LinearProgress sx={{ borderRadius: 0, height: 2 }} />}
+          {isLoading && !staffList.length ? <ModuleLoading /> : null}
 
           <StaffTableToolbar
             filters={filters}

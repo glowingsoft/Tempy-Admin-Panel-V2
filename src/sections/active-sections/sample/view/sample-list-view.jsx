@@ -2,7 +2,7 @@ import { debounce } from 'lodash';
 import isEqual from 'lodash/isEqual';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { LinearProgress, TableContainer } from '@mui/material';
+import { TableContainer } from '@mui/material';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -12,6 +12,7 @@ import { useRouter } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
 
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import {
   emptyRows,
@@ -183,10 +184,8 @@ export function SampleListView() {
         <Box sx={{ position: 'relative' }}>
           <TableContainer sx={{ position: 'relative', overflow: 'unset', zIndex: 100 }}>
             <Scrollbar sx={{ minHeight: 444 }}>
-              {status === 'pending' ? (
-                <Box sx={{ width: '100%' }}>
-                  <LinearProgress />
-                </Box>
+              {isLoading && !data.length ? (
+                <ModuleLoading />
               ) : (
                 <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 800 }}>
                   <TableHeadCustom

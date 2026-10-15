@@ -9,12 +9,12 @@ import Avatar from '@mui/material/Avatar';
 import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 
 import { getStaffSpecialtyLabel } from 'src/_mock/_staff';
 
@@ -32,9 +32,9 @@ function loginHref({ speciality, location, staffId }) {
 
 export function TempyStaffSearchModal({ open, onClose, speciality = '', location = null }) {
   const router = useRouter();
-  const { data, isFetching, isError, error } = useSearchPublicStaffQuery(
+  const { data, isLoading, isFetching, isError, error } = useSearchPublicStaffQuery(
     { speciality, location },
-    { skip: !open || !speciality || !location?.fullAddress, refetchOnMountOrArgChange: true }
+    { skip: !open || !speciality || !location?.fullAddress, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
   const staff = data?.data || [];
@@ -68,7 +68,7 @@ export function TempyStaffSearchModal({ open, onClose, speciality = '', location
           {location?.fullAddress ? ` · ${location.fullAddress}` : ''}
         </Typography>
 
-        {isFetching ? <LinearProgress sx={{ mb: 1 }} /> : null}
+        {isLoading && !staff.length ? <ModuleLoading sx={{ py: 4 }} /> : null}
 
         {isError && !isFetching ? (
           <Alert severity="error" sx={{ mx: 3, mb: 1.5 }}>

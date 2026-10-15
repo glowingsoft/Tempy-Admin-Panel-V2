@@ -10,7 +10,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Label } from 'src/components/label';
@@ -294,7 +293,7 @@ export function CareHomeComplianceView() {
           })}
         </Stack>
 
-        {listLoading && !filteredWorkers.length ? <ModuleLoading /> : listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+        {listLoading && !filteredWorkers.length ? <ModuleLoading /> : null}
 
         {!canLoadWorkers ? (
           <EmptyContent

@@ -35,10 +35,10 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import LinearProgress from '@mui/material/LinearProgress';
 import { useTheme } from '@mui/material/styles';
 
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { getJobApiErrorMessage } from 'src/sections/care-home/jobs/care-home-job-api-utils';
 import { ShiftDayHeaderCell } from 'src/components/shifts/shift-day-header-cell';
 import { ShiftRotaGridScroll, useDragScroll } from 'src/components/shifts/shift-rota-grid-scroll';
@@ -2492,12 +2492,16 @@ export function AgencyShiftsView({
   const { isPanning, handleMouseDown: handleGridMouseDown } = useDragScroll(gridRef);
 
   const agencyBranchesQuery = useGetAgencyBranchesQuery(
-    { page: 0, limit: 100, status: '' },
-    { skip: !useCalendarApi || !isAgencyApi, refetchOnMountOrArgChange: true }
+    { page: 0, limit: 100 },
+    { skip: !useCalendarApi || !isAgencyApi, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
   const hccBranchesQuery = useGetHomeCareCompanyBranchesQuery(
-    { page: 0, limit: 100, status: '' },
-    { skip: !useCalendarApi || !isHomeCareCompanyApi, refetchOnMountOrArgChange: true }
+    { page: 0, limit: 100 },
+    {
+      skip: !useCalendarApi || !isHomeCareCompanyApi,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
   );
   const nurseBranchesQuery = useGetNurseBranchesQuery(
     { page: 0, limit: 100, status: '' },
@@ -2848,24 +2852,25 @@ export function AgencyShiftsView({
 
   const agencyCalendarQuery = useGetAgencyBookingCalendarQuery(calendarQueryArgs, {
     skip: !useCalendarApi || !calendarQueryArgs || !isAgencyApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const hccCalendarQuery = useGetHomeCareCompanyBookingCalendarQuery(calendarQueryArgs, {
     skip: !useCalendarApi || !calendarQueryArgs || !isHomeCareCompanyApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const nurseCalendarQuery = useGetNurseBookingCalendarQuery(calendarQueryArgs, {
     skip: !useCalendarApi || !calendarQueryArgs || !isNurseApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const {
     data: calendarData,
+    isLoading: isCalendarLoading,
     isFetching: isCalendarFetching,
     isError: isCalendarError,
     error: calendarError,
@@ -2888,21 +2893,21 @@ export function AgencyShiftsView({
 
   const agencyAvailabilityListQuery = useGetAgencyAvailabilityQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isAgencyApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const hccAvailabilityListQuery = useGetHomeCareCompanyAvailabilityQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isHomeCareCompanyApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const nurseAvailabilityListQuery = useGetNurseAvailabilityQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isNurseApi,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
   const { data: availabilityData } = isNurseApi
     ? nurseAvailabilityListQuery
@@ -3963,9 +3968,15 @@ export function AgencyShiftsView({
 
   return (
     <LayoutRoot disablePadding maxWidth={false} sx={layoutSx}>
-      {(useCalendarApi && isCalendarFetching) || postedJobsLoading ? (
-        <LinearProgress
-          sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3, height: 2 }}
+      {((useCalendarApi && isCalendarLoading && !calendarSynced) ||
+        (postedJobsLoading && !postedJobs?.length)) ? (
+        <ModuleLoading
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 3,
+            bgcolor: 'background.paper',
+          }}
         />
       ) : null}
       <Box sx={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>

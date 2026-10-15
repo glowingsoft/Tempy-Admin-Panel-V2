@@ -3,7 +3,6 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-
 import { paths } from 'src/routes/paths';
 
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -16,10 +15,8 @@ import { RICH_TEXT_SX } from 'src/sections/dashboard-settings/rich-text-sx';
 import { BRAND_GRADIENT, BRAND_SOFT_BG } from 'src/theme/brand-gradient';
 import { varAlpha } from 'src/theme/styles';
 
-// ----------------------------------------------------------------------
 
 const CONTENT_SX = {
-  // Quill's list numbering / indentation first; the page's own look below wins where they overlap.
   ...RICH_TEXT_SX,
   typography: 'body1',
   color: 'text.primary',
@@ -62,12 +59,11 @@ export function DashboardCmsContentView({
   const meta = SETTINGS_CONTENT_TYPES[contentType] || SETTINGS_CONTENT_TYPES.terms;
   const title = data?.title || meta.titleFallback;
   const content = data?.content || '';
-  // Breadcrumbs already show the page heading — avoid repeating the same title.
   const showContentTitle =
     Boolean(title) &&
     String(title).trim().toLowerCase() !== String(meta.heading || '').trim().toLowerCase();
 
-  const loading = Boolean(isLoading || isFetching);
+  const loading = Boolean(isLoading);
 
   return (
     <Box sx={{ px: { xs: 2, md: 3 }, pb: 5, pt: 3 }}>

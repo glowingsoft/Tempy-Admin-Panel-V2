@@ -1,5 +1,3 @@
-import { STAFF_COMPLIANCE } from 'src/sections/care-home/compliance/care-home-compliance-data';
-
 import {
   CARE_TUTOR_CONNECTION_STATUS,
   DEFAULT_TRAINING_COMMISSION_PERCENT,
@@ -35,43 +33,15 @@ function writeJson(key, value) {
   }
 }
 
-function seedStaffFromMock() {
-  return STAFF_COMPLIANCE.reduce((acc, row) => {
-    const certificates = Object.entries(row.careTutor?.courses || {})
-      .filter(([, status]) => status === 'green')
-      .map(([courseTitle]) => ({
-        id: `cert-${row.id}-${courseTitle}`.replace(/\s+/g, '-').toLowerCase(),
-        courseTitle,
-        status: 'verified',
-        verifiedAt: '2026-07-15T10:00:00.000Z',
-        expiresAt: '2027-07-15T10:00:00.000Z',
-        certificateId: `CT-${String(row.id).slice(-3).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
-        provider: 'CareTutor',
-      }));
-
-    acc[row.id] = {
-      staffId: row.id,
-      staffName: row.name,
-      overall: row.careTutor?.overall || 'grey',
-      completed: row.careTutor?.completed ?? 0,
-      total: row.careTutor?.total ?? 0,
-      overdue: row.careTutor?.overdue ?? 0,
-      courses: { ...(row.careTutor?.courses || {}) },
-      certificates,
-    };
-    return acc;
-  }, {});
-}
-
 export function getCareTutorSettings(orgId) {
   const stored = readJson(settingsKey(orgId));
   return {
-    connectionStatus: stored?.connectionStatus || CARE_TUTOR_CONNECTION_STATUS.CONNECTED,
+    connectionStatus: stored?.connectionStatus || CARE_TUTOR_CONNECTION_STATUS.DISCONNECTED,
     commissionPercent:
       Number(stored?.commissionPercent ?? DEFAULT_TRAINING_COMMISSION_PERCENT) ||
       DEFAULT_TRAINING_COMMISSION_PERCENT,
-    lastSync: stored?.lastSync || '28 min ago',
-    accountLinked: stored?.accountLinked !== false,
+    lastSync: stored?.lastSync || '',
+    accountLinked: stored?.accountLinked === true,
   };
 }
 
@@ -86,12 +56,10 @@ export function saveCareTutorSettings(orgId, patch = {}) {
 
 export function getCareTutorStaffMap(orgId) {
   const stored = readJson(staffKey(orgId));
-  if (stored && typeof stored === 'object' && Object.keys(stored).length) {
+  if (stored && typeof stored === 'object') {
     return stored;
   }
-  const seeded = seedStaffFromMock();
-  writeJson(staffKey(orgId), seeded);
-  return seeded;
+  return {};
 }
 
 export function getCareTutorStaffRecord(orgId, staffId) {

@@ -8,7 +8,6 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -23,6 +22,7 @@ import {
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { AgencyStaffDetailsContent } from './agency-staff-details-content';
@@ -171,7 +171,7 @@ export function AgencyStaffDetailsDialog({ open, onClose, staff, onDeleted }) {
 
         <DialogContent sx={{ p: 3 }}>
           {detailBusy && !detailSuccess ? (
-            <LinearProgress sx={{ borderRadius: 0, height: 2 }} />
+            <ModuleLoading sx={{ py: 6 }} />
           ) : (
             <AgencyStaffDetailsContent staff={currentStaff} />
           )}

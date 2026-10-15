@@ -11,8 +11,8 @@ import { createCustomFetchBaseQuery } from '../baseQuery';
 export const careTutorApi = createApi({
   reducerPath: 'careTutorApi',
   baseQuery: createCustomFetchBaseQuery(),
-  keepUnusedDataFor: 0,
-  refetchOnMountOrArgChange: true,
+  keepUnusedDataFor: 60,
+  refetchOnMountOrArgChange: 60,
   tagTypes: ['CareTutorTraining', 'CareTutorSettings'],
 
   endpoints: (builder) => ({

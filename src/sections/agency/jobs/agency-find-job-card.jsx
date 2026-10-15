@@ -797,7 +797,8 @@ function JobActionButtons({
     );
 
     if (alreadyAssigned) {
-      const assignedChip = (
+      // Agency / home care only assign — no Cancel beside Assigned.
+      return (
         <Chip
           size="small"
           color="success"
@@ -810,23 +811,6 @@ function JobActionButtons({
             borderRadius: 1,
           }}
         />
-      );
-
-      if (bookingStatus !== 'active' || !onCancelBooking) return assignedChip;
-
-      return (
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          {assignedChip}
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={() => onCancelBooking(job)}
-            sx={{ ...actionButtonSx, minWidth: 70 }}
-          >
-            Cancel
-          </Button>
-        </Stack>
       );
     }
 
@@ -934,13 +918,22 @@ export function AgencyFindJobCard({
     shiftCompleted ||
     job?.actionType === 'assigned' ||
     ['active', 'inProgress', 'completed', 'assigned'].includes(bookingStatus);
-  const checkedIn = Boolean(attendance?.checkInAt);
+  // Worker checked in (or shift finished) — agency must not keep showing "Not checked in".
+  const checkedIn = Boolean(
+    attendance?.checkInAt ||
+      attendance?.checkOutAt ||
+      attendance?.autoCheckedOut ||
+      ['inProgress', 'completed'].includes(String(bookingStatus || '').toLowerCase())
+  );
+  // Agency only assigns: after assign show "Not checked in" until the worker checks in.
   const showNotCheckedIn =
-    typeof onOpenAttendance === 'function' &&
     assignedWork &&
     !checkedIn &&
     bookingStatus !== 'pending' &&
-    !CANCELLED_BOOKING_STATUSES.includes(bookingStatus);
+    !CANCELLED_BOOKING_STATUSES.includes(bookingStatus) &&
+    (mode === 'agency' ||
+      mode === 'homeCareCompany' ||
+      typeof onOpenAttendance === 'function');
   const showAttendance =
     (mode === 'staffMember' || hasBooking || shiftCompleted) &&
     typeof onOpenAttendance === 'function' &&

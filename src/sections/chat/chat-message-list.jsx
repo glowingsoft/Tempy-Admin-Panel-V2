@@ -1,7 +1,6 @@
 import Stack from '@mui/material/Stack';
-import LinearProgress from '@mui/material/LinearProgress';
-
 import { Scrollbar } from 'src/components/scrollbar';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
 
 import { ChatMessageItem } from './chat-message-item';
@@ -18,20 +17,10 @@ export function ChatMessageList({ messages = [], participants, loading }) {
 
   const lightbox = useLightBox(slides);
 
-  if (loading) {
+  if (loading && !messages.length) {
     return (
-      <Stack sx={{ flex: '1 1 auto', position: 'relative' }}>
-        <LinearProgress
-          color="inherit"
-          sx={{
-            top: 0,
-            left: 0,
-            width: 1,
-            height: 2,
-            borderRadius: 0,
-            position: 'absolute',
-          }}
-        />
+      <Stack sx={{ flex: '1 1 auto' }}>
+        <ModuleLoading />
       </Stack>
     );
   }

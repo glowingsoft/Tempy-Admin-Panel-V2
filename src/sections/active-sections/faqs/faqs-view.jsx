@@ -11,7 +11,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import LinearProgress from '@mui/material/LinearProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -31,6 +30,7 @@ import { TablePaginationCustom } from 'src/components/table';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { Field, Form } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { toast } from 'src/components/snackbar';
 
 import { handleApiError } from 'src/store/handleApiError';
@@ -130,7 +130,7 @@ export function FaqsView() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const { data: faqsData, isLoading, isError, error, refetch } = useGetAdminFaqsQuery({ page: page + 1, limit: rowsPerPage }, { refetchOnMountOrArgChange: true });
+  const { data: faqsData, isLoading, isError, error, refetch } = useGetAdminFaqsQuery({ page: page + 1, limit: rowsPerPage }, { refetchOnMountOrArgChange: 60, refetchOnFocus: false });
 
   const [createFaq] = useCreateFaqMutation();
   const [updateFaq] = useUpdateFaqMutation();
@@ -282,8 +282,8 @@ export function FaqsView() {
             </Alert>
           )}
 
-          {isLoading ? (
-            <LinearProgress sx={{ borderRadius: 0, height: 2 }} />
+          {isLoading && !faqs.length ? (
+            <ModuleLoading />
           ) : (
             <Stack spacing={2}>
               {faqs.length ? (

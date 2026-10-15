@@ -24,10 +24,13 @@ import { toast } from 'src/components/snackbar';
 import { Form, Field } from 'src/components/hook-form';
 
 import { StaffDocumentUploadRow } from 'src/sections/staff/staff-document-upload-row';
-import { SupplierStaffStatusField } from 'src/sections/staff/supplier-staff-status-field';
-import { getAgencyBranchLocationLabel } from 'src/sections/branches/agency-branch-utils';
+import {
+  getAgencyBranchLocationLabel,
+  getAgencyStaffLocationOptionLabel,
+} from 'src/sections/branches/agency-branch-utils';
 import { ensureFormAddressCoordinates } from 'src/sections/branches/address-form-utils';
 
+import { BRANCH_LIST_ARGS } from 'src/store/rtk-query-defaults';
 import { useGetAgencyBranchesQuery } from 'src/store/Reducer/agency-branches-api';
 import { useGetAgencyStaffNursesQuery } from 'src/store/Reducer/agency-staff-api';
 
@@ -39,9 +42,56 @@ import {
   staffFormHasValidCoordinates,
 } from './agency-staff-api-utils';
 
+function looksLikeEmailLabel(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function sanitizeAddressLabel(value) {
+  const label = String(value || '').trim();
+  if (!label || label === '—' || looksLikeEmailLabel(label)) return '';
+  return label;
+}
+
 function buildLocationSearchLabel(member = {}) {
-  const parts = [member.city, member.state, member.country].filter(Boolean);
-  return parts.join(', ');
+  const address = sanitizeAddressLabel(member.location || member.fullAddress);
+  if (address) return address;
+  return [member.city, member.state, member.country].filter(Boolean).join(', ');
+}
+
+function applyBranchLocationToForm(setValue, branch, { fillAddress = false } = {}) {
+  if (!branch || typeof setValue !== 'function') return;
+
+  const location = branch.location && typeof branch.location === 'object' ? branch.location : {};
+  const label =
+    getAgencyBranchLocationLabel(branch) ||
+    location.fullAddress ||
+    [location.city, location.state, location.country].filter(Boolean).join(', ') ||
+    '';
+
+  if (label && label !== '—') {
+    setValue('locationSearch', label, { shouldDirty: true });
+  }
+
+  if (fillAddress) {
+    const address = sanitizeAddressLabel(location.fullAddress || label);
+    if (address) {
+      setValue('fullAddress', address, { shouldDirty: true, shouldValidate: true });
+    }
+    if (location.city) setValue('city', String(location.city), { shouldDirty: true });
+    if (location.state) setValue('state', String(location.state), { shouldDirty: true });
+    if (location.country) setValue('country', String(location.country), { shouldDirty: true });
+    if (location.postalCode != null && String(location.postalCode).trim()) {
+      setValue('postalCode', String(location.postalCode), { shouldDirty: true });
+    }
+  }
+
+  const coords = Array.isArray(location.coordinates) ? location.coordinates : null;
+  if (coords && coords.length >= 2) {
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (Number.isFinite(lng)) setValue('longitude', lng, { shouldDirty: true });
+    if (Number.isFinite(lat)) setValue('latitude', lat, { shouldDirty: true });
+  }
 }
 
 const FIELD_LABELS = {
@@ -288,22 +338,43 @@ export function AgencyStaffFormDialog({
     isLoading: loadingNurses,
     isFetching: fetchingNurses,
     error: nursesError,
-  } = useNursesQuery({ page: 0, limit: 500 }, { skip: !open || isEdit });
+  } = useNursesQuery(
+    { page: 0, limit: 500 },
+    { skip: !open || isEdit, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
+  );
 
   const {
     data: branchesData,
     isLoading: loadingBranches,
     isFetching: fetchingBranches,
     error: branchesError,
-  } = useBranchesQuery({ page: 0, limit: 100 }, { skip: !open });
+  } = useBranchesQuery(BRANCH_LIST_ARGS, {
+    skip: !open,
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
+  });
 
   const branchOptions = useMemo(() => {
-    const list = branchesData?.data || [];
-    return list.filter((branch) => {
+    const list = (branchesData?.data || []).filter((branch) => {
       const status = String(branch.status || 'active').toLowerCase();
       return status !== 'deleted' && status !== 'delete';
     });
-  }, [branchesData?.data]);
+
+    const savedId = String(currentStaff?.branch || '').trim();
+    if (!isEdit || !savedId || list.some((branch) => String(branch.id) === savedId)) {
+      return list;
+    }
+
+    const savedName = String(currentStaff?.branchName || 'Saved location').trim();
+    return [
+      {
+        id: savedId,
+        name: savedName.split('—')[0].trim() || 'Saved location',
+        location: { fullAddress: savedName },
+      },
+      ...list,
+    ];
+  }, [branchesData?.data, currentStaff?.branch, currentStaff?.branchName, isEdit]);
 
   const branchHelperText = useMemo(() => {
     if (loadingBranches || fetchingBranches) return 'Loading locations...';
@@ -332,8 +403,8 @@ export function AgencyStaffFormDialog({
           password: '',
           dob: editStaff.dob || '',
           gender: editStaff.gender || '',
-          location: editStaff.location || '',
-          fullAddress: editStaff.location || '',
+          location: sanitizeAddressLabel(editStaff.location),
+          fullAddress: sanitizeAddressLabel(editStaff.location || editStaff.fullAddress),
           locationSearch: buildLocationSearchLabel(editStaff),
           city: editStaff.city || '',
           state: editStaff.state || '',
@@ -342,7 +413,7 @@ export function AgencyStaffFormDialog({
           longitude: editStaff.longitude ?? 0,
           latitude: editStaff.latitude ?? 0,
           taxNumber: editStaff.taxNumber || '',
-          branch: editStaff.branch || '',
+          branch: String(editStaff.branch || ''),
           specialty: normalizeSpecialities(
             editStaff.specialities || editStaff.specialties || editStaff.specialty || 'generalNurse'
           ),
@@ -378,6 +449,7 @@ export function AgencyStaffFormDialog({
   } = methods;
 
   const staffMode = watch('staffMode');
+  const selectedBranchId = watch('branch');
   const isExistingMode = staffMode === 'existing';
   const busy = submitting || isSubmitting;
 
@@ -389,6 +461,45 @@ export function AgencyStaffFormDialog({
     setActiveStep(0);
     reset(defaultValues);
   }, [open, defaultValues, reset]);
+
+  useEffect(() => {
+    if (!open || !isEdit || !editStaff || !branchOptions.length) return;
+
+    const current = String(getValues('branch') || '').trim();
+    if (current && branchOptions.some((branch) => String(branch.id) === current)) return;
+
+    const savedBits = [editStaff.branch, editStaff.branchName, editStaff.location, editStaff.city]
+      .flatMap((value) => String(value || '').split('—'))
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length > 2);
+
+    const match = branchOptions.find((branch) => {
+      const id = String(branch.id || '').trim().toLowerCase();
+      const name = String(branch.name || '').trim().toLowerCase();
+      const locationLabel = String(getAgencyBranchLocationLabel(branch) || '')
+        .trim()
+        .toLowerCase();
+      return savedBits.some(
+        (bit) => bit === id || bit === name || bit === locationLabel || (name && bit.includes(name))
+      );
+    });
+
+    if (match) {
+      setValue('branch', String(match.id), { shouldValidate: true, shouldDirty: false });
+    }
+  }, [open, isEdit, editStaff, branchOptions, getValues, setValue]);
+
+  useEffect(() => {
+    if (!open || !selectedBranchId || !branchOptions.length) return;
+
+    const branch = branchOptions.find((item) => String(item.id) === String(selectedBranchId));
+    if (!branch) return;
+
+    // Same as Add: picking Location fills map coords / address bits from that branch.
+    applyBranchLocationToForm(setValue, branch, {
+      fillAddress: !sanitizeAddressLabel(getValues('fullAddress')),
+    });
+  }, [open, selectedBranchId, branchOptions, getValues, setValue]);
 
   const handleSelectRegisteredStaff = useCallback(
     (member) => {
@@ -530,7 +641,9 @@ export function AgencyStaffFormDialog({
 
       let formData = data;
 
-      if ((!isExistingMode || isEdit) && !isRegistryLocked) {
+      // New staff only: map search must resolve coordinates.
+      // Edit / existing-staff add use the Location dropdown (branch), same as Add.
+      if (!isEdit && !isExistingMode && !isRegistryLocked) {
         const hasCoords = await ensureFormAddressCoordinates(getValues, setValue, {
           addressField: 'locationSearch',
         });
@@ -542,7 +655,8 @@ export function AgencyStaffFormDialog({
       }
 
       if (
-        (!isExistingMode || isEdit) &&
+        !isEdit &&
+        !isExistingMode &&
         !isRegistryLocked &&
         !staffFormHasValidCoordinates(formData)
       ) {
@@ -550,11 +664,15 @@ export function AgencyStaffFormDialog({
         return;
       }
 
+      const safeAddress = sanitizeAddressLabel(
+        formData.fullAddress || formData.location || editStaff?.location || ''
+      );
+
       const payload = isEdit
         ? buildAgencyStaffUpdatePayload({
           ...formData,
-          location: formData.fullAddress || formData.location || editStaff?.location || '',
-          fullAddress: formData.fullAddress || formData.location || editStaff?.location || '',
+          location: safeAddress,
+          fullAddress: safeAddress,
           city: formData.city || editStaff?.city || '',
           state: formData.state || editStaff?.state || '',
           country: formData.country || editStaff?.country || '',
@@ -666,27 +784,30 @@ export function AgencyStaffFormDialog({
 
             {(!showStepNavigation || activeStep === 0) && (
               <>
-                <Field.Select
-                  name="branch"
-                  label="Location *"
-                  InputLabelProps={{ shrink: true }}
-                  helperText={branchHelperText}
+                <Box
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                    bgcolor: 'background.paper',
+                    pb: 1,
+                    pt: 0.5,
+                  }}
                 >
-                  <MenuItem value="">Select location</MenuItem>
-                  {branchOptions.map((branch) => {
-                    const locationLabel = getAgencyBranchLocationLabel(branch);
-                    const label =
-                      locationLabel && locationLabel !== '—'
-                        ? `${branch.name || 'Location'} — ${locationLabel}`
-                        : branch.name || branch.id;
-
-                    return (
-                      <MenuItem key={branch.id} value={branch.id}>
-                        {label}
+                  <Field.Select
+                    name="branch"
+                    label="Location *"
+                    InputLabelProps={{ shrink: true }}
+                    helperText={branchHelperText}
+                  >
+                    <MenuItem value="">Select location</MenuItem>
+                    {branchOptions.map((branch) => (
+                      <MenuItem key={branch.id} value={String(branch.id)}>
+                        {getAgencyStaffLocationOptionLabel(branch)}
                       </MenuItem>
-                    );
-                  })}
-                </Field.Select>
+                    ))}
+                  </Field.Select>
+                </Box>
 
                 {!isEdit && isExistingMode && (
                   <Stack spacing={1}>
@@ -846,29 +967,25 @@ export function AgencyStaffFormDialog({
                         label="National Insurance / Tax Number *"
                         disabled={isRegistryLocked}
                       />
-                      {isRegistryLocked ? (
-                        <>
-                          <Field.Text name="fullAddress" label="Full address *" disabled sx={{ gridColumn: '1 / -1' }} />
-                          <Field.Text name="locationSearch" label="Location" disabled sx={{ gridColumn: '1 / -1' }} />
-                        </>
-                      ) : (
-                        <>
-                          <Field.Text
-                            name="fullAddress"
-                            label="Full address *"
-                            disabled={isRegistryLocked}
-                            helperText="Home or correspondence address"
-                            sx={{ gridColumn: '1 / -1' }}
+                      <Field.Text
+                        name="fullAddress"
+                        label="Full address *"
+                        disabled={isRegistryLocked}
+                        helperText="Home or correspondence address"
+                        inputProps={{ autoComplete: 'street-address' }}
+                        sx={{ gridColumn: '1 / -1' }}
+                      />
+                      {/* Map search only when creating a brand-new staff login.
+                          Edit / existing use the Location * dropdown above (same as Add). */}
+                      {!isEdit && !isRegistryLocked ? (
+                        <Box sx={{ gridColumn: '1 / -1' }}>
+                          <Field.StandaloneAddress
+                            name="locationSearch"
+                            label="Map location"
+                            helperText="Search map location for latitude & longitude"
                           />
-                          <Box sx={{ gridColumn: '1 / -1' }}>
-                            <Field.StandaloneAddress
-                              name="locationSearch"
-                              label="Location *"
-                              helperText="Search map location for latitude & longitude"
-                            />
-                          </Box>
-                        </>
-                      )}
+                        </Box>
+                      ) : null}
                       <Field.Text name="city" label="City" disabled={isRegistryLocked} />
                       <Field.Text name="state" label="State" disabled={isRegistryLocked} />
                       <Field.Text name="country" label="Country" disabled={isRegistryLocked} />
@@ -897,13 +1014,6 @@ export function AgencyStaffFormDialog({
                     type="number"
                     inputProps={{ min: 0, max: 100, step: 1 }}
                   />
-                  {isEdit ? (
-                    <SupplierStaffStatusField
-                      required
-                      isEdit
-                      currentStatus={currentStaff?.status}
-                    />
-                  ) : null}
                 </Box>
               </>
             )}

@@ -14,7 +14,6 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -44,6 +43,7 @@ import { useGetNurseBidsQuery, useUpdateNurseBidMutation } from 'src/store/Reduc
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -194,27 +194,26 @@ export function AgencyBidsView({ mode = 'agency' }) {
 
   const agencyBidsQuery = useGetAgencyBidsQuery(bidsQueryArgs, {
     skip: isHomeCareCompany || isStaffMember || !currentUserId,
-    refetchOnFocus: true,
+    refetchOnFocus: false,
     refetchOnReconnect: true,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
   });
   const hccBidsQuery = useGetHomeCareCompanyBidsQuery(bidsQueryArgs, {
     skip: !isHomeCareCompany || !currentUserId,
-    refetchOnFocus: true,
+    refetchOnFocus: false,
     refetchOnReconnect: true,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
   });
   const nurseBidsQuery = useGetNurseBidsQuery(bidsQueryArgs, {
     skip: !isStaffMember || !currentUserId,
-    refetchOnFocus: true,
+    refetchOnFocus: false,
     refetchOnReconnect: true,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 60,
   });
 
   const {
     data: bidsResponse,
     isLoading,
-    isFetching,
     isError,
     error: bidsError,
     refetch,
@@ -245,7 +244,7 @@ export function AgencyBidsView({ mode = 'agency' }) {
     [bidsResponse?.data, ownerUserIds, isImpersonating, isStaffMember]
   );
   const bidCountMeta = {};
-  const listLoading = isLoading || isFetching;
+  const listLoading = isLoading;
 
   const statusCounts = useMemo(() => {
     const fromList = (status) =>
@@ -424,7 +423,7 @@ export function AgencyBidsView({ mode = 'agency' }) {
         />
 
         <Card>
-          {listLoading ? <LinearProgress sx={{ borderRadius: 0, height: 2 }} /> : null}
+          {listLoading && !bids.length ? <ModuleLoading /> : null}
 
           <AgencyBidTableToolbar
             filters={filters}
