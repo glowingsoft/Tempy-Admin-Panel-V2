@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -8,14 +8,18 @@ import Table from '@mui/material/Table';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import CircularProgress from '@mui/material/CircularProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -35,7 +39,9 @@ import { ModuleLoading } from 'src/components/loading-screen';
 import { TableHeadCustom, TableNoData, TablePaginationCustom } from 'src/components/table';
 
 import { handleApiError } from 'src/store/handleApiError';
+import { saveBlobAsFile } from 'src/sections/staff/staff-import-utils';
 import {
+  useDownloadAdminTransactionInvoiceMutation,
   useGetAdminPlatformFeeQuery,
   useGetAdminTransactionByIdQuery,
   useGetAdminTransactionsQuery,
@@ -64,7 +70,15 @@ const TABLE_HEAD = [
   { id: 'status', label: 'Status' },
   { id: 'payoutStatus', label: 'Payout' },
   { id: 'paidAt', label: 'Paid at' },
+  { id: 'actions', label: 'Invoice', align: 'right' },
 ];
+
+function invoiceFilename(result, fallbackId) {
+  if (result?.filename) return result.filename;
+  const type = String(result?.contentType || '').toLowerCase();
+  if (type.includes('html')) return `invoice-${fallbackId}.html`;
+  return `invoice-${fallbackId}.pdf`;
+}
 
 function humanizeStatus(value) {
   const raw = String(value || '').trim();
@@ -117,7 +131,7 @@ function DetailItem({ label, children }) {
   );
 }
 
-function TransactionDetailsDialog({ transactionId, onClose }) {
+function TransactionDetailsDialog({ transactionId, onClose, onDownloadInvoice, downloading }) {
   const { data, isLoading, isError, error } = useGetAdminTransactionByIdQuery(transactionId, {
     skip: !transactionId,
   });
@@ -218,6 +232,26 @@ function TransactionDetailsDialog({ transactionId, onClose }) {
           </Box>
         )}
       </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          color="inherit"
+          variant="outlined"
+          disabled={!transactionId || downloading || isLoading || isError}
+          onClick={() => onDownloadInvoice?.({ id: transactionId, reference: data?.reference })}
+          startIcon={
+            downloading ? (
+              <CircularProgress color="inherit" size={16} />
+            ) : (
+              <Iconify icon="solar:download-bold" width={18} />
+            )
+          }
+        >
+          {downloading ? 'Downloading…' : 'Download PDF'}
+        </Button>
+        <Button variant="contained" onClick={onClose}>
+          Close
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }
@@ -285,7 +319,9 @@ export function AdminBookingTransactionsView() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [downloadingId, setDownloadingId] = useState('');
   const keyword = useDebounce(search.trim(), 400);
+  const [downloadInvoice] = useDownloadAdminTransactionInvoiceMutation();
 
   useEffect(() => {
     setPage(0);
@@ -297,6 +333,33 @@ export function AdminBookingTransactionsView() {
     keyword,
     status,
   });
+
+  const handleDownloadInvoice = useCallback(
+    async (row) => {
+      const id = String(row?.id || '').trim();
+      if (!id || downloadingId) return;
+
+      setDownloadingId(id);
+      try {
+        const result = await downloadInvoice(id).unwrap();
+        if (result?.blob) {
+          saveBlobAsFile(
+            result.blob,
+            invoiceFilename(result, row.reference || id)
+          );
+          return;
+        }
+        toast.error(result?.json?.message || 'Could not download the invoice');
+      } catch (err) {
+        toast.error(
+          err?.data?.json?.message || handleApiError(err) || 'Could not download the invoice'
+        );
+      } finally {
+        setDownloadingId('');
+      }
+    },
+    [downloadInvoice, downloadingId]
+  );
 
   const statusCounts = data?.statusCounts || {};
   const matchedTransactions = (data?.transactions || []).filter((row) => !status || String(row.status || '').toLowerCase() === status);
@@ -321,7 +384,7 @@ export function AdminBookingTransactionsView() {
           <Box sx={{ px: 3, pt: 3, pb: 2 }}>
             <Typography variant="h6">Transactions</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Customer payments. Open a row to load the full transaction.
+              Customer payments. Open a row to load the full transaction, or download the invoice PDF.
             </Typography>
           </Box>
 
@@ -369,43 +432,70 @@ export function AdminBookingTransactionsView() {
           ) : (
             <>
               <Scrollbar>
-                <Table size="small" sx={{ minWidth: 1100 }}>
+                <Table size="small" sx={{ minWidth: 1180 }}>
                   <TableHeadCustom headLabel={TABLE_HEAD} />
                   <TableBody>
-                    {transactions.map((row) => (
-                      <TableRow key={row.id || row.reference} hover sx={{ cursor: 'pointer' }} onClick={() => setSelectedId(row.id)}>
-                        <TableCell>
-                          <Typography variant="subtitle2">{row.reference || '—'}</Typography>
-                          {row.date ? (
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              {row.date}
-                              {row.time ? ` · ${row.time}` : ''}
-                            </Typography>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>{row.jobName || '—'}</TableCell>
-                        <TableCell>
-                          <PersonCell person={row.customer} />
-                        </TableCell>
-                        <TableCell>
-                          <PersonCell person={row.worker} />
-                        </TableCell>
-                        <TableCell align="right">{fCurrency(row.amount)}</TableCell>
-                        <TableCell align="right">{fCurrency(row.platformFee)}</TableCell>
-                        <TableCell align="right">{fCurrency(row.supplierAmount)}</TableCell>
-                        <TableCell>
-                          <Label variant="soft" color={statusColor(row.status)}>
-                            {humanizeStatus(row.status)}
-                          </Label>
-                        </TableCell>
-                        <TableCell>
-                          <Label variant="soft" color={statusColor(row.payoutStatus)}>
-                            {humanizeStatus(row.payoutStatus)}
-                          </Label>
-                        </TableCell>
-                        <TableCell>{row.paidAt || '—'}</TableCell>
-                      </TableRow>
-                    ))}
+                    {transactions.map((row) => {
+                      const isDownloading = downloadingId === row.id;
+                      return (
+                        <TableRow
+                          key={row.id || row.reference}
+                          hover
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedId(row.id)}
+                        >
+                          <TableCell>
+                            <Typography variant="subtitle2">{row.reference || '—'}</Typography>
+                            {row.date ? (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {row.date}
+                                {row.time ? ` · ${row.time}` : ''}
+                              </Typography>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>{row.jobName || '—'}</TableCell>
+                          <TableCell>
+                            <PersonCell person={row.customer} />
+                          </TableCell>
+                          <TableCell>
+                            <PersonCell person={row.worker} />
+                          </TableCell>
+                          <TableCell align="right">{fCurrency(row.amount)}</TableCell>
+                          <TableCell align="right">{fCurrency(row.platformFee)}</TableCell>
+                          <TableCell align="right">{fCurrency(row.supplierAmount)}</TableCell>
+                          <TableCell>
+                            <Label variant="soft" color={statusColor(row.status)}>
+                              {humanizeStatus(row.status)}
+                            </Label>
+                          </TableCell>
+                          <TableCell>
+                            <Label variant="soft" color={statusColor(row.payoutStatus)}>
+                              {humanizeStatus(row.payoutStatus)}
+                            </Label>
+                          </TableCell>
+                          <TableCell>{row.paidAt || '—'}</TableCell>
+                          <TableCell align="right" onClick={(event) => event.stopPropagation()}>
+                            <Tooltip title="Download PDF">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  disabled={!row.id || Boolean(downloadingId)}
+                                  onClick={() => handleDownloadInvoice(row)}
+                                  aria-label="Download invoice PDF"
+                                >
+                                  {isDownloading ? (
+                                    <CircularProgress size={18} color="inherit" />
+                                  ) : (
+                                    <Iconify icon="solar:download-bold" width={18} />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
 
                     <TableNoData notFound={!isLoading && !transactions.length} />
                   </TableBody>
@@ -426,7 +516,12 @@ export function AdminBookingTransactionsView() {
         </Card>
       </Stack>
 
-      <TransactionDetailsDialog transactionId={selectedId} onClose={() => setSelectedId('')} />
+      <TransactionDetailsDialog
+        transactionId={selectedId}
+        onClose={() => setSelectedId('')}
+        onDownloadInvoice={handleDownloadInvoice}
+        downloading={Boolean(selectedId && downloadingId === selectedId)}
+      />
     </DashboardContent>
   );
 }

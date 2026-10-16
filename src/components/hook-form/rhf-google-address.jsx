@@ -2,16 +2,22 @@ import { debounce } from 'lodash';
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
+import { LoadingButton } from '@mui/lab';
 
 import { CONFIG } from 'src/config-global';
 
+import { toast } from 'src/components/snackbar';
+import { detectGpsPlace } from 'src/sections/tempy-home/detect-gps-place';
+import { applyAddressPlaceToForm } from 'src/sections/branches/address-form-utils';
+
 import { Iconify } from '../iconify';
 
-// ----------------------------------------------------------------------
 
 let googleMapsPromise = null;
 
@@ -117,10 +123,16 @@ function fetchGoogleSuggestions(input, autocompleteService, sessionToken) {
   });
 }
 
-// ----------------------------------------------------------------------
 
-export function RHFGoogleAddress({ name, label, helperText, placeholder, ...other }) {
-  const { control, setValue } = useFormContext();
+export function RHFGoogleAddress({
+  name,
+  label,
+  helperText,
+  placeholder,
+  showDetectGps = true,
+  ...other
+}) {
+  const { control, setValue, getValues, clearErrors } = useFormContext();
 
   const googleApiKey = CONFIG.google.mapsApiKey;
   const mapboxApiKey = CONFIG.mapbox.apiKey;
@@ -128,6 +140,7 @@ export function RHFGoogleAddress({ name, label, helperText, placeholder, ...othe
   const [isGoogleReady, setIsGoogleReady] = useState(!!window.google?.maps?.places);
   const [options, setOptions] = useState([]);
   const [fetching, setFetching] = useState(false);
+  const [detectingGps, setDetectingGps] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const autocompleteService = useRef(null);
@@ -231,8 +244,37 @@ export function RHFGoogleAddress({ name, label, helperText, placeholder, ...othe
     setValue(name, option.label, { shouldValidate: true, shouldDirty: true });
   };
 
+  const handleDetectGps = useCallback(async () => {
+    setDetectingGps(true);
+    setDropdownOpen(false);
+    try {
+      const place = await detectGpsPlace();
+      if (!Number.isFinite(Number(place.latitude)) || !Number.isFinite(Number(place.longitude))) {
+        toast.error(place.error || 'Unable to read GPS. Please allow location access and try again.');
+        return;
+      }
+
+      const values = getValues();
+      const hasCoordinateFields =
+        Object.prototype.hasOwnProperty.call(values, 'latitude') ||
+        Object.prototype.hasOwnProperty.call(values, 'longitude');
+
+      if (hasCoordinateFields) {
+        applyAddressPlaceToForm(setValue, place, {
+          addressField: name,
+          updateSearchLabel: true,
+        });
+      } else {
+        setValue(name, place.label, { shouldValidate: true, shouldDirty: true });
+      }
+      clearErrors?.(name);
+    } finally {
+      setDetectingGps(false);
+    }
+  }, [clearErrors, getValues, name, setValue]);
+
   return (
-    <>
+    <Box sx={{ width: 1 }}>
       <div ref={placesDivRef} style={{ display: 'none' }} />
 
       <Controller
@@ -249,7 +291,7 @@ export function RHFGoogleAddress({ name, label, helperText, placeholder, ...othe
             onClose={() => setDropdownOpen(false)}
             filterOptions={(items) => items}
             options={options}
-            loading={fetching}
+            loading={fetching || detectingGps}
             inputValue={typeof field.value === 'string' ? field.value : ''}
             onInputChange={(_, value, reason) => {
               if (reason === 'input' || reason === 'clear') {
@@ -329,7 +371,9 @@ export function RHFGoogleAddress({ name, label, helperText, placeholder, ...othe
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {fetching ? <CircularProgress color="inherit" size={18} /> : null}
+                      {fetching || detectingGps ? (
+                        <CircularProgress color="inherit" size={18} />
+                      ) : null}
                       {params.InputProps.endAdornment}
                       <InputAdornment position="end">
                         <Iconify
@@ -352,6 +396,20 @@ export function RHFGoogleAddress({ name, label, helperText, placeholder, ...othe
           />
         )}
       />
-    </>
+
+      {showDetectGps ? (
+        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
+          <LoadingButton
+            size="small"
+            color="inherit"
+            loading={detectingGps}
+            startIcon={<Iconify icon="solar:routing-2-bold" width={16} />}
+            onClick={handleDetectGps}
+          >
+            Detect GPS
+          </LoadingButton>
+        </Stack>
+      ) : null}
+    </Box>
   );
 };

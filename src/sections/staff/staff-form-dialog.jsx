@@ -23,7 +23,6 @@ import { ensureFormAddressCoordinates } from 'src/sections/branches/address-form
 
 import { StaffDocumentUploadRow } from './staff-document-upload-row';
 
-// ----------------------------------------------------------------------
 
 const StaffFormSchema = zod.object({
   name: zod.string().min(1, { message: 'Name is required!' }),
@@ -81,7 +80,6 @@ const EMPTY_FORM_VALUES = {
   certifications: [],
 };
 
-// ----------------------------------------------------------------------
 
 export function StaffFormDialog({ open, onClose, currentStaff, onSubmit, isNested = false }) {
   const isEdit = !!currentStaff;
@@ -236,7 +234,7 @@ export function StaffFormDialog({ open, onClose, currentStaff, onSubmit, isNeste
                 <Field.StandaloneAddress
                   name="locationSearch"
                   label="Location"
-                  helperText="Search map location for latitude & longitude"
+                  helperText="Search a place or tap Detect GPS for latitude & longitude"
                 />
               </Box>
               <Field.Text name="city" label="City" />

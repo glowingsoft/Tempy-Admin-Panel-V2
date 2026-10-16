@@ -15,11 +15,11 @@ import 'leaflet/dist/leaflet.css';
 
 // ----------------------------------------------------------------------
 
-/** Street tiles close to Google Maps roadmap (no API key required). */
+/** Esri street tiles — no API key (CARTO voyager now watermarks “API KEY REQUIRED”). */
 const STREET_TILES = {
-  url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
   attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
 };
 
 const OVERVIEW_MAX_ZOOM = 12.2;

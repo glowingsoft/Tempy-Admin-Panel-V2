@@ -167,7 +167,15 @@ export const gocardlessApi = createApi({
     }),
 
     getAdminPayouts: builder.query({
-      query: () => ({ url: API_ROUTES.ADMIN_PAYOUTS, method: 'GET' }),
+      query: ({ page = 1, limit = 10, status = '' } = {}) => {
+        const params = { page, limit };
+        if (status && status !== 'all') params.status = status;
+        return {
+          url: API_ROUTES.ADMIN_PAYOUTS,
+          method: 'GET',
+          params,
+        };
+      },
       transformResponse: (response) => extractAdminPayouts(response),
       providesTags: [{ type: 'AdminPayout', id: 'LIST' }],
     }),
@@ -184,14 +192,15 @@ export const gocardlessApi = createApi({
       invalidatesTags: [{ type: 'AdminPayout', id: 'LIST' }],
     }),
 
+    /** POST /admin/gocardless/payouts/settle — { supplierId, reference } */
     recordAdminPayout: builder.mutation({
       query: ({ supplierId, bookingIds, reference }) => ({
         url: API_ROUTES.ADMIN_PAYOUTS_SETTLE,
         method: 'POST',
         body: {
           supplierId,
-          ...(Array.isArray(bookingIds) && bookingIds.length ? { bookingIds } : {}),
           ...(reference ? { reference } : {}),
+          ...(Array.isArray(bookingIds) && bookingIds.length ? { bookingIds } : {}),
         },
       }),
       invalidatesTags: [{ type: 'AdminPayout', id: 'LIST' }],
