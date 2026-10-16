@@ -2,7 +2,12 @@ import { format, isValid, parseISO } from 'date-fns';
 
 import { fToNow } from 'src/utils/format-time';
 import { formatShiftRowLabel } from 'src/components/jobs/job-date-filters';
-import { parseCoordinates, readApiLate, readApiLong } from 'src/sections/branches/geo-coordinates';
+import {
+  normalizeLatLng,
+  parseCoordinates,
+  readApiLate,
+  readApiLong,
+} from 'src/sections/branches/geo-coordinates';
 import { pickStoredMediaValue } from 'src/store/Reducer/upload-api';
 
 export const SUPPLIER_JOB_STATUS_TABS = [
@@ -105,20 +110,24 @@ export function extractLatLng(source, { allowZero = true } = {}) {
     Boolean
   );
 
+  // Pass 1: GeoJSON coordinates — more reliable than named lat/lng (often swapped in older rows).
+  for (const node of candidates) {
+    const parsed = parseCoordinates(node.coordinates);
+    if (!parsed) continue;
+    if (!allowZero && parsed.latitude === 0 && parsed.longitude === 0) continue;
+    return { latitude: parsed.latitude, longitude: parsed.longitude };
+  }
+
+  // Pass 2: named latitude / longitude (normalized for common swaps).
   for (const node of candidates) {
     const latDirect = pickNumber(readApiLate(node));
     const lngDirect = pickNumber(readApiLong(node));
+    if (latDirect == null || lngDirect == null) continue;
 
-    if (latDirect != null && lngDirect != null) {
-      if (!allowZero && latDirect === 0 && lngDirect === 0) continue;
-      return { latitude: latDirect, longitude: lngDirect };
-    }
-
-    const parsed = parseCoordinates(node.coordinates);
-    if (parsed) {
-      if (!allowZero && parsed.latitude === 0 && parsed.longitude === 0) continue;
-      return { latitude: parsed.latitude, longitude: parsed.longitude };
-    }
+    const normalized = normalizeLatLng(latDirect, lngDirect);
+    if (!normalized) continue;
+    if (!allowZero && normalized.latitude === 0 && normalized.longitude === 0) continue;
+    return normalized;
   }
 
   return null;

@@ -192,8 +192,6 @@ const AgencyStaffFormSchema = zod
     certifications: zod.array(zod.any()).default([]),
   })
   .superRefine((data, ctx) => {
-    // Existing pick / Edit: agency fields only (branch, specialty, rates, status).
-    // Do not require phone/tax/address again — status-only updates must succeed (QA).
     if (data.staffMode === 'existing' || data.staffMode === 'edit') {
       const phone = asTrimmedString(data.phoneNumber);
       if (phone && !isValidFlexiblePhone(phone)) {
@@ -232,7 +230,6 @@ const AgencyStaffFormSchema = zod
         path: ['phoneNumber'],
       });
     }
-    // Password only when creating a brand-new staff login
     if (data.staffMode === 'new') {
       if (!password) {
         ctx.addIssue({ code: 'custom', message: 'Required', path: ['password'] });
@@ -383,10 +380,8 @@ export function AgencyStaffFormDialog({
     return `${branchOptions.length} location${branchOptions.length === 1 ? '' : 's'} available`;
   }, [branchOptions.length, branchesError, fetchingBranches, loadingBranches]);
 
-  // Show full nurses list from API (do not hide by existing agency emails)
   const availableRegisteredStaff = useMemo(() => nursesData?.data || [], [nursesData?.data]);
 
-  // Edit uses list row from GET /web/agency/staff (`_id`) — no GET-by-id (returns Staff not found).
   const editStaff = useMemo(() => {
     if (!isEdit || !currentStaff) return null;
     return currentStaff;
@@ -495,7 +490,6 @@ export function AgencyStaffFormDialog({
     const branch = branchOptions.find((item) => String(item.id) === String(selectedBranchId));
     if (!branch) return;
 
-    // Same as Add: picking Location fills map coords / address bits from that branch.
     applyBranchLocationToForm(setValue, branch, {
       fillAddress: !sanitizeAddressLabel(getValues('fullAddress')),
     });
@@ -641,8 +635,6 @@ export function AgencyStaffFormDialog({
 
       let formData = data;
 
-      // New staff only: map search must resolve coordinates.
-      // Edit / existing-staff add use the Location dropdown (branch), same as Add.
       if (!isEdit && !isExistingMode && !isRegistryLocked) {
         const hasCoords = await ensureFormAddressCoordinates(getValues, setValue, {
           addressField: 'locationSearch',
@@ -680,7 +672,6 @@ export function AgencyStaffFormDialog({
           longitude: formData.longitude ?? editStaff?.longitude ?? 0,
           latitude: formData.latitude ?? editStaff?.latitude ?? 0,
           taxNumber: formData.taxNumber || editStaff?.taxNumber || '',
-          // Keep previously saved docs + any newly uploaded files
           governmentId: [
             ...(editStaff?.documents?.governmentId ||
               currentStaff?.documents?.governmentId ||
@@ -708,7 +699,6 @@ export function AgencyStaffFormDialog({
         await onSubmit?.(payload, { formData, staffMode: formData.staffMode, isEdit });
         onClose?.();
       } catch {
-        // Parent shows toast; keep dialog open
       }
     },
     (formErrors) => {
@@ -975,14 +965,12 @@ export function AgencyStaffFormDialog({
                         inputProps={{ autoComplete: 'street-address' }}
                         sx={{ gridColumn: '1 / -1' }}
                       />
-                      {/* Map search only when creating a brand-new staff login.
-                          Edit / existing use the Location * dropdown above (same as Add). */}
                       {!isEdit && !isRegistryLocked ? (
                         <Box sx={{ gridColumn: '1 / -1' }}>
                           <Field.StandaloneAddress
                             name="locationSearch"
                             label="Map location"
-                            helperText="Search map location for latitude & longitude"
+                            helperText="Search a place or tap Detect GPS for latitude & longitude"
                           />
                         </Box>
                       ) : null}

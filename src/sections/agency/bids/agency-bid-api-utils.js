@@ -410,15 +410,10 @@ export function canEditAgencyBid(bid) {
   return normalizeAgencyBidStatus(bid.status) === 'pending';
 }
 
-/**
- * PUT /bids/:id { status: 'withdraw' } is allowed on a pending bid, or on an accepted bid
- * nobody is booked on yet (the backend then reopens the shift).
- */
+/** Withdraw is only shown/allowed while the bid is still pending. */
 export function canWithdrawAgencyBid(bid) {
   if (!bid) return false;
-  const status = normalizeAgencyBidStatus(bid.status);
-  if (status === 'pending') return true;
-  return status === 'accepted' && !String(bid.bookingId || '').trim();
+  return normalizeAgencyBidStatus(bid.status) === 'pending';
 }
 
 /** Accepted bid that can be used for POST /booking { bid, worker }. */

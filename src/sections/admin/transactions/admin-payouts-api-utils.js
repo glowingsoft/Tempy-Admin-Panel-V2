@@ -24,6 +24,19 @@ function personName(value) {
   return asText(source.companyName || source.name || source.fullName) || asText(value);
 }
 
+function formatWhen(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return asText(value);
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function mapAdminPayout(item = {}) {
   const payment = asObject(item.payment);
   const supplier = asObject(item.supplier || item.employer || item.worker || item.user || item.payee);
@@ -49,6 +62,12 @@ export function mapAdminPayout(item = {}) {
       ? toNumber(item.totalOwed)
       : toNumber(payment.totalAmount ?? item.totalAmount ?? payment.amount ?? item.amount);
 
+  const payoutReferences = Array.isArray(item.payoutReferences)
+    ? item.payoutReferences.map((ref) => asText(ref)).filter(Boolean)
+    : asText(item.payoutReference)
+      ? [asText(item.payoutReference)]
+      : [];
+
   return {
     supplierId,
     name: asText(item.name) || personName(item.supplierName || supplier) || 'Supplier',
@@ -61,14 +80,12 @@ export function mapAdminPayout(item = {}) {
     bookingCount: Number.isFinite(Number(item.bookingCount)) ? Number(item.bookingCount) : bookingIds.length,
     bookingIds,
     payoutStatus: asText(item.payoutStatus || payment.payoutStatus).toLowerCase(),
+    lastPaidAt: formatWhen(item.lastPaidAt || item.paidAt || payment.paidAt),
+    payoutReferences,
   };
 }
 
-function isOwed(row) {
-  return !row.payoutStatus || row.payoutStatus === 'owed';
-}
-
-export function extractAdminPayouts(response) {
+function extractRows(response) {
   const data = response?.data;
   const candidates = [
     data,
@@ -80,26 +97,48 @@ export function extractAdminPayouts(response) {
     response?.payouts,
     response?.results,
   ];
-  const rows = (candidates.find(Array.isArray) || [])
-    .map(mapAdminPayout)
-    .filter((row) => row.supplierId && isOwed(row));
+  return candidates.find(Array.isArray) || [];
+}
 
-  const grouped = new Map();
-  rows.forEach((row) => {
-    const existing = grouped.get(row.supplierId);
-    if (!existing) {
-      grouped.set(row.supplierId, { ...row, bookingIds: [...row.bookingIds] });
-      return;
-    }
-    existing.bookingIds = [...new Set([...existing.bookingIds, ...row.bookingIds])];
-    existing.totalOwed = Math.round((existing.totalOwed + row.totalOwed) * 100) / 100;
-    existing.bookingCount = existing.bookingIds.length || existing.bookingCount + row.bookingCount;
-    if (!existing.accountHolderName) existing.accountHolderName = row.accountHolderName;
-    if (!existing.sortCode) existing.sortCode = row.sortCode;
-    if (!existing.accountNumber) existing.accountNumber = row.accountNumber;
-    existing.bankDetailsMissing = !existing.sortCode && !existing.accountNumber;
-    if (existing.name === 'Supplier' && row.name !== 'Supplier') existing.name = row.name;
-  });
+function readCountBucket(counts, key) {
+  const bucket = asObject(asObject(counts)[key]);
+  return {
+    suppliers: toNumber(bucket.suppliers ?? bucket.count ?? bucket.total),
+    bookings: toNumber(bucket.bookings),
+  };
+}
 
-  return [...grouped.values()].sort((a, b) => b.totalOwed - a.totalOwed);
+/**
+ * Map GET /admin/gocardless/payouts (?status=&page=&limit=).
+ * Returns rows + pagination meta + status counts from `meta.counts`.
+ */
+export function extractAdminPayouts(response) {
+  const data = asObject(response?.data);
+  const metaSource = asObject(response?.meta ?? data.meta);
+  const rows = extractRows(response).map(mapAdminPayout).filter((row) => row.supplierId);
+
+  const countsSource = asObject(metaSource.counts || data.counts || response?.counts);
+  const owed = readCountBucket(countsSource, 'owed');
+  const paid = readCountBucket(countsSource, 'paid');
+
+  const totalRecords = toNumber(
+    metaSource.totalRecords ?? metaSource.total ?? metaSource.totalCount ?? data.totalRecords
+  );
+
+  return {
+    rows,
+    meta: {
+      page: toNumber(metaSource.currentPage || metaSource.page) || 1,
+      totalPages: toNumber(metaSource.totalPages) || 1,
+      totalRecords,
+      limit: toNumber(metaSource.limit) || rows.length || 10,
+      hasTotal: Number.isFinite(Number(metaSource.totalRecords ?? metaSource.total ?? metaSource.totalCount)),
+    },
+    counts: {
+      owed,
+      paid,
+      allSuppliers: owed.suppliers + paid.suppliers,
+      allBookings: owed.bookings + paid.bookings,
+    },
+  };
 }

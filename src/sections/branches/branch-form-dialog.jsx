@@ -103,7 +103,6 @@ function getCoords(branch) {
   return { longitude: 0, latitude: 0 };
 }
 
-/** Backend accepts active | pending | inactive | deleted, and defaults to pending. */
 export function resolveBranchStatus(status, fallback = BRANCH_STATUS.PENDING) {
   const raw = String(status || '').trim().toLowerCase();
   if (raw === 'delete') return BRANCH_STATUS.DELETED;
@@ -138,7 +137,6 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
     },
     status: resolveBranchStatus(data.status),
     ...buildBranchProfilePayload(data),
-    // Required only when the caller is an admin creating a branch for another user.
     ...(callerUserId ? { userId: callerUserId } : {}),
   };
 }
@@ -257,7 +255,6 @@ export function BranchFormDialog({
     reset(defaultValues);
     setIsSubmitting(false);
     setActiveStep(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when dialog opens / branch changes
   }, [open, currentBranch?.id, currentBranch?._id, reset]);
 
   const saveForm = useCallback(async () => {
@@ -268,7 +265,6 @@ export function BranchFormDialog({
         await onSubmit?.(nextData);
         onClose?.();
       } catch {
-        // Parent shows toast
       } finally {
         setIsSubmitting(false);
       }
@@ -311,7 +307,7 @@ export function BranchFormDialog({
       if (!hasCoords) {
         setError('fullAddress', {
           type: 'manual',
-          message: 'Pick a location from the suggestions',
+          message: 'Pick a suggestion or tap Detect GPS',
         });
         return;
       }
@@ -391,7 +387,10 @@ export function BranchFormDialog({
                 size="small"
                 labelPlacement="outlined"
                 error={Boolean(errors.fullAddress)}
-                helperText={errors.fullAddress?.message || 'Type an address — suggestions appear below'}
+                helperText={
+                  errors.fullAddress?.message ||
+                  'Search an address or tap Detect GPS latitude and longitude are set automatically'
+                }
               />
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

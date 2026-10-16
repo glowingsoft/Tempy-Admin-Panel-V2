@@ -180,7 +180,8 @@ export function AgencyBidsView({ mode = 'agency' }) {
     () => ({
       page: 0,
       limit: 100,
-      status: filters.state.status === 'all' ? '' : filters.state.status,
+      // Always load all statuses — filter client-side so dropdown counts stay stable.
+      status: '',
       ...(currentUserId
         ? {
           userId: currentUserId,
@@ -189,7 +190,7 @@ export function AgencyBidsView({ mode = 'agency' }) {
         }
         : {}),
     }),
-    [filters.state.status, currentUserId, isImpersonating, isStaffMember]
+    [currentUserId, isImpersonating, isStaffMember]
   );
 
   const agencyBidsQuery = useGetAgencyBidsQuery(bidsQueryArgs, {
@@ -665,9 +666,6 @@ export function AgencyBidsView({ mode = 'agency' }) {
           <>
             Are you sure you want to withdraw your bid for <strong>{bidToWithdraw?.jobTitle}</strong>{' '}
             at <strong>{bidToWithdraw?.careHome}</strong>?
-            {normalizeAgencyBidStatus(bidToWithdraw?.status) === 'accepted'
-              ? ' The shift will reopen for other bidders.'
-              : ''}
           </>
         }
         action={

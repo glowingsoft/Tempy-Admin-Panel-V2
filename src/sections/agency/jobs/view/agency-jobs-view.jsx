@@ -916,7 +916,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return applyJobDistances([...incoming, ...apiJobs], userOrigin);
   }, [isStaffMember, jobsResponse?.data, userOrigin, directRequests]);
 
-  // Full-page loader only on first load. Socket/background refetch keeps the list visible.
   const listLoading = jobsLoading;
 
   const jobsRootPath = isStaffMember
@@ -1782,8 +1781,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     () =>
       isSupplierJobs && tabs.value === 'active'
         ? [...new Set(tabJobs.map((job) => String(job?.id || '').trim()).filter(Boolean))]
-            .sort()
-            .join(',')
+          .sort()
+          .join(',')
         : '',
     [isSupplierJobs, tabJobs, tabs.value]
   );
@@ -1927,12 +1926,15 @@ export function AgencyJobsView({ mode = 'agency' }) {
         } catch {
         }
       } catch (error) {
-        const message =
+        const raw =
           error?.data?.message ||
           error?.data?.error?.message ||
           (typeof error?.data === 'string' ? error.data : null) ||
           error?.message ||
           'Check-in failed. Please try again.';
+        const message = /outside allowed radius/i.test(String(raw))
+          ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Detect GPS again.'
+          : raw;
         const blockingId = String(error?.data?.data?.bookingId || '').trim();
         if (blockingId) {
           setBlockingBookingId(blockingId);

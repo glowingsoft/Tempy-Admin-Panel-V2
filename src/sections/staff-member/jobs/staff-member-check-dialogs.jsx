@@ -15,6 +15,7 @@ import { alpha } from '@mui/material/styles';
 
 import { StandaloneAddressInput } from 'src/sections/tempy-home/standalone-address-input';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
 import { resolveCurrentLocation } from './staff-member-location';
@@ -131,26 +132,62 @@ export function SignaturePad({ onChange, height = 240 }) {
   );
 }
 
-function LocationField({ value, onChange, onPlaceSelect, loading, onDetect }) {
+function LocationField({
+  value,
+  onChange,
+  onPlaceSelect,
+  loading,
+  onDetect,
+  gpsOnly = false,
+  error = '',
+}) {
   return (
     <Box>
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
         Current Location
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-        Enter your location, or detect via GPS.
+        {gpsOnly
+          ? 'Check-in uses your live GPS location (not a selected job or map place).'
+          : 'Enter your location, or detect via GPS.'}
       </Typography>
-      <StandaloneAddressInput
-        value={value}
-        onChange={onChange}
-        onPlaceSelect={onPlaceSelect}
-        label=""
-        size="small"
-        placeholder="Enter current location address…"
-        sx={{
-          '& .MuiInputAdornment-root': { alignSelf: 'center', mt: 0 },
-        }}
-      />
+      {gpsOnly ? (
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1.25,
+            borderRadius: 1.5,
+            border: (theme) =>
+              `1px solid ${error ? theme.palette.error.main : theme.palette.divider}`,
+            bgcolor: 'background.neutral',
+            minHeight: 48,
+          }}
+        >
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {loading
+              ? 'Detecting GPS…'
+              : value?.trim() || 'GPS location not available yet'}
+          </Typography>
+        </Box>
+      ) : (
+        <StandaloneAddressInput
+          value={value}
+          onChange={onChange}
+          onPlaceSelect={onPlaceSelect}
+          label=""
+          size="small"
+          showDetectGps={false}
+          placeholder="Enter current location address…"
+          sx={{
+            '& .MuiInputAdornment-root': { alignSelf: 'center', mt: 0 },
+          }}
+        />
+      )}
+      {error ? (
+        <Alert severity="warning" sx={{ mt: 1 }}>
+          {error}
+        </Alert>
+      ) : null}
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
         <LoadingButton
           size="small"
@@ -177,29 +214,45 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [locationError, setLocationError] = useState('');
   const fileInputRef = useRef(null);
 
-  const detectLocation = useCallback(async () => {
-    setLocating(true);
-    const next = await resolveCurrentLocation(job?.address || '');
-    if (next?.label) {
-      setLocationLabel(next.label);
-      setLocationMeta(next);
-    }
-    setLocating(false);
-  }, [job?.address]);
+  const detectLocation = useCallback(
+    async ({ notify = false } = {}) => {
+      setLocating(true);
+      setLocationError('');
+      const next = await resolveCurrentLocation(isCheckout ? job?.address || '' : '');
+      setLocationLabel(next?.label || 'Location unavailable');
+      setLocationMeta(next || null);
+
+      const failed =
+        !Number.isFinite(Number(next?.lat)) || !Number.isFinite(Number(next?.lng));
+      if (failed) {
+        const message =
+          next?.error ||
+          'Unable to read GPS. Allow location for this site, then tap Detect GPS again.';
+        setLocationError(message);
+        if (notify) toast.error(message);
+      }
+
+      setLocating(false);
+      return next;
+    },
+    [isCheckout, job?.address]
+  );
 
   useEffect(() => {
     if (!open) return undefined;
     setPhotoPreview(null);
     setPhotoFileName('');
     setSignatureDataUrl(null);
-    setLocationLabel(job?.address || '');
+    setLocationLabel(isCheckout ? job?.address || '' : '');
     setLocationMeta(null);
     setSubmitError('');
-    detectLocation();
+    setLocationError('');
+    detectLocation({ notify: false });
     return undefined;
-  }, [open, job?.address, detectLocation, mode]);
+  }, [open, job?.address, detectLocation, mode, isCheckout]);
 
   const handlePhotoChange = (event) => {
     const file = event.target.files?.[0];
@@ -215,26 +268,55 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
   };
 
   const trimmedLocation = locationLabel.trim();
+  const hasGpsCoords =
+    Number.isFinite(Number(locationMeta?.lat)) && Number.isFinite(Number(locationMeta?.lng));
   const hasProof = Boolean(photoPreview) && Boolean(signatureDataUrl);
-  const canSubmit = (isCheckout || hasProof) && Boolean(trimmedLocation) && !locating;
+  const canSubmit =
+    (isCheckout || hasProof) &&
+    Boolean(trimmedLocation) &&
+    !locating &&
+    (isCheckout || hasGpsCoords);
 
   const handleConfirm = async () => {
     if (!canSubmit || !job) return;
     setSubmitting(true);
     setSubmitError('');
     try {
-      await onConfirm?.({
-        job,
-        photoDataUrl: photoPreview,
-        photoFileName,
-        signatureDataUrl,
-        location: {
+      let locationPayload;
+
+      if (isCheckout) {
+        locationPayload = {
           label: trimmedLocation,
           lat: locationMeta?.lat ?? job?.latitude ?? null,
           lng: locationMeta?.lng ?? job?.longitude ?? null,
           capturedAt: new Date().toISOString(),
           source: locationMeta?.source || 'manual',
-        },
+        };
+      } else {
+        const fresh = await detectLocation({ notify: false });
+        const lat = Number(fresh?.lat);
+        const lng = Number(fresh?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new Error(
+            fresh?.error ||
+            'Current GPS location is required for check-in. Please enable location access and try again.'
+          );
+        }
+        locationPayload = {
+          label: String(fresh.label || '').trim() || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          lat,
+          lng,
+          capturedAt: fresh.capturedAt || new Date().toISOString(),
+          source: fresh.source || 'gps',
+        };
+      }
+
+      await onConfirm?.({
+        job,
+        photoDataUrl: photoPreview,
+        photoFileName,
+        signatureDataUrl,
+        location: locationPayload,
       });
     } catch (error) {
       setSubmitError(
@@ -343,7 +425,9 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
           </Box>
 
           <LocationField
+            gpsOnly={!isCheckout}
             value={locationLabel}
+            error={locationError}
             onChange={(next) => {
               setLocationLabel(next);
               setLocationMeta((current) =>
@@ -353,6 +437,7 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
               );
             }}
             onPlaceSelect={(place) => {
+              if (!isCheckout) return;
               const label = place?.label || '';
               setLocationLabel(label);
               setLocationMeta({
@@ -364,7 +449,7 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
               });
             }}
             loading={locating}
-            onDetect={detectLocation}
+            onDetect={() => detectLocation({ notify: true })}
           />
         </Stack>
       </DialogContent>
@@ -387,9 +472,7 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
   );
 }
 
-// ----------------------------------------------------------------------
 
-/** @deprecated Use StaffMemberCheckInDialog with mode="checkout" */
 export function StaffMemberCheckOutDialog({ open, job, onClose, onConfirm }) {
   return (
     <StaffMemberCheckInDialog

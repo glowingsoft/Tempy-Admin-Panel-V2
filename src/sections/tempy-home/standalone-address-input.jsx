@@ -2,6 +2,7 @@ import { debounce } from 'lodash';
 import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import Paper from '@mui/material/Paper';
 import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
@@ -10,12 +11,15 @@ import Typography from '@mui/material/Typography';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import CircularProgress from '@mui/material/CircularProgress';
 import InputAdornment from '@mui/material/InputAdornment';
+import { LoadingButton } from '@mui/lab';
 
 import { CONFIG } from 'src/config-global';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
-// ----------------------------------------------------------------------
+import { detectGpsPlace } from './detect-gps-place';
+
 
 const GOOGLE_MAPS_API_KEY =
   import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
@@ -96,7 +100,6 @@ const CITY_BIAS = {
   sahiwal: { latitude: 30.6682, longitude: 73.1114 },
 };
 
-/** Longer names first so "rawalpindi" wins over shorter overlaps. */
 const CITY_BIAS_KEYS = Object.keys(CITY_BIAS).sort((a, b) => b.length - a.length);
 
 function toTitleCase(value) {
@@ -112,7 +115,6 @@ function extractQueryCity(query) {
   return CITY_BIAS_KEYS.find((city) => text.includes(city)) || '';
 }
 
-/** Pull a known city name from an address label when providers omit `city`. */
 export function deriveCityFromLabel(label) {
   const key = extractQueryCity(label);
   if (key) return toTitleCase(key);
@@ -164,7 +166,6 @@ function fetchGoogleJsPredictions(input, service, sessionToken) {
     const request = {
       input,
       sessionToken,
-      // Always prefer Pakistan results so IP-near Lahore does not override other cities.
       componentRestrictions: { country: 'pk' },
     };
     if (queryCity && CITY_BIAS[queryCity] && window.google?.maps?.LatLng) {
@@ -221,7 +222,6 @@ export async function fetchPhotonSuggestions(input) {
     limit: '8',
     lang: 'en',
   };
-  // Bias Photon toward the typed city (or Pakistan) so results don't snap to Lahore by IP/popularity.
   if (bias) {
     params.lat = String(bias.latitude);
     params.lon = String(bias.longitude);
@@ -351,7 +351,6 @@ export async function geocodeAddress(query) {
     console.warn('Nominatim geocode failed', error);
   }
 
-  // Last resort for known cities so we never fall back to a wrong hub city.
   if (queryCity && CITY_BIAS[queryCity]) {
     return {
       label: text,
@@ -377,21 +376,21 @@ function withTimeout(promise, ms) {
 async function searchLocations(input, apiKey, serviceRef, sessionTokenRef) {
   const googlePromise = apiKey
     ? withTimeout(
-        (async () => {
-          const google = await loadGoogleMaps(apiKey);
-          if (!serviceRef.current) {
-            serviceRef.current = new google.maps.places.AutocompleteService();
-          }
-          if (!sessionTokenRef.current) {
-            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-          }
-          return fetchGoogleJsPredictions(input, serviceRef.current, sessionTokenRef.current);
-        })(),
-        3000
-      ).catch((error) => {
-        console.warn('Google Autocomplete failed', error);
-        return [];
-      })
+      (async () => {
+        const google = await loadGoogleMaps(apiKey);
+        if (!serviceRef.current) {
+          serviceRef.current = new google.maps.places.AutocompleteService();
+        }
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+        }
+        return fetchGoogleJsPredictions(input, serviceRef.current, sessionTokenRef.current);
+      })(),
+      3000
+    ).catch((error) => {
+      console.warn('Google Autocomplete failed', error);
+      return [];
+    })
     : Promise.resolve([]);
 
   const photonPromise = withTimeout(fetchPhotonSuggestions(input), 2500).catch((error) => {
@@ -440,12 +439,14 @@ export function StandaloneAddressInput({
   labelPlacement = 'above',
   error,
   helperText,
+  showDetectGps = true,
   sx,
   ...other
 }) {
   const googleApiKey = GOOGLE_MAPS_API_KEY;
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [detectingGps, setDetectingGps] = useState(false);
   const [open, setOpen] = useState(false);
   const inputRef = useRef(null);
   const listRef = useRef(null);
@@ -536,7 +537,6 @@ export function StandaloneAddressInput({
           !String(geocodedCity).toLowerCase().includes(String(selectedCity).toLowerCase()) &&
           !String(selectedCity).toLowerCase().includes(String(geocodedCity).toLowerCase());
 
-        // If geocode snapped to another city (often Lahore), keep label/city and use known city coords.
         if (cityMismatch) {
           const biasKey = extractQueryCity(selectedCity);
           const bias = biasKey ? CITY_BIAS[biasKey] : null;
@@ -576,6 +576,21 @@ export function StandaloneAddressInput({
     onChange(option.label);
     const resolved = await resolvePlaceWithCoords(option);
     emitPlace(resolved);
+  };
+
+  const handleDetectGps = async () => {
+    setDetectingGps(true);
+    setOpen(false);
+    try {
+      const place = await detectGpsPlace();
+      if (!Number.isFinite(Number(place.latitude)) || !Number.isFinite(Number(place.longitude))) {
+        toast.error(place.error || 'Unable to read GPS. Please allow location access and try again.');
+        return;
+      }
+      emitPlace(place);
+    } finally {
+      setDetectingGps(false);
+    }
   };
 
   const showList = open && (loading || options.length > 0);
@@ -628,7 +643,7 @@ export function StandaloneAddressInput({
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                {loading ? <CircularProgress color="inherit" size={16} /> : null}
+                {loading || detectingGps ? <CircularProgress color="inherit" size={16} /> : null}
                 <Iconify icon="solar:map-point-bold" width={18} sx={{ color: 'text.disabled' }} />
               </InputAdornment>
             ),
@@ -636,6 +651,20 @@ export function StandaloneAddressInput({
           inputProps={{ autoComplete: 'off' }}
           {...other}
         />
+
+        {showDetectGps ? (
+          <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
+            <LoadingButton
+              size="small"
+              color="inherit"
+              loading={detectingGps}
+              startIcon={<Iconify icon="solar:routing-2-bold" width={16} />}
+              onClick={handleDetectGps}
+            >
+              Detect GPS
+            </LoadingButton>
+          </Stack>
+        ) : null}
 
         <Popper
           open={showList}

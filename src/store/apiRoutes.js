@@ -123,9 +123,10 @@ export const API_ROUTES = {
   GOCARDLESS_MANDATE: '/gocardless/mandate',
   ADMIN_TRANSACTIONS: '/admin/transactions',
   ADMIN_TRANSACTION_BY_ID: (id) => `/admin/transactions/${id}`,
+  ADMIN_TRANSACTION_INVOICE: (id) => `/admin/transactions/${id}/invoice`,
   ADMIN_TRANSACTION_PLATFORM_FEE: '/admin/transactions/platform-fee',
   ADMIN_PAYOUTS: '/admin/gocardless/payouts',
-  ADMIN_PAYOUTS_SETTLE: '/admin/payouts/settle',
+  ADMIN_PAYOUTS_SETTLE: '/admin/gocardless/payouts/settle',
   ADMIN_BOOKING_REFUND: (bookingId) => `/admin/gocardless/bookings/${bookingId}/refund`,
 
   AGENCY_BRANCHES: '/web/agency/branches',

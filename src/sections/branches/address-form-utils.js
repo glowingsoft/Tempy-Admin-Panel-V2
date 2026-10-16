@@ -2,7 +2,6 @@ import { deriveCityFromLabel, geocodeAddress } from 'src/sections/tempy-home/sta
 
 import { isValidLngLat } from './geo-coordinates';
 
-// ----------------------------------------------------------------------
 
 export function applyAddressPlaceToForm(
   setValue,
@@ -25,7 +24,6 @@ export function applyAddressPlaceToForm(
     setValue('longitude', lng, { shouldDirty: true });
   }
 
-  // Always overwrite — do not keep a previous city (e.g. Lahore) when picking Sialkot.
   const city =
     String(place.city || '').trim() || deriveCityFromLabel(place.label || place.secondaryText || '');
   setValue('city', city, { shouldDirty: true, shouldValidate: true });
@@ -60,6 +58,6 @@ export async function ensureFormAddressCoordinates(
 }
 
 export const ADDRESS_COORDINATES_HELPER =
-  'Search and pick a place on the map — latitude and longitude are set automatically.';
+  'Search a place or tap Detect GPS — latitude and longitude are set automatically.';
 
 export const FULL_ADDRESS_HELPER = 'Street address for records (separate from map location).';

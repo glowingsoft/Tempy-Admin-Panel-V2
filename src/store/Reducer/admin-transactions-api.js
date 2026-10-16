@@ -4,6 +4,7 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
 import { API_ROUTES } from '../apiRoutes';
+import { fileResponseHandler } from '../file-response';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
 function toNumber(value) {
@@ -185,7 +186,23 @@ export const adminTransactionsApi = createApi({
       }),
       invalidatesTags: [{ type: 'AdminPlatformFee', id: 'CURRENT' }],
     }),
+
+    /** GET /admin/transactions/:id/invoice — PDF / HTML invoice download. */
+    downloadAdminTransactionInvoice: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.ADMIN_TRANSACTION_INVOICE(id),
+        method: 'GET',
+        responseHandler: fileResponseHandler,
+        cache: 'no-store',
+      }),
+    }),
   }),
 });
 
-export const { useGetAdminTransactionsQuery, useGetAdminTransactionByIdQuery, useGetAdminPlatformFeeQuery, useUpdateAdminPlatformFeeMutation } = adminTransactionsApi;
+export const {
+  useGetAdminTransactionsQuery,
+  useGetAdminTransactionByIdQuery,
+  useGetAdminPlatformFeeQuery,
+  useUpdateAdminPlatformFeeMutation,
+  useDownloadAdminTransactionInvoiceMutation,
+} = adminTransactionsApi;
