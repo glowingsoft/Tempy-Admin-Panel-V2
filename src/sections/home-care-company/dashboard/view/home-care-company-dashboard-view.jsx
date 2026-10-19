@@ -16,10 +16,13 @@ import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
 import { DashboardQuickAccess } from 'src/sections/dashboard/dashboard-quick-access';
 import { DashboardActivityList } from 'src/sections/dashboard/dashboard-activity-list';
+import { DashboardBranchesActivity } from 'src/sections/dashboard/dashboard-branches-activity';
 import { DashboardEarningsChart } from 'src/sections/dashboard/dashboard-earnings-chart';
 import { DashboardOverviewChart } from 'src/sections/dashboard/dashboard-overview-chart';
 import { DashboardOverviewHeader } from 'src/sections/dashboard/dashboard-overview-header';
+import { DashboardShiftsEarnings } from 'src/sections/dashboard/dashboard-shifts-earnings';
 import { DashboardStatusBreakdown } from 'src/sections/dashboard/dashboard-status-breakdown';
+import { DashboardWinRateByRegion } from 'src/sections/dashboard/dashboard-win-rate-by-region';
 import {
   DASHBOARD_LINK_MAPS,
   withDashboardLinks,
@@ -45,6 +48,13 @@ const MODULES = [
     href: ROOT.staff,
   },
   {
+    title: 'Locations',
+    description: 'Sites · Branches',
+    icon: 'solar:map-point-bold-duotone',
+    color: 'success',
+    href: ROOT.branches,
+  },
+  {
     title: 'Jobs',
     description: 'Find · Apply',
     icon: 'solar:case-round-bold-duotone',
@@ -66,6 +76,10 @@ const EMPTY_DASHBOARD = {
   chart: { categories: [], series: [] },
   breakdowns: [],
   recentActivity: [],
+  branchesActivity: [],
+  openJobs: [],
+  winRateByRegion: [],
+  shiftsAndEarnings: [],
   moduleValues: {},
 };
 
@@ -141,6 +155,29 @@ export function HomeCareCompanyDashboardView() {
               title="Recent activity"
               items={dashboard.recentActivity}
             />
+          </Grid>
+
+          <Grid xs={12} lg={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardActivityList
+              title="Open jobs"
+              items={dashboard.openJobs || []}
+            />
+          </Grid>
+
+          <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardWinRateByRegion items={dashboard.winRateByRegion || []} />
+          </Grid>
+
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardBranchesActivity
+              title="Location Activity"
+              items={dashboard.branchesActivity || []}
+              href={ROOT.branches}
+            />
+          </Grid>
+
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardShiftsEarnings items={dashboard.shiftsAndEarnings || []} />
           </Grid>
 
           {dashboard.breakdowns.map((item) => (

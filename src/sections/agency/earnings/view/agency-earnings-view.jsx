@@ -9,6 +9,7 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Menu from '@mui/material/Menu';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Grid from '@mui/material/Unstable_Grid2';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
@@ -18,6 +19,7 @@ import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { fNumber, fCurrency } from 'src/utils/format-number';
 
@@ -100,12 +102,14 @@ export function AgencyEarningsView({ role = 'agency' }) {
   const sessionUser = useSelector((state) => state.user?.user);
   const apiRole = EARNINGS_API_ROLE[resolveDashboardRole(sessionUser)] || role;
 
-  const [periodId, setPeriodId] = useState('week');
+  const [periodId, setPeriodId] = useState('month');
   const [workerFilter, setWorkerFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [periodAnchor, setPeriodAnchor] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const period = PERIOD_OPTIONS.find((item) => item.id === periodId) || PERIOD_OPTIONS[0];
 
@@ -126,7 +130,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
     { ...filterArgs, page: page + 1, limit: rowsPerPage },
     { skip: !userId }
   );
-  const [fetchAllEarnings, { isFetching: isExporting }] = useLazyGetEarningsQuery();
+  const [fetchAllEarnings] = useLazyGetEarningsQuery();
 
   const isSpend = data ? data.type === 'spend' : CUSTOMER_ROLES.includes(apiRole);
   const isNurse = apiRole === 'nurse';
@@ -233,44 +237,83 @@ export function AgencyEarningsView({ role = 'agency' }) {
     setPage(0);
   }, []);
 
+  const moneyCell = (value) => Number(value || 0).toFixed(2);
+
+  const buildReportPayload = (all) => {
+    const reportIsSpend = all?.type === 'spend';
+    const reportSummary = all?.summary || {};
+    const totalBlock = reportSummary.total || {};
+    return {
+      title: labels.title,
+      periodLabel: `${period.label} (${range.from} to ${range.to})`,
+      summaryRows: [
+        [`${labels.total} (£)`, moneyCell(totalBlock.amount)],
+        ...PAYMENT_STATUSES.map((status) => [
+          `${statusLabel(status)} (£)`,
+          moneyCell(reportSummary[status]?.amount),
+        ]),
+        [labels.shifts, totalBlock.bookings ?? 0],
+        ['Hours', totalBlock.hours ?? 0],
+      ],
+      topWorkers: isNurse ? [] : all?.topWorkers || [],
+      columns: [
+        { label: 'Shift ref', value: (row) => row.reference || '—' },
+        { label: 'Date', value: (row) => row.date || '—' },
+        { label: 'Time', value: (row) => row.time || '—' },
+        { label: 'Job', value: (row) => row.jobName || '—' },
+        { label: 'Location', value: (row) => row.location || '—' },
+        { label: 'Address', value: (row) => row.address || '—' },
+        {
+          label: labels.person,
+          value: (row) =>
+            (isNurse ? row.customerName : row.worker?.name) || '—',
+        },
+        { label: 'Hours', value: (row) => row.hours ?? 0 },
+        {
+          label: 'Amount (£)',
+          value: (row) => {
+            if (isNurse && row.creditedToEmployer) return 'Paid to employer';
+            const amount = reportIsSpend
+              ? row.gross || row.amount
+              : row.totalAmount || row.amount;
+            return moneyCell(amount);
+          },
+        },
+        { label: 'Status', value: (row) => statusLabel(row.paymentStatus) },
+      ],
+      rows: Array.isArray(all?.history) ? all.history : [],
+    };
+  };
+
   const handleExport = async () => {
     try {
+      setIsExporting(true);
       const all = await fetchAllEarnings({ ...filterArgs, page: 1, limit: EXPORT_LIMIT }).unwrap();
       exportEarningsReport({
-        title: labels.title,
-        periodLabel: `${period.label} (${range.from} to ${range.to})`,
-        summaryRows: [
-          [`${labels.total} (£)`, all.summary.total.amount.toFixed(2)],
-          ...PAYMENT_STATUSES.map((status) => [
-            `${statusLabel(status)} (£)`,
-            all.summary[status].amount.toFixed(2),
-          ]),
-          [labels.shifts, all.summary.total.bookings],
-          ['Hours', all.summary.total.hours],
-        ],
-        topWorkers: all.topWorkers || [],
-        columns: [
-          { label: 'Shift ref', value: (row) => row.reference },
-          { label: 'Date', value: (row) => row.date },
-          { label: 'Time', value: (row) => row.time },
-          { label: 'Job', value: (row) => row.jobName },
-          { label: 'Location', value: (row) => row.location },
-          { label: 'Address', value: (row) => row.address },
-          { label: labels.person, value: (row) => personOf(row).name },
-          { label: 'Hours', value: (row) => row.hours },
-          { label: 'Amount (£)', value: (row) => row.amount.toFixed(2) },
-          { label: 'Status', value: (row) => statusLabel(row.paymentStatus) },
-        ],
-        rows: all.history,
-        filename: `${labels.title.toLowerCase()}-${range.from}-to-${range.to}.csv`,
+        ...buildReportPayload(all),
+        filename: `${labels.title.toLowerCase().replace(/\s+/g, '-')}-${range.from}-to-${range.to}.csv`,
       });
-      if (all.meta.totalRecords > EXPORT_LIMIT) {
+      if (all.meta?.totalRecords > EXPORT_LIMIT) {
         toast.warning(`Exported the first ${EXPORT_LIMIT} of ${all.meta.totalRecords} shifts`);
       } else {
         toast.success(`${labels.title} report exported`);
       }
     } catch (exportError) {
       toast.error(exportError?.data?.message || 'Could not export the report');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      setIsPrinting(true);
+      const all = await fetchAllEarnings({ ...filterArgs, page: 1, limit: EXPORT_LIMIT }).unwrap();
+      printEarningsReport(buildReportPayload(all));
+    } catch (printError) {
+      toast.error(printError?.data?.message || 'Could not prepare the print report');
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -608,16 +651,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
   );
 
   return (
-    <DashboardContent
-      maxWidth="xl"
-      sx={{
-        '@media print': {
-          '& .MuiDrawer-root, & .MuiAppBar-root, .earnings-no-print': {
-            display: 'none !important',
-          },
-        },
-      }}
-    >
+    <DashboardContent maxWidth="xl">
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         alignItems={{ xs: 'flex-start', sm: 'center' }}
@@ -631,7 +665,7 @@ export function AgencyEarningsView({ role = 'agency' }) {
             {labels.description}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap className="earnings-no-print">
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
           <Chip
             label={period.label}
             color="primary"
@@ -661,21 +695,38 @@ export function AgencyEarningsView({ role = 'agency' }) {
               }}
             />
           )}
-          <Chip
-            label={isExporting ? 'Exporting…' : 'Export report'}
+          <Button
+            size="small"
             variant="outlined"
-            icon={<Iconify icon="solar:export-bold" width={16} />}
+            color="inherit"
+            startIcon={
+              isExporting ? (
+                <CircularProgress color="inherit" size={14} />
+              ) : (
+                <Iconify icon="solar:export-bold" width={16} />
+              )
+            }
             onClick={handleExport}
-            disabled={!data || isExporting}
-            sx={{ cursor: 'pointer' }}
-          />
-          <Chip
-            label="Print"
+            disabled={!data || isExporting || isPrinting}
+          >
+            {isExporting ? 'Exporting…' : 'Export report'}
+          </Button>
+          <Button
+            size="small"
             variant="outlined"
-            icon={<Iconify icon="solar:printer-minimalistic-bold" width={16} />}
-            onClick={printEarningsReport}
-            sx={{ cursor: 'pointer' }}
-          />
+            color="inherit"
+            startIcon={
+              isPrinting ? (
+                <CircularProgress color="inherit" size={14} />
+              ) : (
+                <Iconify icon="solar:printer-minimalistic-bold" width={16} />
+              )
+            }
+            onClick={handlePrint}
+            disabled={!data || isExporting || isPrinting}
+          >
+            {isPrinting ? 'Preparing…' : 'Print'}
+          </Button>
         </Stack>
       </Stack>
 

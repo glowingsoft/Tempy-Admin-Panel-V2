@@ -48,7 +48,6 @@ import {
   useUpdateAdminPlatformFeeMutation,
 } from 'src/store/Reducer/admin-transactions-api';
 
-// ----------------------------------------------------------------------
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -311,7 +310,6 @@ function PlatformFeeCard() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 export function AdminBookingTransactionsView() {
   const [page, setPage] = useState(0);
@@ -409,7 +407,7 @@ export function AdminBookingTransactionsView() {
               label="Status"
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              sx={{ minWidth: { sm: 180 } }}
+              sx={{ width: { xs: 1, sm: 'auto' }, minWidth: { xs: 0, sm: 180 } }}
             >
               {STATUS_OPTIONS.map((option) => {
                 const optionCount = option.value ? statusCounts[option.value] : null;

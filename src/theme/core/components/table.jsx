@@ -3,12 +3,8 @@ import { tableCellClasses } from '@mui/material/TableCell';
 
 import { varAlpha } from '../../styles';
 
-// ----------------------------------------------------------------------
 
 const MuiTableContainer = {
-  /** **************************************
-   * STYLE
-   *************************************** */
   styleOverrides: {
     root: ({ theme }) => ({
       position: 'relative',
@@ -18,23 +14,15 @@ const MuiTableContainer = {
   },
 };
 
-// ----------------------------------------------------------------------
 
 const MuiTable = {
-  /** **************************************
-   * STYLE
-   *************************************** */
   styleOverrides: {
     root: ({ theme }) => ({ '--palette-TableCell-border': theme.vars.palette.divider }),
   },
 };
 
-// ----------------------------------------------------------------------
 
 const MuiTableRow = {
-  /** **************************************
-   * STYLE
-   *************************************** */
   styleOverrides: {
     root: ({ theme }) => ({
       [`&.${tableRowClasses.selected}`]: {
@@ -46,12 +34,8 @@ const MuiTableRow = {
   },
 };
 
-// ----------------------------------------------------------------------
 
 const MuiTableCell = {
-  /** **************************************
-   * STYLE
-   *************************************** */
   styleOverrides: {
     root: { borderBottomStyle: 'dashed' },
     head: ({ theme }) => ({
@@ -68,25 +52,29 @@ const MuiTableCell = {
   },
 };
 
-// ----------------------------------------------------------------------
 
 const MuiTablePagination = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
   defaultProps: {
     backIconButtonProps: { size: 'small' },
     nextIconButtonProps: { size: 'small' },
     slotProps: { select: { name: 'table-pagination-select' } },
   },
 
-  /** **************************************
-   * STYLE
-   *************************************** */
   styleOverrides: {
     root: { width: '100%' },
-    toolbar: { height: 64 },
-    actions: { marginRight: 8 },
+    toolbar: ({ theme }) => ({
+      minHeight: 64,
+      flexWrap: 'wrap',
+      [theme.breakpoints.down('sm')]: {
+        minHeight: 56,
+        justifyContent: 'center',
+        gap: theme.spacing(0.5),
+      },
+    }),
+    actions: ({ theme }) => ({
+      marginRight: 8,
+      [theme.breakpoints.down('sm')]: { marginRight: 0 },
+    }),
     select: ({ theme }) => ({
       paddingLeft: 8,
       '&:focus': { borderRadius: theme.shape.borderRadius },
@@ -99,8 +87,6 @@ const MuiTablePagination = {
     },
   },
 };
-
-// ----------------------------------------------------------------------
 
 export const table = {
   MuiTable,

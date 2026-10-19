@@ -1776,7 +1776,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     });
   }, []);
 
-  // Agency / HCC: load booking attendance so "Not checked in" clears after the worker checks in.
   const activeSupplierJobIdsKey = useMemo(
     () =>
       isSupplierJobs && tabs.value === 'active'
@@ -1825,7 +1824,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
           });
         });
       } catch {
-        // Booking attendance is optional for the label; ignore failures.
       }
     });
 
@@ -2154,13 +2152,13 @@ export function AgencyJobsView({ mode = 'agency' }) {
   return (
     <DashboardContent maxWidth="xl">
       <Stack
-        direction="row"
-        alignItems="center"
+        direction={{ xs: 'column', sm: 'row' }}
+        alignItems={{ xs: 'stretch', sm: 'center' }}
         justifyContent="space-between"
-        spacing={2}
+        spacing={1.5}
         sx={{ mb: 3 }}
       >
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
           <Box
             component={RouterLink}
             href={jobsRootPath}
@@ -2179,8 +2177,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
           value={viewMode}
           onChange={handleViewModeChange}
           sx={{
+            alignSelf: { xs: 'flex-start', sm: 'center' },
             '& .MuiToggleButton-root': {
-              px: 1.25,
+              px: { xs: 1, sm: 1.25 },
               py: 0.75,
               borderColor: 'divider',
               '&.Mui-selected': {
@@ -2645,7 +2644,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
         onClose={() => setSupplierAttendanceJob(null)}
       />
 
-      {/* Check In / Out is staff-only — agency / home care only assign. */}
       {isStaffMember && (
         <>
           <StaffMemberCheckInDialog

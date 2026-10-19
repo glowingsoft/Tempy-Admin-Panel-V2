@@ -18,7 +18,6 @@ import { varAlpha } from 'src/theme/styles';
 
 import { DashboardEmptyState, hasChartValues } from 'src/sections/dashboard/dashboard-empty-state';
 
-// ----------------------------------------------------------------------
 
 function plural(count, word) {
   return `${fNumber(count)} ${word}${count === 1 ? '' : 's'}`;
@@ -28,7 +27,6 @@ function money(value) {
   return fCurrency(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** "2026-09" or "September" → "Sep". */
 function shortMonth(category, month) {
   const source = String(month || category || '').trim();
   const [year, monthIndex] = source.split('-').map(Number);
@@ -125,10 +123,6 @@ function MonthBar({ value, max, label, title, color, track }) {
   );
 }
 
-/**
- * Monthly earnings for supplier dashboards (agency, home care company, staff member).
- * `chart` is the mapped `earningsGraph`: { categories, series: [{ name, data }], total, points }.
- */
 export function DashboardEarningsChart({
   title = 'Earnings',
   subheader = 'Completed shifts over the last 12 months',
@@ -160,6 +154,17 @@ export function DashboardEarningsChart({
 
   const upcoming = chart.upcoming && typeof chart.upcoming === 'object' ? chart.upcoming : null;
   const upcomingValue = upcoming ? upcoming.formatted || money(upcoming.amount) : '';
+  const thisWeek = chart.thisWeek && typeof chart.thisWeek === 'object' ? chart.thisWeek : null;
+  const thisWeekValue = thisWeek ? thisWeek.formatted || money(thisWeek.amount) : '';
+  const totalBlock = chart.totalBlock && typeof chart.totalBlock === 'object' ? chart.totalBlock : null;
+  const thisMonthBlock =
+    chart.thisMonthBlock && typeof chart.thisMonthBlock === 'object' ? chart.thisMonthBlock : null;
+  const showSummaryFromBlocks = !hasData && Boolean(totalBlock || thisMonthBlock);
+  const summaryTileCount =
+    (hasData ? 3 : 0) +
+    (showSummaryFromBlocks ? (totalBlock ? 1 : 0) + (thisMonthBlock ? 1 : 0) : 0) +
+    (upcoming ? 1 : 0) +
+    (thisWeek ? 1 : 0);
 
   const agencyShifts = chart.agencySupplied?.bookings || 0;
   const agencyNote = agencyShifts
@@ -200,7 +205,7 @@ export function DashboardEarningsChart({
         }
       />
 
-      {hasData || upcoming ? (
+      {hasData || upcoming || thisWeek || showSummaryFromBlocks ? (
         <>
           <Box
             sx={{
@@ -210,8 +215,8 @@ export function DashboardEarningsChart({
               gap: 1.5,
               gridTemplateColumns: {
                 xs: '1fr',
-                sm: hasData ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 360px)',
-                lg: `repeat(${hasData ? (upcoming ? 4 : 3) : 1}, minmax(0, 1fr))`,
+                sm: summaryTileCount > 1 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 360px)',
+                lg: `repeat(${Math.min(Math.max(summaryTileCount, 1), 5)}, minmax(0, 1fr))`,
               },
             }}
           >
@@ -243,6 +248,37 @@ export function DashboardEarningsChart({
                   color="warning"
                 />
               </>
+            ) : null}
+            {showSummaryFromBlocks && totalBlock ? (
+              <SummaryTile
+                label="Total earned"
+                value={totalBlock.formatted || money(totalBlock.amount)}
+                hint={shiftHint(totalBlock) || 'All time'}
+                icon="solar:wallet-money-bold"
+                color="primary"
+              />
+            ) : null}
+            {showSummaryFromBlocks && thisMonthBlock ? (
+              <SummaryTile
+                label="This month"
+                value={thisMonthBlock.formatted || money(thisMonthBlock.amount)}
+                hint={thisMonthBlock.period || shiftHint(thisMonthBlock) || 'Current month'}
+                icon="solar:calendar-bold"
+                color="info"
+              />
+            ) : null}
+            {thisWeek ? (
+              <SummaryTile
+                label="This week"
+                value={thisWeekValue}
+                hint={
+                  thisWeek.period
+                    ? thisWeek.period
+                    : shiftHint(thisWeek) || 'Current week'
+                }
+                icon="solar:calendar-date-bold"
+                color="secondary"
+              />
             ) : null}
             {upcoming ? (
               <SummaryTile

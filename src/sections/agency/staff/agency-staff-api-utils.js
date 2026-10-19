@@ -48,7 +48,6 @@ function buildAgencyStaffLocation(data) {
   return location;
 }
 
-/** True when form has a resolved map point from the location picker / geocode. */
 export function staffFormHasValidCoordinates(data = {}) {
   const lng = Number(data.longitude);
   const lat = Number(data.latitude);
@@ -63,7 +62,6 @@ function pickTaxNumber(...candidates) {
   return '';
 }
 
-/** Keep tax number as string so NI / alphanumeric values are not lost. */
 function resolveTaxNumber(value) {
   const raw = String(value ?? '').trim();
   return raw || undefined;
@@ -133,7 +131,6 @@ function resolveProfileIconUrl(...candidates) {
   return '';
 }
 
-/** Normalize API/doc values → `{ name, preview, url }[]` for UI. */
 export function normalizeDocumentList(files = []) {
   const list = Array.isArray(files) ? files : files ? [files] : [];
 
@@ -165,10 +162,6 @@ export function normalizeDocumentList(files = []) {
     .filter(Boolean);
 }
 
-/**
- * Map API document fields → UI `documents` shape.
- * Create body uses: governmentIdentity / degree / certification
- */
 export function mapAgencyStaffDocuments(item = {}, staff = {}) {
   const nestedDocs = item.documents || staff.documents || {};
 
@@ -193,7 +186,6 @@ function buildDocumentPayloadFields(data) {
   };
 }
 
-/** Build UI documents object from Add/Edit form values (keeps local previews). */
 export function buildDocumentsFromFormData(data = {}) {
   return {
     governmentId: normalizeDocumentList(data.governmentId),
@@ -204,7 +196,6 @@ export function buildDocumentsFromFormData(data = {}) {
 
 export function extractAgencyStaffIdFromResponse(response) {
   const raw = response?.data || response || {};
-  // Prefer agency-staff membership id; do not fall back to nested nurse id here.
   return String(raw._id || raw.id || raw.agencyStaffId || '');
 }
 
@@ -234,30 +225,20 @@ function normalizeStaffRef(staffField) {
   return {};
 }
 
-/**
- * Accepts flexible phone formats for agency staff:
- * - 03004785384
- * - +923004785384
- * - 923004785384
- * - 3004785384
- */
 export function parseFlexiblePhoneForApi(phoneValue) {
   const raw = String(phoneValue || '').trim();
   if (!raw) return { code: '', number: '' };
 
   const digits = raw.replace(/\D/g, '');
 
-  // Local PK: 03XXXXXXXXX
   if (/^0\d{10}$/.test(digits)) {
     return { code: '+92', number: digits.slice(1) };
   }
 
-  // 92XXXXXXXXXX without +
   if (/^92\d{10}$/.test(digits)) {
     return { code: '+92', number: digits.slice(2) };
   }
 
-  // 3XXXXXXXXX (10 digits, common PK mobile without 0)
   if (/^3\d{9}$/.test(digits)) {
     return { code: '+92', number: digits };
   }
@@ -307,9 +288,6 @@ export function isNurseAccountUserType(userType) {
   return ['nurse', 'staff_member', 'staff', 'worker'].includes(raw);
 }
 
-/** Map GET `/web/agency/staff/nurses` item → autocomplete option.
- * POST `/web/agency/staff` needs the nurse *user* id in `staff` — not a wrapper/membership id.
- */
 export function mapAgencyNurseFromApi(item = {}) {
   const nested = normalizeStaffRef(item.staff || item.user || item.nurse || item.worker);
   const source = item.name || item.email ? item : { ...nested, ...item };
@@ -362,15 +340,9 @@ export function mapAgencyNurseFromApi(item = {}) {
   };
 }
 
-/** Map GET `/web/agency/staff` list item → UI row / edit form.
- * Edit/PUT uses document `_id` (agency-staff membership id).
- * Nested `staff._id` is the linked nurse user id (not used for PUT).
- */
 export function mapAgencyStaffFromApi(item = {}) {
   const staff = normalizeStaffRef(item.staff);
-  // List document `_id` — PUT/DELETE `/web/agency/staff/:id`
   const membershipId = pickMongoId(item._id, item.id, item.agencyStaffId);
-  // Linked nurse profile id (nested staff)
   const nurseId = pickMongoId(staff._id, staff.id, typeof item.staff === 'string' ? item.staff : '', item.staffId, item.nurseId, item.workerId, item.worker);
   const id = membershipId || nurseId;
 
@@ -406,7 +378,6 @@ export function mapAgencyStaffFromApi(item = {}) {
   const branchLocationLabel =
     branchLocation?.fullAddress || [branchLocation?.city, branchLocation?.state, branchLocation?.country].filter(Boolean).join(', ') || branchLocation?.name || '';
 
-  // Staff personal address only — never fall back to branch.location (that is the site, e.g. Lahore).
   const locationSource =
     (item.location && typeof item.location === 'object' ? item.location : null) ||
     (staff.location && typeof staff.location === 'object' ? staff.location : null) ||
@@ -488,7 +459,6 @@ export function mapAgencyStaffFromApi(item = {}) {
   };
 }
 
-/** Build POST `/web/agency/staff` body from form values. */
 export function buildAgencyStaffPayload(data, { existingStaffId } = {}) {
   const branch = String(data.branch || data.branchId || '').trim();
 
@@ -529,7 +499,6 @@ export function buildAgencyStaffPayload(data, { existingStaffId } = {}) {
   return payload;
 }
 
-/** Normalize UI status → API status (lowercase enum). */
 export function resolveAgencyStaffStatusForApi(status) {
   const raw = String(status || 'pending')
     .trim()
@@ -541,10 +510,8 @@ export function resolveAgencyStaffStatusForApi(status) {
   return 'pending';
 }
 
-/** Build PUT `/web/agency/staff/:id` body from form values. */
 export function buildAgencyStaffUpdatePayload(data) {
   const payload = {
-    // API requires `speciality` on update
     speciality: normalizeSpecialities(data.specialties, data.speciality, data.specialty, 'generalNurse'),
     ratePerHour: Number(data.ratePerHour) || 0,
     platformPercent: Number(data.platformPercent) || 0,
@@ -564,7 +531,6 @@ export function buildAgencyStaffUpdatePayload(data) {
 
   if (data.gender?.trim()) payload.gender = data.gender.trim();
 
-  // Same shape as create — only `location` (do not send `address`; backend may treat it as an id).
   const location = buildAgencyStaffLocation(data);
   if (location.fullAddress) {
     payload.location = location;
@@ -595,11 +561,6 @@ function mapBookingToJobCard(booking = {}, index = 0, prefix = 'job') {
   };
 }
 
-/**
- * Map GET `/web/agency/staff/:id` detail payload → Staff details modal shape.
- * Response shape (backend):
- * { basicInfo, documentation, staffDetails, address, reviews, bookings, stats }
- */
 export function mapAgencyStaffDetailFromApi(raw = {}, staffId = '') {
   const data = raw?.basicInfo || raw?.staffDetails ? raw : raw?.data || raw;
   const basic = data.basicInfo || {};
