@@ -207,7 +207,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
             setPaymentStatus(event.target.value);
             resetPage();
           }}
-          sx={{ minWidth: 200 }}
+          sx={{ width: { xs: 1, md: 'auto' }, minWidth: { xs: 0, md: 200 } }}
         >
           {PAYMENT_STATUS_OPTIONS.map((option) => (
             <MenuItem key={option.value || 'all-payment'} value={option.value}>
@@ -224,7 +224,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
             setPayoutStatus(event.target.value);
             resetPage();
           }}
-          sx={{ minWidth: 180 }}
+          sx={{ width: { xs: 1, md: 'auto' }, minWidth: { xs: 0, md: 180 } }}
         >
           {PAYOUT_STATUS_OPTIONS.map((option) => (
             <MenuItem key={option.value || 'all-payout'} value={option.value}>
@@ -242,7 +242,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
             resetPage();
           }}
           InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160 }}
+          sx={{ width: { xs: 1, md: 'auto' }, minWidth: { xs: 0, md: 160 } }}
         />
       </Stack>
 

@@ -41,7 +41,6 @@ import {
   useRefundAdminBookingMutation,
 } from 'src/store/Reducer/gocardless-api';
 
-// ----------------------------------------------------------------------
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -92,7 +91,6 @@ export function AdminTransactionsView() {
   const [refundForm, setRefundForm] = useState(null);
 
   const isAllStatus = status === 'all';
-  // API only accepts status=owed|paid — "all" needs both lists merged.
   const owedQuery = useGetAdminPayoutsQuery(
     {
       page: isAllStatus ? 1 : page + 1,
@@ -159,7 +157,6 @@ export function AdminTransactionsView() {
           byId.set(row.supplierId, row);
           return;
         }
-        // Prefer paid row when the same supplier appears in both.
         if (String(row.payoutStatus).toLowerCase() === 'paid') {
           byId.set(row.supplierId, row);
         }
@@ -419,7 +416,12 @@ export function AdminTransactionsView() {
                         </Label>
                       </TableCell>
                       <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={0.75}
+                          justifyContent="flex-end"
+                          alignItems={{ xs: 'stretch', sm: 'center' }}
+                        >
                           {!paid ? (
                             <Button
                               size="small"

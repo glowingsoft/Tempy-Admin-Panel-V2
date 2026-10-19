@@ -3,7 +3,6 @@ import GlobalStyles from '@mui/material/GlobalStyles';
 
 import { layoutClasses } from '../classes';
 
-// ----------------------------------------------------------------------
 
 export function LayoutSection({
   sx,
@@ -18,7 +17,7 @@ export function LayoutSection({
       styles={{
         body: {
           '--layout-nav-zIndex': 1101,
-          '--layout-nav-mobile-width': '320px',
+          '--layout-nav-mobile-width': 'min(320px, 100vw)',
           '--layout-header-blur': '8px',
           '--layout-header-zIndex': 1100,
           '--layout-header-mobile-height': '64px',

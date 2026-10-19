@@ -21,7 +21,6 @@ import {
   normalizeAgencyBidStatus,
 } from './agency-bid-api-utils';
 
-// ----------------------------------------------------------------------
 
 const STATUS_CONFIG = {
   pending: { label: 'Pending', color: 'warning' },
@@ -60,12 +59,20 @@ export function AgencyBidDetailDialog({ open, bid, onClose, onEdit, onWithdraw, 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1 }}>
             <JobMediaThumb image={bid.image} alt={bid.jobTitle} width={48} height={48} />
-            <Typography variant="h6">{bid.jobTitle}</Typography>
+            <Typography variant="h6" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+              {bid.jobTitle}
+            </Typography>
           </Stack>
-          <Chip label={statusConfig.label} size="small" color={statusConfig.color} variant="soft" />
+          <Chip
+            label={statusConfig.label}
+            size="small"
+            color={statusConfig.color}
+            variant="soft"
+            sx={{ flexShrink: 0 }}
+          />
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           {bid.jobRef}

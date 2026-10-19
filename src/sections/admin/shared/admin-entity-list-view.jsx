@@ -49,7 +49,6 @@ import {
 import { ADMIN_USERS_TABLE_HEAD } from './admin-users-api-utils';
 import { AdminEntityTableRow } from './admin-entity-table-row';
 
-// ----------------------------------------------------------------------
 
 function applyFilter({ inputData, filters, searchKeys }) {
   let data = inputData;
@@ -97,7 +96,6 @@ export function AdminEntityListView({
 
   useEffect(() => {
     table.onResetPage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedKeyword, statusFilter]);
 
   const {
@@ -298,7 +296,7 @@ export function AdminEntityListView({
               label="Status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              sx={{ minWidth: 160, flexShrink: 0 }}
+              sx={{ width: { xs: 1, sm: 'auto' }, minWidth: { xs: 0, sm: 160 }, flexShrink: 0 }}
               InputLabelProps={{ shrink: true }}
             >
               {ADMIN_ENTITY_STATUS_FILTERS.map((option) => (

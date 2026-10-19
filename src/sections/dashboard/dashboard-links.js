@@ -1,6 +1,5 @@
 import { paths } from 'src/routes/paths';
 
-// ----------------------------------------------------------------------
 
 function normalizeTitle(value) {
   return String(value || '')
@@ -8,10 +7,7 @@ function normalizeTitle(value) {
     .toLowerCase();
 }
 
-/**
- * Attach hrefs to dashboard stats / breakdowns from a role-specific map.
- * Titles are matched case-insensitively.
- */
+
 function typeKey(value) {
   return normalizeTitle(value).replace(/[\s/_-]/g, '');
 }
@@ -54,9 +50,6 @@ export function withDashboardLinks(dashboard = {}, linkMap = {}) {
   };
 }
 
-// ----------------------------------------------------------------------
-// Role link maps — keep in sync with each dashboard’s available routes.
-// ----------------------------------------------------------------------
 
 const careHome = paths.dashboard;
 const agency = paths.dashboard.agency;
@@ -72,14 +65,15 @@ function createdJobsFilterHref(base, query) {
   return query ? `${base}?${query}` : base;
 }
 
-/** Customer-style dashboards (Care Home / Hospital / LA / IHC). */
-function buildCustomerLinkMap({ shifts, staff, jobsCreated, jobsBids, jobsPost }) {
+function buildCustomerLinkMap({ shifts, staff, jobsCreated, jobsBids, jobsPost, branches }) {
   const created = jobsCreated || jobsPost;
   return {
     stats: {
+      'total jobs': created,
+      'active jobs': createdJobsFilterHref(created, 'filter=active'),
       'total bookings': shifts,
       'active staff': staff,
-      'active jobs': createdJobsFilterHref(created, 'filter=scheduled'),
+      locations: branches,
       'pending jobs': createdJobsFilterHref(created, 'filter=pending'),
       'completed jobs': createdJobsFilterHref(created, 'filter=completed'),
       'pending bids': createdJobsFilterHref(created, 'filter=pending'),
@@ -89,11 +83,11 @@ function buildCustomerLinkMap({ shifts, staff, jobsCreated, jobsBids, jobsPost }
       'bookings by status': shifts,
       'staff by status': staff,
       'bids by status': jobsBids,
+      'locations by status': branches,
     },
   };
 }
 
-/** Supplier-style dashboards (Agency / Home Care Company / Staff Member). */
 function buildSupplierLinkMap({ shifts, staff, jobs, bids }) {
   return {
     stats: {
@@ -121,6 +115,7 @@ export const DASHBOARD_LINK_MAPS = {
     jobsCreated: careHome.jobs.created,
     jobsBids: careHome.jobs.bids,
     jobsPost: careHome.jobs.post,
+    branches: careHome.branches,
   }),
 
   hospital: buildCustomerLinkMap({
@@ -129,6 +124,7 @@ export const DASHBOARD_LINK_MAPS = {
     jobsCreated: hospital.jobs.created,
     jobsBids: hospital.jobs.bids,
     jobsPost: hospital.jobs.post,
+    branches: hospital.branches,
   }),
 
   localAuthority: buildCustomerLinkMap({
@@ -137,12 +133,16 @@ export const DASHBOARD_LINK_MAPS = {
     jobsCreated: localAuthority.jobs.created,
     jobsBids: localAuthority.jobs.bids,
     jobsPost: localAuthority.jobs.post,
+    branches: localAuthority.branches,
   }),
 
   individualHomeCare: {
     stats: {
+      'total jobs': individual.jobs.created,
+      'active jobs': createdJobsFilterHref(individual.jobs.created, 'filter=active'),
       'total bookings': individual.shifts,
-      'active jobs': createdJobsFilterHref(individual.jobs.created, 'filter=scheduled'),
+      'active staff': individual.staff,
+      locations: individual.locations || individual.branches,
       'pending jobs': createdJobsFilterHref(individual.jobs.created, 'filter=pending'),
       'completed jobs': createdJobsFilterHref(individual.jobs.created, 'filter=completed'),
       'pending bids': createdJobsFilterHref(individual.jobs.created, 'filter=pending'),
@@ -150,7 +150,9 @@ export const DASHBOARD_LINK_MAPS = {
     breakdowns: {
       'jobs by status': individual.jobs.created,
       'bookings by status': individual.shifts,
+      'staff by status': individual.staff,
       'bids by status': individual.jobs.bids,
+      'locations by status': individual.locations || individual.branches,
     },
   },
 

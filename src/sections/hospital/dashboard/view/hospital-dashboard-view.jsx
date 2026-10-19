@@ -17,6 +17,7 @@ import { useScopedUserId } from 'src/hooks/use-scoped-user-id';
 import { DashboardNavCard } from 'src/sections/dashboard/dashboard-nav-card';
 import { DashboardQuickAccess } from 'src/sections/dashboard/dashboard-quick-access';
 import { DashboardActivityList } from 'src/sections/dashboard/dashboard-activity-list';
+import { DashboardBranchesActivity } from 'src/sections/dashboard/dashboard-branches-activity';
 import { DashboardOverviewChart } from 'src/sections/dashboard/dashboard-overview-chart';
 import { DashboardOverviewHeader } from 'src/sections/dashboard/dashboard-overview-header';
 import { DashboardStatusBreakdown } from 'src/sections/dashboard/dashboard-status-breakdown';
@@ -26,7 +27,6 @@ import {
 } from 'src/sections/dashboard/dashboard-links';
 import { ModuleLoading } from 'src/components/loading-screen';
 
-// ----------------------------------------------------------------------
 
 const MODULES = [
   {
@@ -42,6 +42,13 @@ const MODULES = [
     icon: 'solar:users-group-rounded-bold-duotone',
     color: 'info',
     href: paths.dashboard.hospital.staff,
+  },
+  {
+    title: 'Locations',
+    description: 'Sites · Branches',
+    icon: 'solar:map-point-bold-duotone',
+    color: 'success',
+    href: paths.dashboard.hospital.branches,
   },
   {
     title: 'Add Job',
@@ -72,6 +79,7 @@ const EMPTY_DASHBOARD = {
   chart: { categories: [], series: [] },
   breakdowns: [],
   recentActivity: [],
+  branchesActivity: [],
   moduleValues: {},
 };
 
@@ -137,6 +145,14 @@ export function HospitalDashboardView() {
 
           <Grid xs={12} lg={4} sx={{ display: 'flex', flexDirection: 'column' }}>
             <DashboardActivityList title="Recent activity" items={dashboard.recentActivity} />
+          </Grid>
+
+          <Grid xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <DashboardBranchesActivity
+              title="Location Activity"
+              items={dashboard.branchesActivity || []}
+              href={paths.dashboard.hospital.branches}
+            />
           </Grid>
 
           {dashboard.breakdowns.map((item) => (

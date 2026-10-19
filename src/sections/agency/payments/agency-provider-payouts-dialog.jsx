@@ -32,7 +32,6 @@ import {
   netToProvider,
 } from './agency-payments-data';
 
-// ----------------------------------------------------------------------
 
 export function AgencyProviderPayoutsDialog({ open, bills = [], onClose, onConfirmPayout }) {
   const readyBills = useMemo(() => getReadyPayoutBills(bills), [bills]);
@@ -152,7 +151,7 @@ export function AgencyProviderPayoutsDialog({ open, bills = [], onClose, onConfi
             </Box>
 
             <Scrollbar sx={{ maxHeight: 360 }}>
-              <Table size="small" stickyHeader>
+              <Table size="small" stickyHeader sx={{ minWidth: 720 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell padding="checkbox">

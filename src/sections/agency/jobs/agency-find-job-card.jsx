@@ -797,7 +797,6 @@ function JobActionButtons({
     );
 
     if (alreadyAssigned) {
-      // Agency / home care only assign — no Cancel beside Assigned.
       return (
         <Chip
           size="small"
@@ -918,14 +917,12 @@ export function AgencyFindJobCard({
     shiftCompleted ||
     job?.actionType === 'assigned' ||
     ['active', 'inProgress', 'completed', 'assigned'].includes(bookingStatus);
-  // Worker checked in (or shift finished) — agency must not keep showing "Not checked in".
   const checkedIn = Boolean(
     attendance?.checkInAt ||
-      attendance?.checkOutAt ||
-      attendance?.autoCheckedOut ||
-      ['inProgress', 'completed'].includes(String(bookingStatus || '').toLowerCase())
+    attendance?.checkOutAt ||
+    attendance?.autoCheckedOut ||
+    ['inProgress', 'completed'].includes(String(bookingStatus || '').toLowerCase())
   );
-  // Agency only assigns: after assign show "Not checked in" until the worker checks in.
   const showNotCheckedIn =
     assignedWork &&
     !checkedIn &&
@@ -967,7 +964,8 @@ export function AgencyFindJobCard({
           borderRadius: 2,
           boxShadow: '0 2px 12px rgba(99, 115, 129, 0.1)',
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'stretch', md: 'center' },
           gap: 1.25,
           ...(onOpenJob
             ? {
@@ -977,142 +975,147 @@ export function AgencyFindJobCard({
             : null),
         }}
       >
-        <JobMediaThumb image={job.image} alt={job.title} width={44} height={44} />
+        <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
+          <JobMediaThumb image={job.image} alt={job.title} width={44} height={44} />
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack spacing={0.15} sx={{ minWidth: 0, flex: 1 }}>
-            <Tooltip title={job.title} arrow>
-              <Typography variant="subtitle2" fontWeight={700} noWrap>
-                {job.title}
-              </Typography>
-            </Tooltip>
-            {(job.jobTypeTitle || job.role) && (
-              <Tooltip title={job.jobTypeTitle || job.role} arrow>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {job.jobTypeTitle || job.role}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack spacing={0.15} sx={{ minWidth: 0, flex: 1 }}>
+              <Tooltip title={job.title} arrow>
+                <Typography variant="subtitle2" fontWeight={700} noWrap>
+                  {job.title}
                 </Typography>
               </Tooltip>
-            )}
-          </Stack>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }}>
-            <JobStatusChip job={job} variant={variant} />
-            {hasJobDistance(job) ? (
-              <Chip
-                label={job.distance}
-                size="small"
-                variant="outlined"
-                sx={{
-                  ...metaChipSx,
-                  flexShrink: 0,
-                }}
-              />
-            ) : null}
-          </Stack>
+              {(job.jobTypeTitle || job.role) && (
+                <Tooltip title={job.jobTypeTitle || job.role} arrow>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {job.jobTypeTitle || job.role}
+                  </Typography>
+                </Tooltip>
+              )}
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }} flexWrap="wrap" useFlexGap>
+              <JobStatusChip job={job} variant={variant} />
+              {hasJobDistance(job) ? (
+                <Chip
+                  label={job.distance}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    ...metaChipSx,
+                    flexShrink: 0,
+                  }}
+                />
+              ) : null}
+            </Stack>
 
-          <Tooltip title={job.description || ''} arrow placement="top" disableHoverListener={!job.description}>
-            <Typography sx={{ ...listDescriptionSx, minHeight: '1.1rem' }}>
-              {job.description || '—'}
-            </Typography>
-          </Tooltip>
-
-          {primaryShift && (
-            <Tooltip title={dateParts.label} arrow>
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.35, minWidth: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={shiftDateRowSx}>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    icon={<Iconify icon="solar:calendar-bold" width={12} />}
-                    label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
-                    sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
-                  />
-                  {dateParts.time ? (
-                    <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700 }}>
-                      {dateParts.time}
-                    </Typography>
-                  ) : null}
-                </Stack>
-                {hasMultipleSchedules && (
-                  <Button
-                    size="small"
-                    onClick={() => onViewAllSchedules?.(job)}
-                    sx={{ minWidth: 'auto', px: 0.5, py: 0, fontSize: 9, fontWeight: 700 }}
-                  >
-                    +{shiftRows.length - 1} more
-                  </Button>
-                )}
-              </Stack>
+            <Tooltip title={job.description || ''} arrow placement="top" disableHoverListener={!job.description}>
+              <Typography sx={{ ...listDescriptionSx, minHeight: '1.1rem' }}>
+                {job.description || '—'}
+              </Typography>
             </Tooltip>
-          )}
 
-          <JobLocationBlock job={job} sx={{ mt: 0.35 }} />
-        </Box>
+            {primaryShift && (
+              <Tooltip title={dateParts.label} arrow>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.35, minWidth: 0 }} flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" alignItems="center" spacing={0.5} sx={shiftDateRowSx}>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      icon={<Iconify icon="solar:calendar-bold" width={12} />}
+                      label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
+                      sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
+                    />
+                    {dateParts.time ? (
+                      <Typography variant="caption" noWrap sx={{ color: 'inherit', fontWeight: 700 }}>
+                        {dateParts.time}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+                  {hasMultipleSchedules && (
+                    <Button
+                      size="small"
+                      onClick={() => onViewAllSchedules?.(job)}
+                      sx={{ minWidth: 'auto', px: 0.5, py: 0, fontSize: 9, fontWeight: 700 }}
+                    >
+                      +{shiftRows.length - 1} more
+                    </Button>
+                  )}
+                </Stack>
+              </Tooltip>
+            )}
 
-        <Stack alignItems="flex-end" spacing={0.25} sx={{ flexShrink: 0, minWidth: 90 }}>
-          {job.postedAt && (
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 10 }}>
-              {job.postedAt}
-            </Typography>
-          )}
+            <JobLocationBlock job={job} sx={{ mt: 0.35 }} />
+          </Box>
         </Stack>
 
-        <Stack alignItems="flex-end" spacing={0.25} sx={{ flexShrink: 0, minWidth: 90 }}>
-          {job.hourlyRate != null ? (
-            <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ color: 'primary.main', lineHeight: 1.2 }}>
-              {fCurrency(job.hourlyRate)}/hr
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent={{ xs: 'space-between', md: 'flex-end' }}
+          spacing={1.25}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ flexShrink: 0, width: { xs: 1, md: 'auto' }, pl: { xs: 0, md: 0 } }}
+        >
+          <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }} spacing={0.25} sx={{ minWidth: 0 }}>
+            {job.postedAt && (
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: 10 }}>
+                {job.postedAt}
+              </Typography>
+            )}
+            {job.hourlyRate != null ? (
+              <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ color: 'primary.main', lineHeight: 1.2 }}>
+                {fCurrency(job.hourlyRate)}/hr
+              </Typography>
+            ) : job.totalPay != null ? (
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'primary.main', lineHeight: 1.2 }}>
+                {fCurrency(job.totalPay)}
+              </Typography>
+            ) : null}
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
+              {job.gender ? `Gender: ${job.gender}` : null}
             </Typography>
-          ) : job.totalPay != null ? (
-            <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'primary.main', lineHeight: 1.2 }}>
-              {fCurrency(job.totalPay)}
-            </Typography>
-          ) : null}
-          <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
-            {job.gender ? `Gender: ${job.gender}` : null}
-          </Typography>
-        </Stack>
+          </Stack>
 
-        <Box sx={{ flexShrink: 0 }}>
-          <JobActionButtons readOnly={readOnly}
-            job={job}
-            variant={variant}
-            mode={mode}
-            attendance={attendance}
-            shiftRow={primaryShift}
-            existingBid={existingBid}
-            onBid={onBid}
-            onEditBid={onEditBid}
-            onDeleteBid={onDeleteBid}
-            onAssignStaff={onAssignStaff}
-            onViewStaff={onViewStaff}
-            onCheckIn={onCheckIn}
-            onCheckOut={onCheckOut}
-            onRespondOffer={onRespondOffer}
-            onCancelBooking={onCancelBooking}
-            onChat={onChat}
-            sx={{ minWidth: 88, py: 0.5, fontSize: 11 }}
-          />
-        </Box>
-
-        {(showAttendance || showNotCheckedIn) && (
-          <Box sx={{ flexShrink: 0 }}>
-            <AttendanceSpot
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            <JobActionButtons readOnly={readOnly}
               job={job}
-              showButton={showAttendance}
-              notCheckedIn={showNotCheckedIn}
-              onOpen={onOpenAttendance}
+              variant={variant}
+              mode={mode}
+              attendance={attendance}
+              shiftRow={primaryShift}
+              existingBid={existingBid}
+              onBid={onBid}
+              onEditBid={onEditBid}
+              onDeleteBid={onDeleteBid}
+              onAssignStaff={onAssignStaff}
+              onViewStaff={onViewStaff}
+              onCheckIn={onCheckIn}
+              onCheckOut={onCheckOut}
+              onRespondOffer={onRespondOffer}
+              onCancelBooking={onCancelBooking}
+              onChat={onChat}
+              sx={{ minWidth: { xs: 0, md: 88 }, py: 0.5, fontSize: 11 }}
             />
-          </Box>
-        )}
 
-        {showCareDetails && (
-          <Box sx={{ flexShrink: 0 }}>
-            <CareDetailsAction job={job} onOpen={onOpenCareDetails} />
-          </Box>
-        )}
+            {(showAttendance || showNotCheckedIn) && (
+              <AttendanceSpot
+                job={job}
+                showButton={showAttendance}
+                notCheckedIn={showNotCheckedIn}
+                onOpen={onOpenAttendance}
+              />
+            )}
 
-        <Box sx={{ flexShrink: 0, minWidth: 110 }}>
-          <PostedByFooter job={job} postedBy={postedBy} isCareHome={isCareHome} />
-        </Box>
+            {showCareDetails && (
+              <CareDetailsAction job={job} onOpen={onOpenCareDetails} />
+            )}
+
+            <Box sx={{ minWidth: 0, maxWidth: { xs: 1, md: 140 } }}>
+              <PostedByFooter job={job} postedBy={postedBy} isCareHome={isCareHome} />
+            </Box>
+          </Stack>
+        </Stack>
       </Card>
     );
   }

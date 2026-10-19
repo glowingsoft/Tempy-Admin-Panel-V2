@@ -1,4 +1,4 @@
-import { fToNow } from 'src/utils/format-time';
+import { fDate, fToNow } from 'src/utils/format-time';
 
 import { getWorkflowStatusColorKey } from './dashboard-status-colors';
 
@@ -27,7 +27,6 @@ function isSkippedCountKey(key) {
   return key === 'total' || /rate|percent/i.test(key);
 }
 
-/** Keep every numeric status the API sends, not only the known labels. */
 function extraStatusRows(source, usedKeys) {
   const used = new Set(usedKeys);
   return Object.entries(source || {})
@@ -76,7 +75,6 @@ function parseMonthIndex(label) {
   const raw = String(label || '').trim();
   if (!raw) return -1;
 
-  // "2025-11" / "2025-11-01"
   const iso = raw.match(/^(\d{4})-(\d{1,2})/);
   if (iso) {
     const month = Number(iso[2]);
@@ -87,10 +85,6 @@ function parseMonthIndex(label) {
   return SHORT_MONTHS.findIndex((m) => m.toLowerCase() === short);
 }
 
-/**
- * Keep Jan → Dec left-to-right (API sometimes sends rolling Nov…Oct).
- * Reorders categories + each series.data by calendar month index.
- */
 function toCalendarJanFirst(categories = [], series = [], extraRows = []) {
   if (!Array.isArray(categories) || categories.length < 2) {
     return { categories, series, extraRows };
@@ -117,12 +111,43 @@ function toCalendarJanFirst(categories = [], series = [], extraRows = []) {
   };
 }
 
+function mapBranchesActivity(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => {
+      const location = item?.location && typeof item.location === 'object' ? item.location : {};
+      const rating = item?.rating && typeof item.rating === 'object' ? item.rating : {};
+      const id = String(item?.id || '').trim();
+      const name = String(
+        item?.description || location.title || item?.title || 'Location'
+      ).trim();
+      const address = String(
+        location.fullAddress || [location.city, location.state, location.country].filter(Boolean).join(', ')
+      ).trim();
+      const status = String(item?.status || '').trim().toLowerCase() || 'pending';
+
+      return {
+        id,
+        name,
+        address,
+        status,
+        city: String(location.city || '').trim(),
+        avatarUrl: String(item?.profileIcon || '').trim(),
+        ratingAverage: toCount(rating.average),
+        ratingCount: toCount(rating.count),
+        createdAt: item?.createdAt || '',
+        time: item?.createdAt ? fToNow(item.createdAt) : '',
+      };
+    })
+    .filter((item) => item.id || item.name);
+}
+
 export function mapCustomerDashboardFromApi(response) {
   const data = response?.data && typeof response.data === 'object' ? response.data : response || {};
   const summary = data.summary && typeof data.summary === 'object' ? data.summary : {};
   const jobs = data.jobs && typeof data.jobs === 'object' ? data.jobs : {};
   const bookings = data.bookings && typeof data.bookings === 'object' ? data.bookings : {};
   const staff = data.staff && typeof data.staff === 'object' ? data.staff : {};
+  const branches = data.branches && typeof data.branches === 'object' ? data.branches : {};
   const bids = data.bids && typeof data.bids === 'object' ? data.bids : {};
   const monthly =
     data.monthlyActivity && typeof data.monthlyActivity === 'object' ? data.monthlyActivity : {};
@@ -145,58 +170,74 @@ export function mapCustomerDashboardFromApi(response) {
 
   const jobsMonthly = monthlySeries.find((item) => String(item.name).toLowerCase() === 'jobs');
   const bidsMonthly = monthlySeries.find((item) => String(item.name).toLowerCase() === 'bids');
+  const hasBranches =
+    Object.keys(branches).length > 0 ||
+    summary.totalBranches != null ||
+    summary.activeBranches != null;
 
   return {
     stats: [
       {
+        title: 'Total jobs',
+        total: toCount(summary.totalJobs ?? jobs.total),
+        icon: 'solar:case-round-bold-duotone',
+        color: 'secondary',
+      },
+      {
+        title: 'Active jobs',
+        total: toCount(summary.activeJobs ?? jobs.active),
+        icon: 'solar:clipboard-list-bold-duotone',
+        color: 'warning',
+      },
+      {
         title: 'Total bookings',
-        total: toCount(summary.totalBookings),
+        total: toCount(summary.totalBookings ?? bookings.total),
         icon: 'solar:calendar-bold-duotone',
         color: 'primary',
       },
       {
         title: 'Active staff',
-        total: toCount(summary.activeStaff),
+        total: toCount(summary.activeStaff ?? staff.active),
         icon: 'solar:users-group-rounded-bold-duotone',
         color: 'info',
       },
       {
-        title: 'Active jobs',
-        total: toCount(
-          summary.scheduledJobs ?? summary.filledJobs ?? jobs.scheduled ?? bookings.active
-        ),
-        icon: 'solar:case-round-bold-duotone',
-        color: 'secondary',
-      },
-      {
-        title: 'Pending jobs',
-        total: toCount(summary.pendingJobs ?? jobs.pending ?? jobs.active),
-        icon: 'solar:clipboard-list-bold-duotone',
-        color: 'warning',
-      },
-      {
-        title: 'Completed jobs',
-        total: toCount(jobs.completed),
-        icon: 'solar:check-circle-bold-duotone',
+        title: 'Locations',
+        total: toCount(summary.totalBranches ?? branches.total),
+        icon: 'solar:map-point-bold-duotone',
         color: 'success',
       },
     ],
     sparklineSeries: [
+      lastPoints(jobsMonthly?.data),
+      lastPoints(jobsMonthly?.data),
       [],
       [],
-      lastPoints(jobsMonthly?.data),
-      lastPoints(jobsMonthly?.data),
-      lastPoints(jobsMonthly?.data),
+      [],
     ],
     chart: {
       categories: monthlyCategories,
       series: monthlySeries,
     },
     breakdowns: [
+      ...(hasBranches
+        ? [
+            {
+              title: 'Locations by status',
+              color: 'secondary',
+              hint: 'Active = live sites · Pending = awaiting setup · Inactive = closed',
+              series: statusSeries(branches, [
+                { key: 'active', label: 'Active', colorKey: 'info' },
+                { key: 'pending', label: 'Pending', colorKey: 'warning' },
+                { key: 'inactive', label: 'Inactive', colorKey: 'default' },
+              ]),
+            },
+          ]
+        : []),
       {
         title: 'Jobs by status',
         color: 'primary',
-        hint: 'Active = open or filled · Completed = finished · Cancelled = closed without completing',
+        hint: 'Active = open or filled · Inactive = closed · Completed = finished',
         series: statusSeries(jobs, [
           { key: 'active', label: 'Active', colorKey: 'info' },
           { key: 'inactive', label: 'Inactive', colorKey: 'error' },
@@ -207,7 +248,6 @@ export function mapCustomerDashboardFromApi(response) {
       {
         title: 'Bookings by status',
         color: 'info',
-        // Active ≠ In progress: scheduled upcoming vs currently on shift
         hint: 'Scheduled = confirmed upcoming · In progress = live now',
         series: statusSeries(bookings, [
           { key: 'pending', label: 'Pending', colorKey: 'warning' },
@@ -255,12 +295,14 @@ export function mapCustomerDashboardFromApi(response) {
         clickable: type === 'job' && Boolean(entityId),
       };
     }),
+    branchesActivity: mapBranchesActivity(data.branchesActivity),
     moduleValues: {
       Shifts: String(toCount(bookings.total)),
       Staff: String(toCount(staff.total)),
       'Created Jobs': String(toCount(jobs.total)),
-      'Add Job': String(toCount(jobs.active)),
+      'Add Job': String(toCount(summary.activeJobs ?? jobs.active)),
       'Job Bids': String(toCount(bids.total)),
+      Locations: String(toCount(summary.totalBranches ?? branches.total)),
       ...(data.contracts?.total != null
         ? { Contracts: String(toCount(data.contracts.total)) }
         : {}),
@@ -270,7 +312,6 @@ export function mapCustomerDashboardFromApi(response) {
 
 export const mapCareHomeDashboardFromApi = mapCustomerDashboardFromApi;
 
-/** `{ amount, formatted, hours, bookings }` blocks such as dashboard `upcoming`. */
 function mapMoneyBlock(block) {
   if (!block || typeof block !== 'object' || Array.isArray(block)) return null;
 
@@ -294,7 +335,6 @@ function readUpcomingBlock(data) {
   return mapMoneyBlock(data.upcoming || earnings.upcoming || graph.upcoming);
 }
 
-/** Supplier `earningsGraph`: completed-booking earnings by month (shown Jan → Dec). */
 function mapEarningsGraph(graph) {
   const source = graph && typeof graph === 'object' ? graph : {};
   const rawCategories = Array.isArray(source.categories) ? source.categories.map(String) : [];
@@ -328,6 +368,99 @@ function mapEarningsGraph(graph) {
   };
 }
 
+function mapOpenJobs(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => {
+      const id = String(item?.id || item?._id || '').trim();
+      const title = String(
+        item?.title || item?.jobTitle || item?.name || item?.description || 'Open job'
+      ).trim();
+      const description = String(
+        item?.description || item?.location?.fullAddress || item?.address || item?.status || ''
+      ).trim();
+      return {
+        id: id || `${title}-${item?.createdAt || ''}`,
+        label: [title, description].filter(Boolean).join(' · ') || 'Open job',
+        time: item?.createdAt ? fToNow(item.createdAt) : String(item?.status || ''),
+        icon: item?.icon || 'solar:case-round-bold',
+        color: 'secondary',
+        entityId: id,
+        clickable: Boolean(id),
+      };
+    })
+    .filter((item) => item.id || item.label);
+}
+
+function mapWinRateByRegion(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => {
+      const country = String(item?.country || item?.region || item?.name || '').trim();
+      const totalBids = toCount(item?.totalBids);
+      const wonBids = toCount(item?.wonBids);
+      const winRate =
+        item?.winRate != null && Number.isFinite(Number(item.winRate))
+          ? Number(item.winRate)
+          : totalBids > 0
+            ? (wonBids / totalBids) * 100
+            : 0;
+      return {
+        id: country || `${totalBids}-${wonBids}`,
+        country: country || 'Unknown',
+        totalBids,
+        wonBids,
+        winRate: Math.round(winRate * 100) / 100,
+      };
+    })
+    .filter((item) => item.country);
+}
+
+function mapShiftsAndEarnings(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => {
+      const shift = item?.shift && typeof item.shift === 'object' ? item.shift : {};
+      const id = String(item?.id || item?._id || '').trim();
+      const status = String(item?.status || '').trim();
+      const dateLabel = shift.date ? fDate(shift.date) || '' : '';
+      const start = String(shift.startTime || '').trim();
+      const end = String(shift.endTime || '').trim();
+      const timeRange = start && end ? `${start} – ${end}` : start || end || '';
+      const breakLabel =
+        shift.isBreak && toCount(shift.breakMin) > 0 ? `${toCount(shift.breakMin)}m break` : '';
+
+      return {
+        id: id || `${item?.job || ''}-${shift.id || ''}`,
+        jobId: String(item?.job || '').trim(),
+        workerId: String(item?.worker || '').trim(),
+        status,
+        statusLabel: humanizeKey(status) || '—',
+        dateLabel,
+        timeRange,
+        breakLabel,
+        createdAt: item?.createdAt || '',
+        time: item?.createdAt ? fToNow(item.createdAt) : dateLabel,
+      };
+    })
+    .filter((item) => item.id);
+}
+
+function mapEarningsSummary(earnings) {
+  const source = earnings && typeof earnings === 'object' ? earnings : {};
+  const thisWeek = mapMoneyBlock(source.thisWeek);
+  const thisMonth = mapMoneyBlock(source.thisMonth);
+  return {
+    currency: String(source.currency || 'GBP').trim(),
+    symbol: String(source.symbol || '£').trim(),
+    total: mapMoneyBlock(source.total),
+    upcoming: mapMoneyBlock(source.upcoming),
+    thisWeek: thisWeek
+      ? { ...thisWeek, period: String(source.thisWeek?.period || '').trim() }
+      : null,
+    thisMonth: thisMonth
+      ? { ...thisMonth, period: String(source.thisMonth?.period || '').trim() }
+      : null,
+  };
+}
+
 export function mapAgencyDashboardFromApi(response) {
   const mapped = mapCustomerDashboardFromApi(response);
   const data = response?.data && typeof response.data === 'object' ? response.data : response || {};
@@ -339,10 +472,22 @@ export function mapAgencyDashboardFromApi(response) {
 
   const earningsGraph = mapEarningsGraph(data.earningsGraph);
   const upcoming = readUpcomingBlock(data);
+  const earnings = mapEarningsSummary(data.earnings);
+  const thisWeek = earnings.thisWeek;
 
   return {
     ...mapped,
-    earningsGraph: upcoming ? { ...earningsGraph, upcoming } : earningsGraph,
+    earnings,
+    openJobs: mapOpenJobs(data.openJobs),
+    winRateByRegion: mapWinRateByRegion(data.winRateByRegion),
+    shiftsAndEarnings: mapShiftsAndEarnings(data.shiftsAndEarnings),
+    earningsGraph: {
+      ...earningsGraph,
+      ...(upcoming ? { upcoming } : {}),
+      ...(thisWeek ? { thisWeek } : {}),
+      ...(earnings.total ? { totalBlock: earnings.total } : {}),
+      ...(earnings.thisMonth ? { thisMonthBlock: earnings.thisMonth } : {}),
+    },
     stats: [
       {
         title: 'New jobs',
@@ -374,6 +519,13 @@ export function mapAgencyDashboardFromApi(response) {
       Staff: String(toCount(staff.total)),
       Jobs: String(toCount(summary.newJobs) || toCount(jobs.total)),
       Bids: String(toCount(bids.total)),
+      Locations: String(
+        toCount(
+          summary.totalBranches ??
+            data.branches?.total ??
+            (Array.isArray(data.branchesActivity) ? data.branchesActivity.length : 0)
+        )
+      ),
       ...(data.agreements?.total != null
         ? { Agreements: String(toCount(data.agreements.total)) }
         : {}),
@@ -383,7 +535,6 @@ export function mapAgencyDashboardFromApi(response) {
 
 export const mapSupplierDashboardFromApi = mapAgencyDashboardFromApi;
 
-/** Employee / nurse dashboard — not the same as agency “staff” stats. */
 export function mapNurseDashboardFromApi(response) {
   const mapped = mapAgencyDashboardFromApi(response);
   const data = response?.data && typeof response.data === 'object' ? response.data : response || {};
@@ -391,7 +542,6 @@ export function mapNurseDashboardFromApi(response) {
   const jobs = data.jobs && typeof data.jobs === 'object' ? data.jobs : {};
   const bookings = data.bookings && typeof data.bookings === 'object' ? data.bookings : {};
   const bids = data.bids && typeof data.bids === 'object' ? data.bids : {};
-  // Shifts worked through an agency/company are paid by them, so they're excluded from earningsGraph.
   const agencySupplied = data.earnings?.agencySupplied || {};
 
   return {
@@ -429,5 +579,11 @@ export function mapNurseDashboardFromApi(response) {
         color: 'info',
       },
     ],
+    moduleValues: {
+      ...mapped.moduleValues,
+      Shifts: String(toCount(bookings.total)),
+      Jobs: String(toCount(summary.newJobs ?? jobs.total)),
+      Bids: String(toCount(bids.total)),
+    },
   };
 }
