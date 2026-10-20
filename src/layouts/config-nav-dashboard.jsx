@@ -57,7 +57,6 @@ export const navData = [
       { title: 'Analytics', path: paths.dashboard.general.analytics, icon: ICONS.analytics },
       { title: 'Banking', path: paths.dashboard.general.banking, icon: ICONS.banking },
       { title: 'Sample', path: paths.dashboard.sample, icon: ICONS.file },
-      { title: 'Blank', path: paths.dashboard.blank, icon: ICONS.blank },
     ],
   },
   /**
@@ -236,7 +235,6 @@ export const navData = [
   //       icon: ICONS.external,
   //       info: <Iconify width={18} icon="prime:external-link" />,
   //     },
-  //     { title: 'Blank', path: paths.dashboard.blank, icon: ICONS.blank },
   //   ],
   // },
 ];

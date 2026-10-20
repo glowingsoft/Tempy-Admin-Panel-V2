@@ -90,7 +90,6 @@ import { ClosedJobReview } from '../closed-job-review';
 import { LeaveJobReviewDialog } from '../leave-job-review-dialog';
 import { JobTypesProvider } from '../context/job-types-provider';
 import { EMPTY_JOB_LIST_FILTERS, JobListFilterBar, hasJobListFilters } from '../job-list-filter-bar';
-import { appendAgencyJobRequest } from '../agency-job-request';
 import { JobAttendanceDialog } from 'src/sections/staff-member/jobs/job-attendance-dialog';
 import {
   ACTIVE_JOB_HORIZON_OPTIONS,
@@ -1131,9 +1130,24 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
         );
       }
 
+      const isDirectRequest = Boolean(
+        draft.requestFromAgency || draft.agencyId || draft.workerId || draft.employeeId
+      );
+      const directId = String(
+        draft.workerId || draft.employeeId || draft.agencyId || ''
+      ).trim();
+      const schedules = (draft.schedules || []).map((entry) => ({
+        ...entry,
+        receivingBids: directId ? false : entry.receivingBids,
+      }));
+
       const body = buildCareHomeJobPayload(
         {
           ...draft,
+          workerId: directId || draft.workerId,
+          employeeId: directId || draft.employeeId,
+          schedules,
+          receivingBids: isDirectRequest && directId ? false : draft.receivingBids,
           location: branch?.location || draft.location,
         },
         branch,
@@ -1170,18 +1184,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
         if (!isJobCreateSoftError(err)) throw err;
       }
 
-      if (draft.requestFromAgency && (draft.agencyId || draft.agencyName)) {
-        appendAgencyJobRequest({
-          ...draft,
-          type: draft.name || draft.type,
-          assignedAgency: draft.agencyName,
-        });
-        toast.success(
-          draft.agencyName ? `Job created and request noted for ${draft.agencyName}` : 'Job created'
-        );
-      } else {
-        toast.success('Job created successfully');
-      }
+      toast.success('Job created successfully');
     },
     [branches, createJob, editingJob, isHomeCareCompany, isUser, updateJob]
   );

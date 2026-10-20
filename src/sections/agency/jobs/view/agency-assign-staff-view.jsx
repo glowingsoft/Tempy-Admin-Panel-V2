@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 
 import Box from '@mui/material/Box';
@@ -11,12 +11,15 @@ import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import Collapse from '@mui/material/Collapse';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { hideScrollY } from 'src/theme/styles/mixins';
 import { fCurrency } from 'src/utils/format-number';
+
+import { useGetAgencyStaffQuery } from 'src/store/Reducer/agency-staff-api';
 
 import { AgencyJobStaffBlock } from '../agency-job-staff-block';
 import { AgencyJobCalendarBlock } from '../agency-job-calendar-block';
@@ -30,7 +33,6 @@ import {
   getDaysForJob,
   getInitialSelectedCell,
   getShiftConfig,
-  getStaffById,
   getStatsForAgency,
   formatDayRangeLabel,
   formatDistanceKm,
@@ -102,6 +104,45 @@ function formatShiftLabel(dateStr, shiftId) {
   if (shiftId === '02p-06p' || shiftId === '03a-06p') return `${dayLabel}, 02:00 PM - 06:00 PM`;
   if (shiftId === '10p-06a') return `${dayLabel}, 10:00 PM - 06:00 AM`;
   return `${dayLabel}, ${shiftId}`;
+}
+
+function initialsFromName(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+}
+
+function mapApiStaffToAssignRoster(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .filter((member) => member?.id && !member?.isVacant)
+    .map((member, index) => {
+      const worked = Number(member.totalHoursWorked ?? member.weeklyHours ?? 0) || 0;
+      const allowed = Number(member.hoursAllowed ?? 60) || 60;
+      const lat = Number(member.latitude);
+      const lng = Number(member.longitude);
+      return {
+        id: member.id,
+        staffId: member.staffId || member.id,
+        name: member.name || 'Staff',
+        hours: `${worked}h/${allowed}h this week`,
+        rating: Number(member.rating ?? 0) || 0,
+        reviews: Number(member.reviewCount ?? 0) || 0,
+        avatarUrl: member.avatarUrl || '',
+        initials: initialsFromName(member.name),
+        rowBg: index % 2 === 0 ? '#eef5fc' : '#f5faf5',
+        latitude: Number.isFinite(lat) && lat !== 0 ? lat : null,
+        longitude: Number.isFinite(lng) && lng !== 0 ? lng : null,
+      };
+    });
+}
+
+function findStaffById(staffList, id) {
+  if (id == null || id === '') return null;
+  return (staffList || []).find((member) => String(member.id) === String(id)) || null;
 }
 
 function buildInitialShiftSelection(categories, activeJob) {
@@ -234,9 +275,18 @@ function JobCategorySection({
 export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTabChange }) {
   const screenMode = useMemo(() => resolveAssignScreenMode(job), [job]);
   const isViewOnly = screenMode === 'viewStaff';
-  // Real agency staff list is not wired into this screen yet — never fall back to mock roster.
-  const viewStaffList = useMemo(() => [], []);
-  const assignStaffList = useMemo(() => [], []);
+
+  const { data: staffResponse, isFetching: staffLoading } = useGetAgencyStaffQuery({
+    page: 0,
+    limit: 200,
+    status: 'active',
+  });
+
+  const assignStaffList = useMemo(
+    () => mapApiStaffToAssignRoster(staffResponse?.data),
+    [staffResponse?.data]
+  );
+  const viewStaffList = assignStaffList;
 
   const [viewMode, setViewMode] = useState(() => resolveAssignViewMode(job));
   const [dayOffset, setDayOffset] = useState(0);
@@ -282,13 +332,30 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
   const [popoverShiftLabel, setPopoverShiftLabel] = useState('');
   const [popoverCellKey, setPopoverCellKey] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStaffId, setSelectedStaffId] = useState(1);
+  const [selectedStaffId, setSelectedStaffId] = useState(null);
   const cellRefs = useMemo(() => ({ current: {} }), []);
 
-  const assignedStaff = useMemo(
-    () => getStaffById(selectedShift?.assignedStaffId || 1),
-    [selectedShift]
+  const nearestStaffList = useMemo(
+    () =>
+      withStaffDistances(assignStaffList, {
+        latitude: jobMeta.latitude,
+        longitude: jobMeta.longitude,
+      }),
+    [assignStaffList, jobMeta.latitude, jobMeta.longitude]
   );
+
+  useEffect(() => {
+    if (selectedStaffId != null) return;
+    if (nearestStaffList[0]?.id != null) {
+      setSelectedStaffId(nearestStaffList[0].id);
+    }
+  }, [nearestStaffList, selectedStaffId]);
+
+  const assignedStaff = useMemo(() => {
+    const fromSelection = findStaffById(assignStaffList, selectedShift?.assignedStaffId);
+    if (fromSelection) return fromSelection;
+    return assignStaffList[0] || null;
+  }, [assignStaffList, selectedShift?.assignedStaffId]);
 
   const assignedStaffDistance = useMemo(
     () =>
@@ -299,15 +366,6 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
         )
       ),
     [jobMeta.latitude, jobMeta.longitude, assignedStaff]
-  );
-
-  const nearestStaffList = useMemo(
-    () =>
-      withStaffDistances(assignStaffList, {
-        latitude: jobMeta.latitude,
-        longitude: jobMeta.longitude,
-      }),
-    [assignStaffList, jobMeta.latitude, jobMeta.longitude]
   );
 
   const toggleCategory = useCallback((id) => {
@@ -376,7 +434,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
       hourlyRate: job?.hourlyRate || 0,
       earning: job?.totalPay || 0,
       status: getShiftStatusLabel(cell),
-      assignedStaffId: cell?.staffId || 1,
+      assignedStaffId: cell?.staffId || null,
     });
 
     if (!isViewOnly && cell?.status === 'empty' && anchorEl) {
@@ -385,11 +443,11 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
       setPopoverShiftLabel(label);
       setPopoverCellKey({ categoryId, jobId, shiftId, date });
       setSearchQuery('');
-      setSelectedStaffId(1);
+      setSelectedStaffId(nearestStaffList[0]?.id ?? null);
     } else {
       setPopoverAnchor(null);
     }
-  }, [job, isViewOnly]);
+  }, [job, isViewOnly, nearestStaffList]);
 
   const handlePopoverSelectStaff = useCallback(
     (staffId) => {
@@ -535,32 +593,42 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
             </Typography>
 
             <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.5 }}>
-              <Avatar src={assignedStaff.avatarUrl} sx={{ width: 44, height: 44 }}>
-                {assignedStaff.initials}
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  {assignedStaff.name}
+              {staffLoading && !assignedStaff ? (
+                <CircularProgress size={24} />
+              ) : assignedStaff ? (
+                <>
+                  <Avatar src={assignedStaff.avatarUrl} sx={{ width: 44, height: 44 }}>
+                    {assignedStaff.initials}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      {assignedStaff.name}
+                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.25}>
+                      <Iconify icon="material-symbols:star" width={14} sx={{ color: '#FFB800' }} />
+                      <Typography variant="caption">
+                        {assignedStaff.rating} ({assignedStaff.reviews})
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600 }}>
+                      {assignedStaff.hours}
+                    </Typography>
+                    {assignedStaffDistance && (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        sx={{ color: 'primary.main', fontWeight: 700 }}
+                      >
+                        {assignedStaffDistance} away
+                      </Typography>
+                    )}
+                  </Box>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No active staff yet
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={0.25}>
-                  <Iconify icon="material-symbols:star" width={14} sx={{ color: '#FFB800' }} />
-                  <Typography variant="caption">
-                    {assignedStaff.rating} ({assignedStaff.reviews})
-                  </Typography>
-                </Stack>
-                <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600 }}>
-                  {assignedStaff.hours}
-                </Typography>
-                {assignedStaffDistance && (
-                  <Typography
-                    variant="caption"
-                    display="block"
-                    sx={{ color: 'primary.main', fontWeight: 700 }}
-                  >
-                    {assignedStaffDistance} away
-                  </Typography>
-                )}
-              </Box>
+              )}
             </Stack>
 
             <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
@@ -648,6 +716,19 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                 </Stack>
 
                 <Stack spacing={0.75}>
+                  {staffLoading && !nearestStaffList.length ? (
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1 }}>
+                      <CircularProgress size={18} />
+                      <Typography variant="caption" color="text.secondary">
+                        Loading staff…
+                      </Typography>
+                    </Stack>
+                  ) : null}
+                  {!staffLoading && !nearestStaffList.length ? (
+                    <Typography variant="caption" color="text.secondary">
+                      No active staff found
+                    </Typography>
+                  ) : null}
                   {nearestStaffList.map((staff, index) => {
                     const isNearest = index === 0;
                     const isSelected = staff.id === assignedStaff?.id;

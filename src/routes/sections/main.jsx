@@ -11,8 +11,6 @@ import { SplashScreen } from 'src/components/loading-screen';
 const ContactPage = lazy(() => import('src/pages/contact-us'));
 const PricingPage = lazy(() => import('src/pages/pricing'));
 const PaymentPage = lazy(() => import('src/pages/payment'));
-const ComingSoonPage = lazy(() => import('src/pages/coming-soon'));
-const MaintenancePage = lazy(() => import('src/pages/maintenance'));
 // Product
 const ProductListPage = lazy(() => import('src/pages/product/list'));
 const ProductDetailsPage = lazy(() => import('src/pages/product/details'));
@@ -24,8 +22,6 @@ const PostDetailsPage = lazy(() => import('src/pages/post/details'));
 const Page500 = lazy(() => import('src/pages/error/500'));
 const Page403 = lazy(() => import('src/pages/error/403'));
 const Page404 = lazy(() => import('src/pages/error/404'));
-// Blank
-const BlankPage = lazy(() => import('src/pages/blank'));
 
 // ----------------------------------------------------------------------
 
@@ -47,10 +43,6 @@ export const mainRoutes = [
           {
             path: 'contact-us',
             element: <ContactPage />,
-          },
-          {
-            path: 'blank',
-            element: <BlankPage />,
           },
           {
             path: 'product',
@@ -84,22 +76,6 @@ export const mainRoutes = [
         element: (
           <SimpleLayout>
             <PaymentPage />
-          </SimpleLayout>
-        ),
-      },
-      {
-        path: 'coming-soon',
-        element: (
-          <SimpleLayout content={{ compact: true }}>
-            <ComingSoonPage />
-          </SimpleLayout>
-        ),
-      },
-      {
-        path: 'maintenance',
-        element: (
-          <SimpleLayout content={{ compact: true }}>
-            <MaintenancePage />
           </SimpleLayout>
         ),
       },

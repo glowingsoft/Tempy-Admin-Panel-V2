@@ -93,19 +93,9 @@ export function SampleListView() {
   const canReset = !isEqual(defaultFilters, filters);
   const notFound = !isLoading && data.length === 0;
 
-  const handleEditRow = useCallback(
-    (id) => {
-      router.push(paths.dashboard.invoice.edit(id));
-    },
-    [router]
-  );
+  const handleEditRow = useCallback(() => {}, []);
 
-  const handleViewRow = useCallback(
-    (id) => {
-      router.push(paths.dashboard.invoice.details(id));
-    },
-    [router]
-  );
+  const handleViewRow = useCallback(() => {}, []);
 
   useEffect(() => {
     setPage(0);

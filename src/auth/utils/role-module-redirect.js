@@ -75,7 +75,7 @@ export function getRoleModuleRedirectPath(user, moduleKey) {
       'jobs.bids': paths.dashboard.localAuthority.jobs.bids,
       'jobs.post': paths.dashboard.localAuthority.jobs.post,
       'jobs.find': paths.dashboard.localAuthority.root,
-      'jobs.agreedRates': paths.dashboard.localAuthority.jobs.contracts,
+      'jobs.agreedRates': paths.dashboard.localAuthority.root,
       'agency.shifts': paths.dashboard.localAuthority.shifts,
       'agency.bids': paths.dashboard.localAuthority.jobs.bids,
       'agency.jobs': paths.dashboard.localAuthority.jobs.created,

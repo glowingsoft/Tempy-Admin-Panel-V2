@@ -8,7 +8,6 @@ import {
   HospitalPaymentsView,
   HospitalEarningsView,
   HospitalComplianceView,
-  HospitalInvoicesView,
   HospitalPostJobView,
   HospitalCreatedJobsView,
   HospitalCreatedJobDetailsView,
@@ -21,12 +20,10 @@ import {
   LocalAuthorityPaymentsView,
   LocalAuthorityEarningsView,
   LocalAuthorityComplianceView,
-  LocalAuthorityInvoicesView,
   LocalAuthorityPostJobView,
   LocalAuthorityCreatedJobsView,
   LocalAuthorityCreatedJobDetailsView,
   LocalAuthorityJobBidsView,
-  LocalAuthorityContractsView,
 } from 'src/sections/local-authority/local-authority-role-views';
 
 import {
@@ -35,7 +32,6 @@ import {
   IndividualHomeCarePaymentsView,
   IndividualHomeCareEarningsView,
   IndividualHomeCareComplianceView,
-  IndividualHomeCareInvoicesView,
   IndividualHomeCarePostJobView,
   IndividualHomeCareCreatedJobsView,
   IndividualHomeCareCreatedJobDetailsView,
@@ -104,13 +100,6 @@ export const HospitalCompliancePage = createRolePage({
   allowedPermission: 4,
   allowedAccountType: 'hospital_nhs',
   View: HospitalComplianceView,
-});
-
-export const HospitalInvoicesPage = createRolePage({
-  title: 'Invoices',
-  allowedPermission: 4,
-  allowedAccountType: 'hospital_nhs',
-  View: HospitalInvoicesView,
 });
 
 export const HospitalPostJobPage = createRolePage({
@@ -183,13 +172,6 @@ export const LocalAuthorityCompliancePage = createRolePage({
   View: LocalAuthorityComplianceView,
 });
 
-export const LocalAuthorityInvoicesPage = createRolePage({
-  title: 'Invoices',
-  allowedPermission: 5,
-  allowedAccountType: 'local_authority',
-  View: LocalAuthorityInvoicesView,
-});
-
 export const LocalAuthorityPostJobPage = createRolePage({
   title: 'Post Job',
   allowedPermission: 5,
@@ -216,13 +198,6 @@ export const LocalAuthorityJobBidsPage = createRolePage({
   allowedPermission: 5,
   allowedAccountType: 'local_authority',
   View: LocalAuthorityJobBidsView,
-});
-
-export const LocalAuthorityContractsPage = createRolePage({
-  title: 'Contracts',
-  allowedPermission: 5,
-  allowedAccountType: 'local_authority',
-  View: LocalAuthorityContractsView,
 });
 
 export const IndividualHomeCareShiftsPage = createRolePage({
@@ -265,13 +240,6 @@ export const IndividualHomeCareCompliancePage = createRolePage({
   allowedPermission: 6,
   allowedAccountType: 'individual_home_care',
   View: IndividualHomeCareComplianceView,
-});
-
-export const IndividualHomeCareInvoicesPage = createRolePage({
-  title: 'Invoices',
-  allowedPermission: 6,
-  allowedAccountType: 'individual_home_care',
-  View: IndividualHomeCareInvoicesView,
 });
 
 export const IndividualHomeCarePostJobPage = createRolePage({

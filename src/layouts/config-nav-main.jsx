@@ -26,8 +26,6 @@ export const navData = [
           { title: 'FAQs', path: paths.faqs },
           { title: 'Pricing', path: paths.pricing },
           { title: 'Payment', path: paths.payment },
-          { title: 'Maintenance', path: paths.maintenance },
-          { title: 'Coming soon', path: paths.comingSoon },
         ],
       },
       {

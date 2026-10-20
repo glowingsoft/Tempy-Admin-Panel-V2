@@ -15,8 +15,6 @@ const ROOTS = {
 };
 
 export const paths = {
-  comingSoon: '/coming-soon',
-  maintenance: '/maintenance',
   pricing: '/pricing',
   payment: '/payment',
   about: '/about-us',
@@ -124,7 +122,6 @@ export const paths = {
       contracts: `${ROOTS.DASHBOARD}/agency/contracts`,
       agreedRates: `${ROOTS.DASHBOARD}/agency/agreed-rates`,
       permanentHires: `${ROOTS.DASHBOARD}/agency/permanent-hires`,
-      invoices: `${ROOTS.DASHBOARD}/agency/invoices`,
       faqs: `${ROOTS.DASHBOARD}/agency/faqs`,
       support: `${ROOTS.DASHBOARD}/agency/support`,
       terms: `${ROOTS.DASHBOARD}/agency/terms`,
@@ -153,7 +150,6 @@ export const paths = {
         created: `${ROOTS.DASHBOARD}/hospital/jobs/created`,
         bids: `${ROOTS.DASHBOARD}/hospital/jobs/bids`,
       },
-      invoices: `${ROOTS.DASHBOARD}/hospital/invoices`,
     },
     localAuthority: {
       root: `${ROOTS.DASHBOARD}/local-authority`,
@@ -174,9 +170,7 @@ export const paths = {
         post: `${ROOTS.DASHBOARD}/local-authority/jobs/post`,
         created: `${ROOTS.DASHBOARD}/local-authority/jobs/created`,
         bids: `${ROOTS.DASHBOARD}/local-authority/jobs/bids`,
-        contracts: `${ROOTS.DASHBOARD}/local-authority/jobs/contracts`,
       },
-      invoices: `${ROOTS.DASHBOARD}/local-authority/invoices`,
     },
     individualHomeCare: {
       root: `${ROOTS.DASHBOARD}/individual-home-care`,
@@ -201,7 +195,6 @@ export const paths = {
         bids: `${ROOTS.DASHBOARD}/individual-home-care/jobs/bids`,
         agreedRates: `${ROOTS.DASHBOARD}/individual-home-care/jobs/agreed-rates`,
       },
-      invoices: `${ROOTS.DASHBOARD}/individual-home-care/invoices`,
     },
     homeCareCompany: {
       root: `${ROOTS.DASHBOARD}/home-care-company`,
@@ -214,7 +207,6 @@ export const paths = {
       agreedRates: `${ROOTS.DASHBOARD}/home-care-company/agreed-rates`,
       contracts: `${ROOTS.DASHBOARD}/home-care-company/contracts`,
       earnings: `${ROOTS.DASHBOARD}/home-care-company/earnings`,
-      invoices: `${ROOTS.DASHBOARD}/home-care-company/invoices`,
       faqs: `${ROOTS.DASHBOARD}/home-care-company/faqs`,
       support: `${ROOTS.DASHBOARD}/home-care-company/support`,
       terms: `${ROOTS.DASHBOARD}/home-care-company/terms`,
@@ -235,7 +227,6 @@ export const paths = {
       agreedRates: `${ROOTS.DASHBOARD}/staff-member/agreed-rates`,
       permanentHires: `${ROOTS.DASHBOARD}/staff-member/permanent-hires`,
       earnings: `${ROOTS.DASHBOARD}/staff-member/earnings`,
-      invoices: `${ROOTS.DASHBOARD}/staff-member/invoices`,
       faqs: `${ROOTS.DASHBOARD}/staff-member/faqs`,
       support: `${ROOTS.DASHBOARD}/staff-member/support`,
       terms: `${ROOTS.DASHBOARD}/staff-member/terms`,
@@ -259,10 +250,8 @@ export const paths = {
       agreedRates: `${ROOTS.DASHBOARD}/jobs/agreed-rates`,
       jobTypes: `${ROOTS.DASHBOARD}/jobs/job-types`,
     },
-    invoices: `${ROOTS.DASHBOARD}/invoice/list`,
     mail: `${ROOTS.DASHBOARD}/mail`,
     chat: `${ROOTS.DASHBOARD}/chat`,
-    blank: `${ROOTS.DASHBOARD}/blank`,
     kanban: `${ROOTS.DASHBOARD}/kanban`,
     calendar: `${ROOTS.DASHBOARD}/calendar`,
     fileManager: `${ROOTS.DASHBOARD}/file-manager`,
@@ -304,16 +293,6 @@ export const paths = {
       demo: {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,
         edit: `${ROOTS.DASHBOARD}/product/${MOCK_ID}/edit`,
-      },
-    },
-    invoice: {
-      root: `${ROOTS.DASHBOARD}/invoice`,
-      new: `${ROOTS.DASHBOARD}/invoice/new`,
-      details: (id) => `${ROOTS.DASHBOARD}/invoice/${id}`,
-      edit: (id) => `${ROOTS.DASHBOARD}/invoice/${id}/edit`,
-      demo: {
-        details: `${ROOTS.DASHBOARD}/invoice/${MOCK_ID}`,
-        edit: `${ROOTS.DASHBOARD}/invoice/${MOCK_ID}/edit`,
       },
     },
     post: {
@@ -372,7 +351,6 @@ export const paths = {
     allegations: `${ROOTS.ADMIN_DASHBOARD}/allegations`,
     mail: `${ROOTS.ADMIN_DASHBOARD}/mail`,
     chat: `${ROOTS.ADMIN_DASHBOARD}/chat`,
-    blank: `${ROOTS.ADMIN_DASHBOARD}/blank`,
     kanban: `${ROOTS.ADMIN_DASHBOARD}/kanban`,
     calendar: `${ROOTS.ADMIN_DASHBOARD}/calendar`,
     fileManager: `${ROOTS.ADMIN_DASHBOARD}/file-manager`,
@@ -416,16 +394,6 @@ export const paths = {
       demo: {
         details: `${ROOTS.ADMIN_DASHBOARD}/product/${MOCK_ID}`,
         edit: `${ROOTS.ADMIN_DASHBOARD}/product/${MOCK_ID}/edit`,
-      },
-    },
-    invoice: {
-      root: `${ROOTS.ADMIN_DASHBOARD}/invoice`,
-      new: `${ROOTS.ADMIN_DASHBOARD}/invoice/new`,
-      details: (id) => `${ROOTS.ADMIN_DASHBOARD}/invoice/${id}`,
-      edit: (id) => `${ROOTS.ADMIN_DASHBOARD}/invoice/${id}/edit`,
-      demo: {
-        details: `${ROOTS.ADMIN_DASHBOARD}/invoice/${MOCK_ID}`,
-        edit: `${ROOTS.ADMIN_DASHBOARD}/invoice/${MOCK_ID}/edit`,
       },
     },
     post: {

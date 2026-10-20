@@ -40,11 +40,7 @@ import {
   buildUpdateProfilePayload,
   getProfileUserId,
 } from './account-profile-utils';
-import {
-  isStaffMemberAccount,
-  loadStaffProfessionalProfile,
-  saveStaffProfessionalProfile,
-} from 'src/sections/staff-member/profile/staff-member-profile-store';
+import { isStaffMemberAccount } from 'src/sections/staff-member/profile/staff-member-profile-store';
 import { StaffMemberPersonalSummaryField } from 'src/sections/staff-member/profile/staff-member-personal-summary-field';
 import { resolveProfileAssetUrl, resolveUploadedAssetUrl } from 'src/store/Reducer/upload-api';
 import { getDashboardRootPath } from 'src/auth/utils/dashboard-path-utils';
@@ -125,9 +121,7 @@ export function AccountGeneral() {
 
   const userId = getProfileUserId(user);
   const staffProfile = isStaffMemberAccount(user);
-  const [personalSummary, setPersonalSummary] = useState(
-    () => loadStaffProfessionalProfile(userId).bio || ''
-  );
+  const [personalSummary, setPersonalSummary] = useState('');
 
   const {
     data: profile,
@@ -159,6 +153,11 @@ export function AccountGeneral() {
   useEffect(() => {
     reset(buildDefaults(profile, user));
   }, [profile, reset, user]);
+
+  useEffect(() => {
+    if (!staffProfile) return;
+    setPersonalSummary(String(profile?.bio || '').trim());
+  }, [profile?.bio, staffProfile]);
 
   const clearLocalSession = async () => {
     try {
@@ -230,7 +229,16 @@ export function AccountGeneral() {
           };
         }
 
-        const payload = buildUpdateProfilePayload(profileData);
+        const payload = {
+          ...buildUpdateProfilePayload(profileData),
+          ...(staffProfile
+            ? {
+                bio: String(personalSummary || '').trim(),
+                summary: String(personalSummary || '').trim(),
+                about: String(personalSummary || '').trim(),
+              }
+            : {}),
+        };
         const updated = await updateUser({ id: userId, ...payload }).unwrap();
 
         const updatedName = updated.name || payload.name;
@@ -258,11 +266,6 @@ export function AccountGeneral() {
             email: updated.email || user?.email,
           })
         );
-
-        if (staffProfile) {
-          const professional = loadStaffProfessionalProfile(userId);
-          saveStaffProfessionalProfile(userId, { ...professional, bio: personalSummary });
-        }
 
         toast.success('Profile updated successfully');
         refetch();

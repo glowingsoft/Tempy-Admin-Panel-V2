@@ -46,15 +46,26 @@ function summaryKey(value) {
   return SUMMARY_KEYS[raw] || SUMMARY_KEYS[raw.replace(/_/g, '')] || '';
 }
 
+function matchesFeed(row, type) {
+  // Default / Raised = full API list (raised + derived). Other cards narrow by derivedType.
+  if (!type || type === 'raised' || type === 'all') {
+    return true;
+  }
+  return row.feedType === type || row.derivedType === type;
+}
+
 export function useAdminAllegations({ page = 0, limit = 10, status = '', keyword = '', type = '' } = {}) {
-  const listType = !type || type === 'raised' || type === 'all' ? '' : type;
+  const isRaised = !type || type === 'raised' || type === 'all';
+
+  // API returns mixed raised + derived in one list; filter by screen on the client.
   const listQuery = useGetAdminAllegationsQuery({
-    page,
-    limit,
-    status: listType ? '' : status,
+    page: 0,
+    limit: 200,
+    status: isRaised && status && status !== 'all' ? status : '',
     keyword,
-    type: listType,
+    type: '',
   });
+
   const [raiseAllegationMutation, raiseState] = useRaiseAdminAllegationMutation();
   const [updateStatusMutation, statusState] = useUpdateAdminAllegationStatusMutation();
   const [reallocateMutation, reallocateState] = useReallocateAllegationShiftMutation();
@@ -88,32 +99,49 @@ export function useAdminAllegations({ page = 0, limit = 10, status = '', keyword
   );
 
   const rows = listQuery.data?.data || [];
-  const mixedFeeds = Boolean(listType) && rows.some((row) => row.feedType && row.feedType !== listType);
-  const allegations = !listType
-    ? rows.filter((row) => !row.feedType)
-    : mixedFeeds
-      ? rows.filter((row) => row.feedType === listType)
-      : rows;
-  const hasTotal = Boolean(listQuery.data?.meta?.hasTotal);
-  const serverTotal = hasTotal ? Number(listQuery.data.meta.totalRecords) || 0 : null;
+
+  const filtered = useMemo(() => {
+    let list = rows.filter((row) => matchesFeed(row, type));
+    if (isRaised && status && status !== 'all') {
+      list = list.filter((row) => row.status === status);
+    }
+    return list;
+  }, [isRaised, rows, status, type]);
+
+  const allegations = useMemo(
+    () => filtered.slice(page * limit, page * limit + limit),
+    [filtered, limit, page]
+  );
+
+  const hasTotal = true;
+  const serverTotal = filtered.length;
 
   const summaryRef = useRef(EMPTY_SUMMARY);
   const summary = useMemo(() => {
     if (!listQuery.data) return summaryRef.current;
-    const next = { ...summaryRef.current };
+    const next = { ...EMPTY_SUMMARY };
+
     (listQuery.data.cards || []).forEach((card) => {
       const key = summaryKey(card.key);
       if (key) next[key] = Number(card.total) || 0;
     });
-    const activeCount = serverTotal ?? allegations.length;
-    if (!listType) next.raised = activeCount;
-    else next[listType] = activeCount;
+
+    // "All allegations" card = full list size (API raised count is often 0 while derived rows exist).
+    const totalCard = listQuery.data.cards?.find((card) => String(card.key) === 'total');
+    next.raised = Number(totalCard?.total) || rows.length || next.raised || 0;
+    ['cancellation_strike', 'abandoned_shift', 'suspended_user', 'reported_user'].forEach((key) => {
+      if (!listQuery.data.cards?.some((card) => summaryKey(card.key) === key)) {
+        next[key] = rows.filter((row) => matchesFeed(row, key)).length;
+      }
+    });
+
     summaryRef.current = next;
     return next;
-  }, [allegations.length, listQuery.data, listType, serverTotal]);
+  }, [listQuery.data, rows]);
 
   return {
     allegations,
+    allRows: rows,
     hasTotal,
     serverTotal,
     isLoading: listQuery.isLoading,

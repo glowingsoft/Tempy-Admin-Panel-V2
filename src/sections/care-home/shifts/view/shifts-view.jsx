@@ -153,7 +153,6 @@ import {
   mergeUserWithProfile,
 } from '../../jobs/care-home-job-api-utils';
 import { fCurrency } from 'src/utils/format-number';
-import { appendAgencyJobRequest } from '../../jobs/agency-job-request';
 import { pickApiReview, resolveJobReviewTarget, resolveReviewSubmitTarget } from 'src/sections/reviews/reviews-api-utils';
 import {
   useCreateReviewMutation,
@@ -3442,14 +3441,7 @@ function ShiftsViewContent({
       if (!useCalendarApi) {
         const createdJob = createCareHomeJobFromDraft(draft);
         setJobs((prev) => [createdJob, ...prev]);
-        if (createdJob.requestFromAgency && createdJob.assignedAgency) {
-          appendAgencyJobRequest(createdJob);
-        }
-        toast.success(
-          createdJob.requestFromAgency && createdJob.assignedAgency
-            ? `Request sent to ${createdJob.assignedAgency}`
-            : 'Job added successfully'
-        );
+        toast.success('Job added successfully');
         setPostJobContext(null);
         return;
       }

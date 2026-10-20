@@ -119,7 +119,7 @@ export function StaffListView() {
     isFavoriteStaff,
     toggleFavoriteStaff,
     busy: favoriteBusy,
-  } = useStaffFavorites({ skip: true });
+  } = useStaffFavorites({ skip: !favoritesEnabled });
 
   const staffList = useMemo(
     () =>

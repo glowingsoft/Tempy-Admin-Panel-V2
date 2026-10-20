@@ -50,7 +50,7 @@ export function navData(t) {
         },
         {
           title: t('invoice'),
-          path: paths.dashboard.blank,
+          path: paths.dashboard.root,
           icon: <SvgColor src={`${CONFIG.site.basePath}/assets/icons/navbar/ic-invoice.svg`} />,
         },
       ],

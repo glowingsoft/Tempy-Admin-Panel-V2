@@ -19,9 +19,9 @@ import {
 // ----------------------------------------------------------------------
 
 /**
- * Staff-details favourites: POST/DELETE for current dashboard only (no GET).
+ * Staff favourites: GET hydrates the list; POST/DELETE update cache + local map.
  */
-export function useStaffFavorites({ skip = true } = {}) {
+export function useStaffFavorites({ skip = false } = {}) {
   const { user } = useSelector((state) => state.user);
   const dashboardKey = useMemo(() => resolveFavoriteDashboardKey(user), [user]);
   const listArg = useMemo(() => favoritesListArg(dashboardKey), [dashboardKey]);

@@ -8,7 +8,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { Iconify } from 'src/components/iconify';
 
-// ----------------------------------------------------------------------
 
 const POPOVER_W = 300;
 const POPOVER_H = 360;
@@ -67,29 +66,29 @@ export function AssignStaffPopover({
           p: 2,
           ...(showAbove
             ? {
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  bottom: -8,
-                  left: arrowLeft,
-                  borderLeft: '8px solid transparent',
-                  borderRight: '8px solid transparent',
-                  borderTop: '8px solid',
-                  borderTopColor: 'background.paper',
-                },
-              }
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: -8,
+                left: arrowLeft,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderTop: '8px solid',
+                borderTopColor: 'background.paper',
+              },
+            }
             : {
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: -8,
-                  left: arrowLeft,
-                  borderLeft: '8px solid transparent',
-                  borderRight: '8px solid transparent',
-                  borderBottom: '8px solid',
-                  borderBottomColor: 'background.paper',
-                },
-              }),
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: -8,
+                left: arrowLeft,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderBottom: '8px solid',
+                borderBottomColor: 'background.paper',
+              },
+            }),
         }}
       >
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
@@ -118,8 +117,13 @@ export function AssignStaffPopover({
         </Typography>
 
         <Stack spacing={1}>
+          {!filtered.length ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1.5 }}>
+              {search ? 'No staff match this search' : 'No active staff available'}
+            </Typography>
+          ) : null}
           {filtered.map((staff) => {
-            const isSelected = selectedStaffId === staff.id;
+            const isSelected = String(selectedStaffId) === String(staff.id);
             return (
               <Box
                 key={staff.id}

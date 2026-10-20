@@ -18,7 +18,6 @@ export const navDataLocalAuthority = [
         children: [
           { title: 'Created Jobs', path: paths.dashboard.localAuthority.jobs.created },
           { title: 'Job Bids', countKey: 'jobBids', path: paths.dashboard.localAuthority.jobs.bids },
-          { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.localAuthority.jobs.contracts },
         ],
       },
       { title: 'Compliance', path: paths.dashboard.localAuthority.compliance, icon: NAV_ICONS.lock },

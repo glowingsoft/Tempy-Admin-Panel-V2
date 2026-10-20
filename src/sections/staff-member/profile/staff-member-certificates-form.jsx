@@ -1,26 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ModuleLoading } from 'src/components/loading-screen';
+
+import { handleApiError } from 'src/store/handleApiError';
+import {
+  useGetUserByIdQuery,
+  useUpdateUserByIdMutation,
+} from 'src/store/Reducer/users-api';
 
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { CareTutorStaffPanel } from 'src/sections/care-tutor/care-tutor-staff-panel';
+import { useViewOnly } from 'src/hooks/use-view-only';
 
 import { StaffMemberCertificateUploadRow } from './staff-member-certificate-upload-row';
 import { StaffMemberQualificationsList } from './staff-member-qualifications-list';
+import { DEFAULT_STAFF_PROFESSIONAL_PROFILE } from './staff-member-profile-store';
 import {
-  loadStaffProfessionalProfile,
-  saveStaffProfessionalProfile,
-} from './staff-member-profile-store';
-import { useViewOnly } from 'src/hooks/use-view-only';
+  buildStaffProfessionalUpdatePayload,
+  mapStaffProfessionalFromProfile,
+} from './staff-member-profile-api-utils';
 
-// ----------------------------------------------------------------------
 
 const CERTIFICATE_SLOTS = [
   {
@@ -65,7 +74,22 @@ export function StaffMemberCertificatesForm() {
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const userId = getProfileUserId(user);
-  const [profile, setProfile] = useState(() => loadStaffProfessionalProfile(userId));
+
+  const {
+    data: apiProfile,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetUserByIdQuery(userId, { skip: !userId });
+
+  const [updateUser, { isLoading: saving }] = useUpdateUserByIdMutation();
+  const [profile, setProfile] = useState(DEFAULT_STAFF_PROFESSIONAL_PROFILE);
+
+  useEffect(() => {
+    if (!apiProfile) return;
+    setProfile(mapStaffProfessionalFromProfile(apiProfile));
+  }, [apiProfile]);
 
   const certificates = profile.certificates || {};
 
@@ -79,17 +103,48 @@ export function StaffMemberCertificatesForm() {
     }));
   };
 
-  const handleSave = () => {
-    saveStaffProfessionalProfile(userId, profile);
-    toast.success('Certificates saved');
+  const handleSave = async () => {
+    if (!userId) {
+      toast.error('User id not found. Please sign in again.');
+      return;
+    }
+    try {
+      await updateUser({
+        id: userId,
+        ...buildStaffProfessionalUpdatePayload(profile),
+      }).unwrap();
+      toast.success('Certificates saved');
+      refetch();
+    } catch (err) {
+      toast.error(handleApiError(err));
+    }
   };
+
+  if (isLoading && !apiProfile) {
+    return <ModuleLoading />;
+  }
+
+  if (isError && !apiProfile) {
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={() => refetch()}>
+            Retry
+          </Button>
+        }
+      >
+        {error?.data?.message || error?.error || 'Could not load certificates'}
+      </Alert>
+    );
+  }
 
   return (
     <Stack spacing={3}>
       <CareTutorStaffPanel
         orgId={userId}
         staffId={userId}
-        staffName={user?.name || user?.fullName || 'You'}
+        staffName={user?.name || user?.fullName || user?.basicInfo?.name || 'You'}
       />
 
       <StaffMemberQualificationsList
@@ -125,11 +180,10 @@ export function StaffMemberCertificatesForm() {
         </Stack>
       </Card>
 
-      {/* Admin viewing the account cannot save it. */}
       <Stack alignItems="flex-end" sx={{ display: viewOnly ? 'none' : 'flex' }}>
-        <Button variant="contained" onClick={handleSave}>
+        <LoadingButton variant="contained" loading={saving} onClick={handleSave}>
           Save certificates
-        </Button>
+        </LoadingButton>
       </Stack>
     </Stack>
   );

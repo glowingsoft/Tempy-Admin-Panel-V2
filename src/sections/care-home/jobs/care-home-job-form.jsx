@@ -63,8 +63,6 @@ import {
   isPastJobScheduleDate,
   jobTypeMatchesAnyTeam,
 } from './care-home-job-utils';
-import { getCareHomeAgencyPartners } from './agency-job-request';
-
 const OUTLINED_LABEL_SX = {
   px: 0.5,
   bgcolor: 'background.paper',
@@ -457,7 +455,6 @@ export function JobDraftForm({
   // API only — never fall back to local demo branches (Head Office / North Branch).
   const branches = apiBranches;
 
-  const agencyPartners = getCareHomeAgencyPartners();
   const locationLabel = 'Location';
 
   // Edit only: the API says whether the rate and shift times can still change.
@@ -795,9 +792,7 @@ export function JobDraftForm({
                 Agency
               </Typography>
               <Typography variant="subtitle2" fontWeight={700}>
-                {draft.agencyName ||
-                  agencyPartners.find((partner) => partner.id === draft.agencyId)?.name ||
-                  'Partner agency'}
+                {draft.agencyName || 'Partner agency'}
               </Typography>
             </Box>
           )}
