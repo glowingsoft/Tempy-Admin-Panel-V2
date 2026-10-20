@@ -51,7 +51,8 @@ export const adminAllegationsApi = createApi({
         const totalRecords = hasTotal ? Number(totalRaw) || 0 : null;
 
         const cards = collectSummaryCards(
-          response?.summary ||
+          response?.meta?.summary ||
+            response?.summary ||
             response?.counts ||
             response?.data?.summary ||
             response?.data?.counts ||

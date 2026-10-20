@@ -50,10 +50,11 @@ import { ReallocateShiftDialog } from '../reallocate-shift-dialog';
 const ALLEGATION_TABLE_HEAD = [
   { id: 'worker', label: 'Worker' },
   { id: 'employer', label: 'Employer' },
-  { id: 'type', label: 'Type', width: 160 },
-  { id: 'status', label: 'Status', width: 160 },
-  { id: 'shifts', label: 'Shifts to action', width: 120, align: 'center' },
-  { id: 'raised', label: 'Raised', width: 120 },
+  { id: 'type', label: 'Type', width: 140 },
+  { id: 'source', label: 'Source', width: 160 },
+  { id: 'status', label: 'Status', width: 120 },
+  { id: 'description', label: 'Description' },
+  { id: 'createdAt', label: 'Created', width: 120 },
 ];
 
 const FEED_TABLE_HEAD = [
@@ -128,18 +129,8 @@ export function AdminAllegationsView() {
     type: screen,
   });
 
-  const clientPaged = allegations.length > rowsPerPage;
-  const visibleAllegations = clientPaged
-    ? allegations.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-    : allegations;
-  const count = clientPaged
-    ? allegations.length
-    : hasTotal
-      ? serverTotal
-      : allegations.length < rowsPerPage
-        ? page * rowsPerPage + allegations.length
-        : page * rowsPerPage + allegations.length + 1;
-  const pagerCount = Math.max(count, page * rowsPerPage + (visibleAllegations.length || (page > 0 ? 1 : 0)));
+  const visibleAllegations = allegations;
+  const pagerCount = hasTotal ? serverTotal : allegations.length;
 
   const isRaisedScreen = screen === ALLEGATION_FEED.RAISED;
   const screenCard = ALLEGATION_SCREEN_CARDS.find((card) => card.value === screen) || ALLEGATION_SCREEN_CARDS[0];
@@ -159,14 +150,6 @@ export function AdminAllegationsView() {
         : fromList?.affectedShifts || [],
     };
   }, [allegationDetail, allegations, selectedAllegationId]);
-
-  const pendingShifts = useMemo(
-    () =>
-      (selectedAllegation?.affectedShifts || []).filter(
-        (shift) => shift.status === SHIFT_ACTION_STATUS.NEEDS_REALLOCATION
-      ),
-    [selectedAllegation]
-  );
 
   const handleStatusChange = async (row, nextStatus) => {
     if (nextStatus === row.status) return;
@@ -271,9 +254,11 @@ export function AdminAllegationsView() {
         })}
       </Stack>
 
-      <Alert severity="info" sx={{ mb: 3 }}>
-        {screenCard.note}
-      </Alert>
+      {screenCard.note ? (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {screenCard.note}
+        </Alert>
+      ) : null}
 
       <Card sx={{ mb: 3 }}>
         <Stack
@@ -353,26 +338,20 @@ export function AdminAllegationsView() {
                     ))}
                 {isRaisedScreen
                   ? visibleAllegations.map((row) => {
-                  const shiftsToAction = (row.affectedShifts || []).filter(
-                    (shift) => shift.status === SHIFT_ACTION_STATUS.NEEDS_REALLOCATION
-                  ).length;
                   const selected = selectedAllegationId === row.id;
-                  const statusOptions = getAllowedAllegationStatuses(row.status);
-                  const statusLocked = statusOptions.length <= 1;
-                  const statusValue = statusOptions.some((option) => option.value === row.status)
-                    ? row.status
-                    : statusOptions[0]?.value || '';
+                  const statusOption = getAllegationStatusOption(row.status);
+                  const sourceLabel = row.derivedType || row.source || '—';
 
                   return (
                     <TableRow
-                      key={row.id}
+                      key={row.id || row.key || `${row.workerId}-${row.createdAt}`}
                       hover
                       selected={selected}
                       onClick={() => setSelectedAllegationId(row.id)}
                       sx={{ cursor: 'pointer' }}
                     >
                       <TableCell>
-                        <Typography variant="subtitle2">{row.workerName}</Typography>
+                        <Typography variant="subtitle2">{row.workerName || '—'}</Typography>
                         <Typography variant="caption" color="text.secondary">
                           {row.workerEmail || '—'}
                         </Typography>
@@ -380,29 +359,19 @@ export function AdminAllegationsView() {
                       <TableCell>{row.employerName || '—'}</TableCell>
                       <TableCell>{getAllegationTypeLabel(row.allegationType)}</TableCell>
                       <TableCell>
-                        <TextField
-                          select
-                          size="small"
-                          value={statusValue}
-                          disabled={statusLocked || updatingStatus}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) => {
-                            event.stopPropagation();
-                            handleStatusChange(row, event.target.value);
-                          }}
-                          sx={{ minWidth: 150 }}
-                        >
-                          {statusOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </TextField>
+                        <Typography variant="body2" sx={{ textTransform: 'none' }}>
+                          {String(sourceLabel).replace(/_/g, ' ')}
+                        </Typography>
                       </TableCell>
-                      <TableCell align="center">
-                        <Label color={shiftsToAction ? 'warning' : 'default'} variant="soft">
-                          {shiftsToAction}
+                      <TableCell>
+                        <Label color={statusOption.color} variant="soft">
+                          {statusOption.label}
                         </Label>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {row.description || '—'}
+                        </Typography>
                       </TableCell>
                       <TableCell>{row.createdAt ? fToNow(row.createdAt) : '—'}</TableCell>
                     </TableRow>
@@ -435,97 +404,136 @@ export function AdminAllegationsView() {
       {isRaisedScreen && selectedAllegation ? (
         <Card>
           <Box sx={{ p: 2.5 }}>
-            <Typography variant="h6" sx={{ mb: 0.5 }}>
-              Affected shifts — {selectedAllegation.workerName}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {selectedAllegation.description || '—'}
-            </Typography>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ sm: 'center' }}
+              justifyContent="space-between"
+              sx={{ mb: 2 }}
+            >
+              <Box>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  {selectedAllegation.workerName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedAllegation.description || '—'}
+                </Typography>
+              </Box>
 
-            {pendingShifts.length ? (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                {pendingShifts.length} shift{pendingShifts.length === 1 ? '' : 's'} still need
-                re-allocation or re-publishing.
+              {selectedAllegation.canUpdateStatus ? (
+                <TextField
+                  select
+                  size="small"
+                  label="Status"
+                  value={
+                    getAllowedAllegationStatuses(selectedAllegation.status).some(
+                      (option) => option.value === selectedAllegation.status
+                    )
+                      ? selectedAllegation.status
+                      : getAllowedAllegationStatuses(selectedAllegation.status)[0]?.value || ''
+                  }
+                  disabled={
+                    updatingStatus || getAllowedAllegationStatuses(selectedAllegation.status).length <= 1
+                  }
+                  onChange={(event) => handleStatusChange(selectedAllegation, event.target.value)}
+                  sx={{ minWidth: 180 }}
+                >
+                  {getAllowedAllegationStatuses(selectedAllegation.status).map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <Label
+                  color={getAllegationStatusOption(selectedAllegation.status).color}
+                  variant="soft"
+                >
+                  {getAllegationStatusOption(selectedAllegation.status).label}
+                </Label>
+              )}
+            </Stack>
+
+            {(selectedAllegation.affectedShifts || []).length ? (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {selectedAllegation.affectedShifts.length} affected shift
+                {selectedAllegation.affectedShifts.length === 1 ? '' : 's'} from the API.
               </Alert>
-            ) : (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                No shifts are waiting on this allegation.
-              </Alert>
-            )}
+            ) : null}
           </Box>
 
-          <Scrollbar>
-            <Table size="small" sx={{ minWidth: 1100 }}>
-              <TableHeadCustom headLabel={SHIFT_TABLE_HEAD} />
+          {(selectedAllegation.affectedShifts || []).length ? (
+            <Scrollbar>
+              <Table size="small" sx={{ minWidth: 1100 }}>
+                <TableHeadCustom headLabel={SHIFT_TABLE_HEAD} />
 
-              <TableBody>
-                {(selectedAllegation.affectedShifts || []).map((shift) => {
-                  const status = getShiftActionStatusOption(shift.status);
-                  const canAction = shift.status === SHIFT_ACTION_STATUS.NEEDS_REALLOCATION;
+                <TableBody>
+                  {(selectedAllegation.affectedShifts || []).map((shift) => {
+                    const status = getShiftActionStatusOption(shift.status);
+                    const canAction = shift.status === SHIFT_ACTION_STATUS.NEEDS_REALLOCATION;
 
-                  return (
-                    <TableRow key={shift.id} hover>
-                      <TableCell>{shift.ref}</TableCell>
-                      <TableCell>
-                        {shift.date ? fDate(shift.date) : '—'}
-                        {shift.startTime || shift.endTime ? (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {shift.startTime}–{shift.endTime}
-                          </Typography>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{shift.location || '—'}</TableCell>
-                      <TableCell>{shift.role || '—'}</TableCell>
-                      <TableCell>
-                        <Label color={status.color} variant="soft">
-                          {status.label}
-                        </Label>
-                      </TableCell>
-                      <TableCell>{shift.replacementWorkerName || '—'}</TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: 'nowrap', minWidth: 260, width: 260 }}>
-                        {canAction ? (
-                          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ minWidth: 240 }}>
-                            <Tooltip title="Choose a replacement worker, then assign this shift" arrow>
-                              <Button
-                                type="button"
-                                size="small"
-                                variant="outlined"
-                                disabled={reallocating}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleOpenReallocate(shift);
-                                }}
-                                sx={{ whiteSpace: 'nowrap', minWidth: 108 }}
-                              >
-                                Re-allocate
-                              </Button>
-                            </Tooltip>
-                            <Tooltip title="Put the shift back so other suppliers can bid" arrow>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                disabled={republishing}
-                                onClick={() => handleRepublish(shift)}
-                                sx={{ whiteSpace: 'nowrap', minWidth: 108 }}
-                              >
-                                Re-publish
-                              </Button>
-                            </Tooltip>
-                          </Stack>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            {shift.status === SHIFT_ACTION_STATUS.REPUBLISHED ? 'Open for bids' : 'Completed'}
-                          </Typography>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-
-                <TableNoData notFound={!(selectedAllegation.affectedShifts || []).length} />
-              </TableBody>
-            </Table>
-          </Scrollbar>
+                    return (
+                      <TableRow key={shift.id} hover>
+                        <TableCell>{shift.ref}</TableCell>
+                        <TableCell>
+                          {shift.date ? fDate(shift.date) : '—'}
+                          {shift.startTime || shift.endTime ? (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {shift.startTime}–{shift.endTime}
+                            </Typography>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{shift.location || '—'}</TableCell>
+                        <TableCell>{shift.role || '—'}</TableCell>
+                        <TableCell>
+                          <Label color={status.color} variant="soft">
+                            {status.label}
+                          </Label>
+                        </TableCell>
+                        <TableCell>{shift.replacementWorkerName || '—'}</TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: 'nowrap', minWidth: 260, width: 260 }}>
+                          {canAction ? (
+                            <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ minWidth: 240 }}>
+                              <Tooltip title="Choose a replacement worker, then assign this shift" arrow>
+                                <Button
+                                  type="button"
+                                  size="small"
+                                  variant="outlined"
+                                  disabled={reallocating}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleOpenReallocate(shift);
+                                  }}
+                                  sx={{ whiteSpace: 'nowrap', minWidth: 108 }}
+                                >
+                                  Re-allocate
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title="Put the shift back so other suppliers can bid" arrow>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disabled={republishing}
+                                  onClick={() => handleRepublish(shift)}
+                                  sx={{ whiteSpace: 'nowrap', minWidth: 108 }}
+                                >
+                                  Re-publish
+                                </Button>
+                              </Tooltip>
+                            </Stack>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              {shift.status === SHIFT_ACTION_STATUS.REPUBLISHED ? 'Open for bids' : 'Completed'}
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Scrollbar>
+          ) : null}
         </Card>
       ) : null}
 

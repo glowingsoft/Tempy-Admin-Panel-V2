@@ -100,7 +100,6 @@ const CROSS_USER_LOCAL_KEYS = [
   'care-home-jobs',
   'individual-home-care-jobs',
   'care-home-job-types',
-  'agency-incoming-job-requests',
   'agency-staff-availability-blocks',
   'tempy-staff-shift-cancellations',
   'tempy-staff-shift-alerts',

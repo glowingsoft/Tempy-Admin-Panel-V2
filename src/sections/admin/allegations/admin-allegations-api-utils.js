@@ -200,11 +200,14 @@ export function mapAllegationFromApi(item = {}) {
   }
 
   const worker = item.worker || item.nurse || item.staff || item.user || null;
-  const shifts = collectShifts(item);
+  const source = asText(item.source).toLowerCase();
+  const derivedType = asText(item.derivedType);
+  // Prefer derivedType — API `source: "derived"` alone is not a feed card key.
   const feedType =
-    [item.feedType, item.category, item.listType, item.source, item.kind, item.type]
+    [item.derivedType, item.feedType, item.category, item.listType, item.kind, item.type, item.source]
       .map(normalizeFeedType)
       .find(Boolean) || '';
+  const isDerived = source === 'derived' || Boolean(feedType);
 
   return {
     id: pickId(item) || pickId(item.allegationId),
@@ -213,15 +216,24 @@ export function mapAllegationFromApi(item = {}) {
     workerEmail: asText(item.workerEmail || item.email) || personEmail(worker),
     employerName: asText(item.employerName || item.employer?.name),
     accountLabel: accountLabel(item, worker),
+    source,
+    derivedType,
     feedType,
+    canUpdateStatus: !isDerived,
     reportCount: Number(item.reportCount ?? item.reports ?? 0) || 0,
     allegationType: asText(item.allegationType || (feedType ? '' : item.type)),
     description: asText(item.description || item.reason || item.message || item.note),
-    status: asText(item.status || 'open'),
+    status: asText(item.status || 'open').toLowerCase().replace(/[\s-]+/g, '_'),
+    cleared: Boolean(item.cleared),
+    suspendedAt: item.suspendedAt || null,
     workerSuspended: isWorkerSuspended(item, worker),
     createdAt: item.createdAt || item.raisedAt || '',
     updatedAt: item.updatedAt || '',
-    affectedShifts: Array.isArray(shifts) ? shifts.map(mapAllegationShift).filter((shift) => shift.id) : [],
+    // Only what the API sends — never invent shifts.
+    affectedShifts: Array.isArray(item.affectedShifts)
+      ? item.affectedShifts.map(mapAllegationShift).filter((shift) => shift.id)
+      : [],
+    details: item.details && typeof item.details === 'object' ? item.details : null,
     raw: item,
   };
 }
@@ -324,9 +336,27 @@ export function collectSummaryCards(source) {
 
   if (typeof source !== 'object') return [];
 
-  return Object.entries(source)
-    .filter(([, value]) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))))
-    .map(([key, value]) => ({ key, label: summaryLabel(key), total: Number(value) }));
+  const cards = [];
+  Object.entries(source).forEach(([key, value]) => {
+    if (key === 'derived' && value && typeof value === 'object' && !Array.isArray(value)) {
+      Object.entries(value).forEach(([derivedKey, derivedTotal]) => {
+        if (derivedKey === 'total') return;
+        if (typeof derivedTotal !== 'number' && !(typeof derivedTotal === 'string' && Number.isFinite(Number(derivedTotal)))) {
+          return;
+        }
+        cards.push({
+          key: derivedKey,
+          label: summaryLabel(derivedKey),
+          total: Number(derivedTotal) || 0,
+        });
+      });
+      return;
+    }
+    if (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))) {
+      cards.push({ key, label: summaryLabel(key), total: Number(value) });
+    }
+  });
+  return cards;
 }
 
 export function mapReplacementWorker(item = {}) {

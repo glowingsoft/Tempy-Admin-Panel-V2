@@ -41,11 +41,6 @@ const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
-// Invoice
-const InvoiceListPage = lazy(() => import('src/pages/dashboard/invoice/list'));
-const InvoiceDetailsPage = lazy(() => import('src/pages/dashboard/invoice/details'));
-const InvoiceCreatePage = lazy(() => import('src/pages/dashboard/invoice/new'));
-const InvoiceEditPage = lazy(() => import('src/pages/dashboard/invoice/edit'));
 // User
 const UserProfilePage = lazy(() => import('src/pages/dashboard/user/profile'));
 const UserCardsPage = lazy(() => import('src/pages/dashboard/user/cards'));
@@ -77,9 +72,7 @@ const CalendarPage = lazy(() => import('src/pages/dashboard/calendar'));
 const KanbanPage = lazy(() => import('src/pages/dashboard/kanban'));
 // Test render page by role
 const PermissionDeniedPage = lazy(() => import('src/pages/dashboard/permission'));
-// Blank page
 const ParamsPage = lazy(() => import('src/pages/dashboard/params'));
-const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 
 const TermsPage = lazy(() => import('src/pages/dashboard/active-routes/terms'));
 const AboutUsPage = lazy(() => import('src/pages/dashboard/active-routes/about'));
@@ -170,16 +163,6 @@ export const adminDashboardRoutes = [
         ],
       },
       {
-        path: 'invoice',
-        children: [
-          { element: <InvoiceListPage />, index: true },
-          { path: 'list', element: <InvoiceListPage /> },
-          { path: ':id', element: <InvoiceDetailsPage /> },
-          { path: ':id/edit', element: <InvoiceEditPage /> },
-          { path: 'new', element: <InvoiceCreatePage /> },
-        ],
-      },
-      {
         path: 'post',
         children: [
           { element: <BlogPostsPage />, index: true },
@@ -216,7 +199,6 @@ export const adminDashboardRoutes = [
       { path: 'kanban', element: <KanbanPage /> },
       { path: 'permission', element: <PermissionDeniedPage /> },
       { path: 'params', element: <ParamsPage /> },
-      { path: 'blank', element: <BlankPage /> },
     ],
   },
 ];

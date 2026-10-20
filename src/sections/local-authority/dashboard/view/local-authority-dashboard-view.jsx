@@ -71,13 +71,6 @@ const MODULES = [
     color: 'error',
     href: paths.dashboard.localAuthority.jobs.bids,
   },
-  {
-    title: 'Contracts',
-    description: 'Rates · Service level',
-    icon: 'solar:file-check-bold-duotone',
-    color: 'success',
-    href: paths.dashboard.localAuthority.jobs.contracts,
-  },
 ];
 
 const EMPTY_DASHBOARD = {

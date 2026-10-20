@@ -17,7 +17,6 @@ import {
   HospitalPaymentsPage,
   HospitalEarningsPage,
   HospitalCompliancePage,
-  HospitalInvoicesPage,
   HospitalPostJobPage,
   HospitalCreatedJobsPage,
   HospitalCreatedJobDetailsPage,
@@ -28,19 +27,16 @@ import {
   LocalAuthorityPaymentsPage,
   LocalAuthorityEarningsPage,
   LocalAuthorityCompliancePage,
-  LocalAuthorityInvoicesPage,
   LocalAuthorityPostJobPage,
   LocalAuthorityCreatedJobsPage,
   LocalAuthorityCreatedJobDetailsPage,
   LocalAuthorityJobBidsPage,
-  LocalAuthorityContractsPage,
   IndividualHomeCareShiftsPage,
   IndividualHomeCareStaffPage,
   IndividualHomeCareMessagesPage,
   IndividualHomeCarePaymentsPage,
   IndividualHomeCareEarningsPage,
   IndividualHomeCareCompliancePage,
-  IndividualHomeCareInvoicesPage,
   IndividualHomeCarePostJobPage,
   IndividualHomeCareCreatedJobsPage,
   IndividualHomeCareCreatedJobDetailsPage,
@@ -86,17 +82,6 @@ const ProductCreatePage = lazy(() => import('src/pages/dashboard/product/new'));
 const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
-const InvoiceListPage = lazy(() => import('src/pages/dashboard/invoice/list'));
-const InvoiceDetailsPage = lazy(() => import('src/pages/dashboard/invoice/details'));
-const InvoiceCreatePage = lazy(() => import('src/pages/dashboard/invoice/new'));
-const InvoiceEditPage = lazy(() => import('src/pages/dashboard/invoice/edit'));
-
-const invoiceFlowChildren = (ListPage) => [
-  { element: <ListPage />, index: true },
-  { path: 'new', element: <InvoiceCreatePage /> },
-  { path: ':id/edit', element: <InvoiceEditPage /> },
-  { path: ':id', element: <InvoiceDetailsPage /> },
-];
 const UserProfilePage = lazy(() => import('src/pages/dashboard/user/profile'));
 const UserCardsPage = lazy(() => import('src/pages/dashboard/user/cards'));
 const UserListPage = lazy(() => import('src/pages/dashboard/user/list'));
@@ -122,7 +107,6 @@ const CalendarPage = lazy(() => import('src/pages/dashboard/calendar'));
 const KanbanPage = lazy(() => import('src/pages/dashboard/kanban'));
 const PermissionDeniedPage = lazy(() => import('src/pages/dashboard/permission'));
 const ParamsPage = lazy(() => import('src/pages/dashboard/params'));
-const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 
 const DashboardFaqsPage = lazy(() => import('src/pages/dashboard/faqs'));
 const DashboardSupportPage = lazy(() => import('src/pages/dashboard/support'));
@@ -212,7 +196,6 @@ export const dashboardRoutes = [
           { path: 'bids', element: <AgencyBidsPage /> },
           { path: 'contracts', element: <ContractsPage /> },
           { path: 'agreed-rates', element: <AgencyAgreedRatesPage /> },
-          { path: 'invoices', children: invoiceFlowChildren(InvoiceListPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -238,7 +221,6 @@ export const dashboardRoutes = [
           { path: 'payments', element: <HospitalPaymentsPage /> },
           { path: 'earnings', element: <HospitalEarningsPage /> },
           { path: 'compliance', element: <HospitalCompliancePage /> },
-          { path: 'invoices', children: invoiceFlowChildren(HospitalInvoicesPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -263,7 +245,6 @@ export const dashboardRoutes = [
           { path: 'payments', element: <LocalAuthorityPaymentsPage /> },
           { path: 'earnings', element: <LocalAuthorityEarningsPage /> },
           { path: 'compliance', element: <LocalAuthorityCompliancePage /> },
-          { path: 'invoices', children: invoiceFlowChildren(LocalAuthorityInvoicesPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -276,7 +257,6 @@ export const dashboardRoutes = [
           { path: 'jobs/created', element: <LocalAuthorityCreatedJobsPage /> },
           { path: 'jobs/created/:id', element: <LocalAuthorityCreatedJobDetailsPage /> },
           { path: 'jobs/bids', element: <LocalAuthorityJobBidsPage /> },
-          { path: 'jobs/contracts', element: <LocalAuthorityContractsPage /> },
         ],
       },
       {
@@ -289,7 +269,6 @@ export const dashboardRoutes = [
           { path: 'payments', element: <IndividualHomeCarePaymentsPage /> },
           { path: 'earnings', element: <IndividualHomeCareEarningsPage /> },
           { path: 'compliance', element: <IndividualHomeCareCompliancePage /> },
-          { path: 'invoices', children: invoiceFlowChildren(IndividualHomeCareInvoicesPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -321,7 +300,6 @@ export const dashboardRoutes = [
           { path: 'agreed-rates', element: <HomeCareCompanyAgreedRatesPage /> },
           { path: 'contracts', element: <ContractsPage /> },
           { path: 'earnings', element: <HomeCareCompanyEarningsPage /> },
-          { path: 'invoices', children: invoiceFlowChildren(InvoiceListPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -346,7 +324,6 @@ export const dashboardRoutes = [
           { path: 'agreed-rates', element: <StaffMemberAgreedRatesPage /> },
           { path: 'permanent-hires', element: <PermanentHiresPage /> },
           { path: 'earnings', element: <StaffMemberEarningsPage /> },
-          { path: 'invoices', children: invoiceFlowChildren(InvoiceListPage) },
           { path: 'faqs', element: <DashboardFaqsPage /> },
           { path: 'support', element: <DashboardSupportPage /> },
           { path: 'terms', element: <DashboardTermsPage /> },
@@ -407,16 +384,6 @@ export const dashboardRoutes = [
         ],
       },
       {
-        path: 'invoice',
-        children: [
-          { element: <InvoiceListPage />, index: true },
-          { path: 'list', element: <InvoiceListPage /> },
-          { path: ':id', element: <InvoiceDetailsPage /> },
-          { path: ':id/edit', element: <InvoiceEditPage /> },
-          { path: 'new', element: <InvoiceCreatePage /> },
-        ],
-      },
-      {
         path: 'post',
         children: [
           { element: <BlogPostsPage />, index: true },
@@ -453,7 +420,6 @@ export const dashboardRoutes = [
       { path: 'kanban', element: <KanbanPage /> },
       { path: 'permission', element: <PermissionDeniedPage /> },
       { path: 'params', element: <ParamsPage /> },
-      { path: 'blank', element: <BlankPage /> },
     ],
   },
 ];

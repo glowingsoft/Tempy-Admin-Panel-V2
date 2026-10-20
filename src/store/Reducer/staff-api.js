@@ -13,6 +13,13 @@ function resolveStaffListUrl(accountKey) {
   return API_ROUTES[routeKey] || API_ROUTES.CARE_HOME_STAFF;
 }
 
+function resolveStaffByIdUrl(accountKey, id) {
+  const listKey = STAFF_ROUTE_KEYS_BY_ACCOUNT[accountKey] || 'CARE_HOME_STAFF';
+  const byIdFn = API_ROUTES[`${listKey}_BY_ID`];
+  if (typeof byIdFn === 'function') return byIdFn(id);
+  return API_ROUTES.CARE_HOME_STAFF_BY_ID(id);
+}
+
 /** Job-bids accept modal — role-specific /staff/available */
 const AVAILABLE_STAFF_ROUTE_BY_MODE = {
   careHome: 'CARE_HOME_STAFF_AVAILABLE',
@@ -78,6 +85,27 @@ export const staffApi = createApi({
               { type: 'DashboardStaff', id: `LIST-${arg?.accountKey || 'care_home'}` },
             ]
           : [{ type: 'DashboardStaff', id: `LIST-${arg?.accountKey || 'care_home'}` }],
+    }),
+
+    /**
+     * GET /web/{role}/staff/:id — customer staff details (care-home, hospital, LA, user, …).
+     */
+    getDashboardStaffById: builder.query({
+      query: ({ accountKey = 'care_home', id }) => ({
+        url: resolveStaffByIdUrl(accountKey, id),
+        method: 'GET',
+      }),
+      transformResponse: (response) => {
+        const raw = response?.data ?? response;
+        if (!raw || typeof raw !== 'object') return null;
+        return mapDashboardStaffToUi(raw);
+      },
+      providesTags: (result, _error, arg) =>
+        result?.id
+          ? [{ type: 'DashboardStaff', id: result.id }]
+          : arg?.id
+            ? [{ type: 'DashboardStaff', id: arg.id }]
+            : [],
     }),
 
     /**
@@ -180,6 +208,7 @@ export const staffApi = createApi({
 export const {
   useGetDashboardStaffQuery,
   useLazyGetDashboardStaffQuery,
+  useGetDashboardStaffByIdQuery,
   useGetAvailableStaffQuery,
   useGetCareHomeAvailableStaffQuery,
 } = staffApi;

@@ -23,10 +23,10 @@ export const ALLEGATION_FEED_TYPES = [
 export const ALLEGATION_SCREEN_CARDS = [
   {
     value: ALLEGATION_FEED.RAISED,
-    title: 'Raised allegations',
+    title: 'All allegations',
     icon: 'solar:danger-triangle-bold-duotone',
     color: 'error',
-    note: 'Formal allegations are nurses only. Raise one from Individual (Staff Member). The third allegation that still counts suspends the nurse and stops upcoming bookings.',
+    note: '',
   },
   {
     value: ALLEGATION_FEED.CANCELLATION_STRIKE,

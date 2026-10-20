@@ -7,7 +7,6 @@ import { AddJobView } from 'src/sections/care-home/jobs/view/add-job-view';
 import { CreatedJobsView } from 'src/sections/care-home/jobs/view/created-jobs-view';
 import { CreatedJobDetailsView } from 'src/sections/care-home/jobs/view/created-job-details-view';
 import { JobBidsView } from 'src/sections/care-home/jobs/view/job-bids-view';
-import { CareHomeInvoiceListView } from 'src/sections/care-home/invoices/view/care-home-invoice-list-view';
 import { StaffListView } from 'src/sections/staff/view/staff-list-view';
 import { StaffProvider } from 'src/sections/staff/context/staff-provider';
 import { AgencyPaymentsView } from 'src/sections/agency/payments/view/agency-payments-view';
@@ -41,10 +40,6 @@ export function HospitalEarningsView() {
 
 export function HospitalComplianceView() {
   return <CareHomeComplianceView />;
-}
-
-export function HospitalInvoicesView() {
-  return <CareHomeInvoiceListView />;
 }
 
 export function HospitalPostJobView() {

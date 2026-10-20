@@ -79,7 +79,6 @@ import { useUploadAwsFileMutation } from 'src/store/Reducer/upload-api';
 import { handleApiError } from 'src/store/handleApiError';
 import { selectUser } from 'src/store/slices/userSlice';
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
-import { loadAgencyJobRequests } from 'src/sections/care-home/jobs/agency-job-request';
 import {
   buildAgencyBidBody,
   bidMatchesShift,
@@ -407,24 +406,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
   );
 
   const [browserOrigin, setBrowserOrigin] = useState(null);
-  const [directRequests, setDirectRequests] = useState(() =>
-    useAgencyApis ? loadAgencyJobRequests() : []
-  );
 
   const profileOrigin = useMemo(() => getAgencyUserLatLng(currentUser), [currentUser]);
   const userOrigin = profileOrigin || browserOrigin;
-
-  useEffect(() => {
-    if (!useAgencyApis) return undefined;
-
-    const syncDirectRequests = () => setDirectRequests(loadAgencyJobRequests());
-    window.addEventListener('agency-job-requests-updated', syncDirectRequests);
-    window.addEventListener('storage', syncDirectRequests);
-    return () => {
-      window.removeEventListener('agency-job-requests-updated', syncDirectRequests);
-      window.removeEventListener('storage', syncDirectRequests);
-    };
-  }, [useAgencyApis]);
 
   useEffect(() => {
     if (profileOrigin) return undefined;
@@ -906,15 +890,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
   const agencyJobs = useMemo(() => {
     const apiJobs = jobsResponse?.data || [];
-
-    if (isStaffMember) {
-      return applyJobDistances(apiJobs, userOrigin);
-    }
-
-    const apiIds = new Set(apiJobs.map((job) => job.id));
-    const incoming = (directRequests || []).filter((job) => job?.id && !apiIds.has(job.id));
-    return applyJobDistances([...incoming, ...apiJobs], userOrigin);
-  }, [isStaffMember, jobsResponse?.data, userOrigin, directRequests]);
+    return applyJobDistances(apiJobs, userOrigin);
+  }, [jobsResponse?.data, userOrigin]);
 
   const listLoading = jobsLoading;
 

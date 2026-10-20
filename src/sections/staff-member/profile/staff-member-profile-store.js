@@ -42,20 +42,16 @@ export function clampToWordLimit(text = '', limit = PERSONAL_SUMMARY_WORD_LIMIT)
 
 export const DEFAULT_STAFF_PROFESSIONAL_PROFILE = {
   bio: '',
-  training: [
-    { id: 't1', name: 'Moving & handling', status: 'valid', expiresOn: '2027-03-12' },
-    { id: 't2', name: 'Medication administration', status: 'valid', expiresOn: '2026-11-08' },
-    { id: 't3', name: 'Safeguarding adults', status: 'due_soon', expiresOn: '2026-09-20' },
-  ],
+  training: [],
   dbs: {
     status: 'clear',
-    certificateNumber: '001234567890',
-    issueDate: '2025-04-18',
-    expiryDate: '2028-04-18',
+    certificateNumber: '',
+    issueDate: '',
+    expiryDate: '',
   },
   rtw: {
     status: 'continuous',
-    documentType: 'British passport',
+    documentType: '',
     expiryDate: '',
   },
   certificates: {

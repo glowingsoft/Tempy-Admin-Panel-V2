@@ -42,7 +42,6 @@ import {
   getJobApiErrorMessage,
   isJobCreateSoftError,
 } from '../care-home-job-api-utils';
-import { appendAgencyJobRequest } from '../agency-job-request';
 import {
   EMPTY_JOB_DRAFT,
   createDefaultSchedule,
@@ -221,21 +220,30 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
     setSubmitting(true);
 
     try {
-      const body = buildCareHomeJobPayload(draft, branch, { isUser });
-      await createJob(body).unwrap();
+      const isDirectRequest = Boolean(
+        draft.requestFromAgency || draft.agencyId || draft.workerId || draft.employeeId
+      );
+      const directId = String(
+        draft.workerId || draft.employeeId || draft.agencyId || ''
+      ).trim();
+      const schedules = (draft.schedules || []).map((entry) => ({
+        ...entry,
+        receivingBids: directId ? false : entry.receivingBids,
+      }));
 
-      if (draft.requestFromAgency && (draft.agencyId || draft.agencyName)) {
-        appendAgencyJobRequest({
+      const body = buildCareHomeJobPayload(
+        {
           ...draft,
-          type: draft.name || draft.type,
-          assignedAgency: draft.agencyName,
-        });
-        toast.success(
-          draft.agencyName ? `Job created and request noted for ${draft.agencyName}` : 'Job created'
-        );
-      } else {
-        toast.success('Job created successfully');
-      }
+          workerId: directId || draft.workerId,
+          employeeId: directId || draft.employeeId,
+          schedules,
+          receivingBids: isDirectRequest && directId ? false : draft.receivingBids,
+        },
+        branch,
+        { isUser }
+      );
+      await createJob(body).unwrap();
+      toast.success('Job created successfully');
       router.push(redirectPath);
     } catch (err) {
       if (isJobCreateSoftError(err)) {
