@@ -1,62 +1,119 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { useDispatch } from 'react-redux';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import Select from '@mui/material/Select';
-import FormControl from '@mui/material/FormControl';
 import Collapse from '@mui/material/Collapse';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
+import { toast } from 'src/components/snackbar';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { hideScrollY } from 'src/theme/styles/mixins';
 import { fCurrency } from 'src/utils/format-number';
 
+import { getJobApiErrorMessage } from 'src/sections/care-home/jobs/care-home-job-api-utils';
+
 import { useGetAgencyStaffQuery } from 'src/store/Reducer/agency-staff-api';
+import { useGetHomeCareCompanyStaffQuery } from 'src/store/Reducer/home-care-company-staff-api';
+import {
+  agencyAvailabilityApi,
+  useCreateAgencyBookingMutation,
+} from 'src/store/Reducer/agency-availability-api';
+import {
+  homeCareCompanyAvailabilityApi,
+  useCreateHomeCareCompanyBookingMutation,
+} from 'src/store/Reducer/home-care-company-availability-api';
+import { agencyJobsApi } from 'src/store/Reducer/agency-jobs-api';
+import { agencyBidsApi } from 'src/store/Reducer/agency-bids-api';
+import { homeCareCompanyJobsApi } from 'src/store/Reducer/home-care-company-jobs-api';
+import { homeCareCompanyBidsApi } from 'src/store/Reducer/home-care-company-bids-api';
 
 import { AgencyJobStaffBlock } from '../agency-job-staff-block';
 import { AgencyJobCalendarBlock } from '../agency-job-calendar-block';
 import { AssignStaffPopover } from '../agency-assign-staff-popover';
-
-import { AGENCY_JOB_TABS } from 'src/_mock/_agency-jobs';
 import {
-  ASSIGN_AGENCIES,
   SHIFT_LEGEND,
-  getCategoriesForJob,
-  getDaysForJob,
-  getInitialSelectedCell,
-  getShiftConfig,
-  getStatsForAgency,
+  buildInitialShiftSelection,
+  findStaffById,
   formatDayRangeLabel,
   formatDistanceKm,
+  formatShiftLabel,
+  getCategoriesForJob,
+  getDaysForJob,
   getDistanceKm,
-  resolveAssignViewMode,
+  getInitialSelectedCell,
+  getShiftStatusLabel,
+  readAcceptedBidId,
   resolveAssignScreenMode,
+  resolveAssignViewMode,
   withStaffDistances,
-} from 'src/_mock/_agency-assign-staff';
+} from '../agency-assign-staff-utils';
+
+import { AGENCY_JOB_TABS } from 'src/_mock/_agency-jobs';
 
 const SIDEBAR_W = 280;
 
-const CELL_STATUS_LABELS = {
-  upcoming: 'Upcoming Shift',
-  completed: 'Completed Shift',
-  assigned: 'Assigned Shift',
-  replacement: 'Needs Replacement',
-  pending: 'Pending Request',
-  noshow: 'Staff Did Not Appear',
-  empty: 'Unassigned',
-};
+function isMongoObjectId(value) {
+  return /^[a-f\d]{24}$/i.test(String(value || '').trim());
+}
 
-function getShiftStatusLabel(cell) {
-  if (!cell?.status) return 'Shift';
-  return CELL_STATUS_LABELS[cell.status] || 'Shift';
+function initialsFromName(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+}
+
+function resolveWorkerId(staff) {
+  const candidates = [
+    staff?.staffId,
+    staff?.workerId,
+    staff?.raw?.staffId,
+    staff?.raw?.workerId,
+    staff?.raw?.staff?._id,
+    staff?.id,
+  ];
+  for (const candidate of candidates) {
+    const id = String(candidate || '').trim();
+    if (isMongoObjectId(id)) return id;
+  }
+  return '';
+}
+
+function mapApiStaffToAssignRoster(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .filter((member) => member?.id && !member?.isVacant)
+    .map((member, index) => {
+      const worked = Number(member.totalHoursWorked ?? member.weeklyHours ?? 0) || 0;
+      const allowed = Number(member.hoursAllowed ?? 60) || 60;
+      const lat = Number(member.latitude);
+      const lng = Number(member.longitude);
+      const workerId = resolveWorkerId(member);
+      return {
+        id: member.id,
+        staffId: member.staffId || member.id,
+        workerId,
+        name: member.name || 'Staff',
+        hours: `${worked}h/${allowed}h this week`,
+        rating: Number(member.rating ?? 0) || 0,
+        reviews: Number(member.reviewCount ?? 0) || 0,
+        avatarUrl: member.avatarUrl || '',
+        initials: initialsFromName(member.name),
+        rowBg: index % 2 === 0 ? '#eef5fc' : '#f5faf5',
+        latitude: Number.isFinite(lat) && lat !== 0 ? lat : null,
+        longitude: Number.isFinite(lng) && lng !== 0 ? lng : null,
+      };
+    })
+    .filter((member) => member.workerId || member.id);
 }
 
 function ShiftLegend({ items }) {
@@ -97,79 +154,11 @@ function ShiftLegend({ items }) {
   );
 }
 
-function formatShiftLabel(dateStr, shiftId) {
-  const date = parseISO(dateStr);
-  const dayLabel = format(date, 'EEE MMM d');
-  if (shiftId === '09a-05p') return `${dayLabel}, 09:00 AM - 05:00 PM`;
-  if (shiftId === '02p-06p' || shiftId === '03a-06p') return `${dayLabel}, 02:00 PM - 06:00 PM`;
-  if (shiftId === '10p-06a') return `${dayLabel}, 10:00 PM - 06:00 AM`;
-  return `${dayLabel}, ${shiftId}`;
-}
-
-function initialsFromName(name) {
-  const parts = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!parts.length) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
-}
-
-function mapApiStaffToAssignRoster(list = []) {
-  return (Array.isArray(list) ? list : [])
-    .filter((member) => member?.id && !member?.isVacant)
-    .map((member, index) => {
-      const worked = Number(member.totalHoursWorked ?? member.weeklyHours ?? 0) || 0;
-      const allowed = Number(member.hoursAllowed ?? 60) || 60;
-      const lat = Number(member.latitude);
-      const lng = Number(member.longitude);
-      return {
-        id: member.id,
-        staffId: member.staffId || member.id,
-        name: member.name || 'Staff',
-        hours: `${worked}h/${allowed}h this week`,
-        rating: Number(member.rating ?? 0) || 0,
-        reviews: Number(member.reviewCount ?? 0) || 0,
-        avatarUrl: member.avatarUrl || '',
-        initials: initialsFromName(member.name),
-        rowBg: index % 2 === 0 ? '#eef5fc' : '#f5faf5',
-        latitude: Number.isFinite(lat) && lat !== 0 ? lat : null,
-        longitude: Number.isFinite(lng) && lng !== 0 ? lng : null,
-      };
-    });
-}
-
-function findStaffById(staffList, id) {
-  if (id == null || id === '') return null;
-  return (staffList || []).find((member) => String(member.id) === String(id)) || null;
-}
-
-function buildInitialShiftSelection(categories, activeJob) {
-  const selection = {};
-
-  categories.forEach((category) => {
-    category.jobs.forEach((jobItem) => {
-      const key = `${category.id}-${jobItem.id}`;
-      if (activeJob?.id === jobItem.id && activeJob?.assignShift?.shiftId) {
-        selection[key] = activeJob.assignShift.shiftId;
-      } else if (activeJob?.id === jobItem.id && activeJob?.assignShifts?.shiftIds?.[0]) {
-        selection[key] = activeJob.assignShifts.shiftIds[0];
-      } else {
-        selection[key] = jobItem.shiftRows[0]?.id;
-      }
-    });
-  });
-
-  return selection;
-}
-
 function JobCategorySection({
   category,
   days,
   dateRangeLabel,
   viewMode,
-  activeJobId,
   expanded,
   onToggle,
   onPrevPeriod,
@@ -184,6 +173,7 @@ function JobCategorySection({
   cellRefs,
   readOnly,
   staffList,
+  assigning,
 }) {
   return (
     <Box sx={{ mb: 1 }}>
@@ -235,7 +225,7 @@ function JobCategorySection({
       </Box>
 
       <Collapse in={expanded}>
-        <Box sx={{ px: 1, py: 1.5 }}>
+        <Box sx={{ px: 1, py: 1.5, opacity: assigning ? 0.7 : 1, pointerEvents: assigning ? 'none' : 'auto' }}>
           {category.jobs.map((jobItem) =>
             viewMode === 'agency' ? (
               <AgencyJobStaffBlock
@@ -262,6 +252,7 @@ function JobCategorySection({
                 onCellClick={onCalendarCellClick}
                 cellRefs={cellRefs}
                 readOnly={readOnly}
+                staffList={staffList}
               />
             )
           )}
@@ -271,28 +262,47 @@ function JobCategorySection({
   );
 }
 
+// ----------------------------------------------------------------------
 
-export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTabChange }) {
+export function AgencyAssignStaffView({
+  job,
+  currentTab = 'active',
+  onBack,
+  onTabChange,
+  mode = 'agency',
+}) {
+  const dispatch = useDispatch();
+  const isHomeCareCompany = mode === 'homeCareCompany';
   const screenMode = useMemo(() => resolveAssignScreenMode(job), [job]);
   const isViewOnly = screenMode === 'viewStaff';
 
-  const { data: staffResponse, isFetching: staffLoading } = useGetAgencyStaffQuery({
-    page: 0,
-    limit: 200,
-    status: 'active',
-  });
+  const agencyStaffQuery = useGetAgencyStaffQuery(
+    { page: 0, limit: 200, status: 'active' },
+    { skip: isHomeCareCompany }
+  );
+  const hccStaffQuery = useGetHomeCareCompanyStaffQuery(
+    { page: 0, limit: 200, status: 'active' },
+    { skip: !isHomeCareCompany }
+  );
+
+  const staffResponse = isHomeCareCompany ? hccStaffQuery.data : agencyStaffQuery.data;
+  const staffLoading = isHomeCareCompany ? hccStaffQuery.isFetching : agencyStaffQuery.isFetching;
+
+  const [createAgencyBooking, agencyAssignState] = useCreateAgencyBookingMutation();
+  const [createHccBooking, hccAssignState] = useCreateHomeCareCompanyBookingMutation();
+  const assigning = isHomeCareCompany ? hccAssignState.isLoading : agencyAssignState.isLoading;
 
   const assignStaffList = useMemo(
     () => mapApiStaffToAssignRoster(staffResponse?.data),
     [staffResponse?.data]
   );
-  const viewStaffList = assignStaffList;
 
   const [viewMode, setViewMode] = useState(() => resolveAssignViewMode(job));
   const [dayOffset, setDayOffset] = useState(0);
   const visibleCategories = useMemo(() => getCategoriesForJob(job), [job]);
   const visibleDays = useMemo(() => getDaysForJob(job, dayOffset), [job, dayOffset]);
   const dateRangeLabel = useMemo(() => formatDayRangeLabel(visibleDays), [visibleDays]);
+  const acceptedBidId = useMemo(() => readAcceptedBidId(job), [job]);
 
   const jobMeta = useMemo(
     () => ({
@@ -301,27 +311,22 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
       latitude: job?.latitude ?? null,
       longitude: job?.longitude ?? null,
       gender: job?.gender || '',
-      postedBy: job?.postedBy || null,
+      postedBy: job?.postedBy || { name: '', avatarUrl: '' },
       rating: job?.rating ?? 0,
       reviewCount: job?.reviewCount ?? 0,
       totalPay: job?.totalPay ?? 0,
       hourlyRate: job?.hourlyRate ?? 0,
       postedDate: job?.schedule || '',
+      title: job?.title || job?.role || 'Job',
     }),
     [job]
   );
 
-  const [agency, setAgency] = useState(job?.agencyId || 'careplus');
-  const agencyStats = useMemo(() => getStatsForAgency(agency), [agency]);
   const [selectedShift, setSelectedShift] = useState(() => getInitialSelectedCell(job));
   const [expandedCategories, setExpandedCategories] = useState(() => {
     const categories = getCategoriesForJob(job);
-    const config = getShiftConfig(job);
-    if (config?.categoryId) {
-      return { [config.categoryId]: true };
-    }
     const first = categories[0];
-    return first ? { [first.id]: true } : { 'senior-care-days': true };
+    return first ? { [first.id]: true } : {};
   });
   const [jobShiftSelection, setJobShiftSelection] = useState(() =>
     buildInitialShiftSelection(getCategoriesForJob(job), job)
@@ -334,6 +339,18 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState(null);
   const cellRefs = useMemo(() => ({ current: {} }), []);
+
+  useEffect(() => {
+    const categories = getCategoriesForJob(job);
+    setSelectedShift(getInitialSelectedCell(job));
+    setJobShiftSelection(buildInitialShiftSelection(categories, job));
+    setAssignments({});
+    setGridCells({});
+    setExpandedCategories(() => {
+      const first = categories[0];
+      return first ? { [first.id]: true } : {};
+    });
+  }, [job?.id]);
 
   const nearestStaffList = useMemo(
     () =>
@@ -354,7 +371,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
   const assignedStaff = useMemo(() => {
     const fromSelection = findStaffById(assignStaffList, selectedShift?.assignedStaffId);
     if (fromSelection) return fromSelection;
-    return assignStaffList[0] || null;
+    return null;
   }, [assignStaffList, selectedShift?.assignedStaffId]);
 
   const assignedStaffDistance = useMemo(
@@ -368,12 +385,14 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
     [jobMeta.latitude, jobMeta.longitude, assignedStaff]
   );
 
+  const shiftCountLabel = String(job?.shiftRows?.length || 0);
+
   const toggleCategory = useCallback((id) => {
     setExpandedCategories((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const handleViewModeChange = useCallback((mode) => {
-    setViewMode(mode);
+  const handleViewModeChange = useCallback((nextMode) => {
+    setViewMode(nextMode);
     setPopoverAnchor(null);
   }, []);
 
@@ -389,96 +408,197 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
     setJobShiftSelection((prev) => ({ ...prev, [`${categoryId}-${jobId}`]: shiftId }));
   }, []);
 
-  const handleAssign = useCallback((categoryId, jobId, shiftId, date, staffId) => {
-    if (isViewOnly) return;
-
+  const applyLocalAssignment = useCallback((categoryId, jobId, shiftId, date, staffId) => {
     const key = `${categoryId}-${jobId}-${shiftId}`;
     setAssignments((prev) => {
       const shiftMap = { ...(prev[key] || {}) };
       shiftMap[date] = staffId == null ? null : staffId;
       return { ...prev, [key]: shiftMap };
     });
-  }, [isViewOnly]);
 
-  const handleCellSelect = useCallback(({ categoryId, jobId, shiftId, date, staffId }) => {
-    const label = formatShiftLabel(date, shiftId);
-
-    setSelectedShift({
-      categoryId,
-      jobId,
-      shiftId,
-      date,
-      label,
-      duration: shiftId === '02p-06p' || shiftId === '03a-06p' ? '4h' : '8h',
-      break: '30m',
-      totalCost: shiftId === '02p-06p' || shiftId === '03a-06p' ? 60 : 120,
-      hourlyRate: job?.hourlyRate || 0,
-      earning: job?.totalPay || 0,
-      status: isViewOnly ? 'Assigned Shift' : 'Upcoming Shift',
-      assignedStaffId: staffId,
-    });
-  }, [job, isViewOnly]);
-
-  const handleCalendarCellClick = useCallback(({ categoryId, jobId, shiftId, date, cell, anchorEl }) => {
-    const label = formatShiftLabel(date, shiftId);
-
-    setSelectedShift({
-      categoryId,
-      jobId,
-      shiftId,
-      date,
-      label,
-      duration: shiftId === '02p-06p' || shiftId === '03a-06p' ? '4h' : '8h',
-      break: '30m',
-      totalCost: shiftId === '02p-06p' || shiftId === '03a-06p' ? 60 : 120,
-      hourlyRate: job?.hourlyRate || 0,
-      earning: job?.totalPay || 0,
-      status: getShiftStatusLabel(cell),
-      assignedStaffId: cell?.staffId || null,
-    });
-
-    if (!isViewOnly && cell?.status === 'empty' && anchorEl) {
-      const rect = anchorEl.getBoundingClientRect();
-      setPopoverAnchor({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
-      setPopoverShiftLabel(label);
-      setPopoverCellKey({ categoryId, jobId, shiftId, date });
-      setSearchQuery('');
-      setSelectedStaffId(nearestStaffList[0]?.id ?? null);
-    } else {
-      setPopoverAnchor(null);
-    }
-  }, [job, isViewOnly, nearestStaffList]);
-
-  const handlePopoverSelectStaff = useCallback(
-    (staffId) => {
-      setSelectedStaffId(staffId);
-      if (!popoverCellKey) return;
-
-      const { categoryId, jobId, shiftId, date } = popoverCellKey;
-
-      setGridCells((prev) => ({
-        ...prev,
-        [categoryId]: {
-          ...prev[categoryId],
-          [jobId]: {
-            ...prev[categoryId]?.[jobId],
-            [shiftId]: {
-              ...prev[categoryId]?.[jobId]?.[shiftId],
-              [date]: { status: 'upcoming', staffId },
-            },
+    setGridCells((prev) => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [jobId]: {
+          ...prev[categoryId]?.[jobId],
+          [shiftId]: {
+            ...prev[categoryId]?.[jobId]?.[shiftId],
+            [date]: staffId
+              ? { status: 'upcoming', staffId }
+              : { status: 'empty', staffId: null },
           },
         },
-      }));
+      },
+    }));
+  }, []);
 
+  const persistAssignment = useCallback(
+    async (staffMember) => {
+      const workerId = resolveWorkerId(staffMember);
+      if (!isMongoObjectId(acceptedBidId)) {
+        toast.error('Missing accepted bid for this shift — assign from Active jobs after the bid is accepted.');
+        return false;
+      }
+      if (!isMongoObjectId(workerId)) {
+        toast.error('Select a valid staff member to assign');
+        return false;
+      }
+
+      try {
+        const body = { bid: acceptedBidId, worker: workerId };
+        if (isHomeCareCompany) {
+          await createHccBooking(body).unwrap();
+          dispatch(
+            homeCareCompanyAvailabilityApi.util.invalidateTags([
+              { type: 'HomeCareCompanyBookingCalendar', id: 'LIST' },
+            ])
+          );
+          dispatch(homeCareCompanyJobsApi.util.invalidateTags([{ type: 'HomeCareCompanyJob', id: 'LIST' }]));
+          dispatch(homeCareCompanyBidsApi.util.invalidateTags([{ type: 'HomeCareCompanyBid', id: 'LIST' }]));
+        } else {
+          await createAgencyBooking(body).unwrap();
+          dispatch(
+            agencyAvailabilityApi.util.invalidateTags([{ type: 'AgencyBookingCalendar', id: 'LIST' }])
+          );
+          dispatch(agencyJobsApi.util.invalidateTags([{ type: 'AgencyJob', id: 'LIST' }]));
+          dispatch(agencyBidsApi.util.invalidateTags([{ type: 'AgencyBid', id: 'LIST' }]));
+        }
+        toast.success('Staff assigned — check Shifts calendar');
+        return true;
+      } catch (err) {
+        toast.error(
+          getJobApiErrorMessage(err) ||
+          err?.data?.message ||
+          err?.error ||
+          err?.message ||
+          'Failed to assign staff'
+        );
+        return false;
+      }
+    },
+    [acceptedBidId, createAgencyBooking, createHccBooking, dispatch, isHomeCareCompany]
+  );
+
+  const handleAssign = useCallback(
+    async (categoryId, jobId, shiftId, date, staffId) => {
+      if (isViewOnly || assigning) return;
+
+      if (staffId == null) {
+        applyLocalAssignment(categoryId, jobId, shiftId, date, null);
+        return;
+      }
+
+      const staffMember = findStaffById(assignStaffList, staffId);
+      if (!staffMember) {
+        toast.error('Staff member not found');
+        return;
+      }
+
+      const ok = await persistAssignment(staffMember);
+      if (!ok) return;
+
+      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId);
+      setSelectedShift((prev) => ({
+        ...prev,
+        categoryId,
+        jobId,
+        shiftId,
+        date,
+        assignedStaffId: staffId,
+        status: 'Upcoming Shift',
+      }));
+    },
+    [applyLocalAssignment, assignStaffList, assigning, isViewOnly, persistAssignment]
+  );
+
+  const handleCellSelect = useCallback(
+    ({ categoryId, jobId, shiftId, date, staffId }) => {
+      const shiftRows = visibleCategories.flatMap((category) =>
+        category.jobs.flatMap((item) => item.shiftRows || [])
+      );
+      const label = formatShiftLabel(date, shiftId, shiftRows);
+      const row = shiftRows.find((item) => String(item.id) === String(shiftId));
+
+      setSelectedShift({
+        categoryId,
+        jobId,
+        shiftId,
+        date,
+        label,
+        duration: row?.startTime && row?.endTime ? `${row.startTime} – ${row.endTime}` : '—',
+        break: row?.breakMin ? `${row.breakMin}m` : job?.breakMin ? `${job.breakMin}m` : '—',
+        totalCost: row?.totalPay || job?.totalPay || 0,
+        hourlyRate: row?.hourlyRate || job?.hourlyRate || 0,
+        earning: row?.totalPay || job?.totalPay || 0,
+        status: isViewOnly ? 'Assigned Shift' : 'Upcoming Shift',
+        assignedStaffId: staffId,
+      });
+    },
+    [isViewOnly, job, visibleCategories]
+  );
+
+  const handleCalendarCellClick = useCallback(
+    ({ categoryId, jobId, shiftId, date, cell, anchorEl }) => {
+      const shiftRows = visibleCategories.flatMap((category) =>
+        category.jobs.flatMap((item) => item.shiftRows || [])
+      );
+      const label = formatShiftLabel(date, shiftId, shiftRows);
+      const row = shiftRows.find((item) => String(item.id) === String(shiftId));
+
+      setSelectedShift({
+        categoryId,
+        jobId,
+        shiftId,
+        date,
+        label,
+        duration: row?.startTime && row?.endTime ? `${row.startTime} – ${row.endTime}` : '—',
+        break: row?.breakMin ? `${row.breakMin}m` : job?.breakMin ? `${job.breakMin}m` : '—',
+        totalCost: row?.totalPay || job?.totalPay || 0,
+        hourlyRate: row?.hourlyRate || job?.hourlyRate || 0,
+        earning: row?.totalPay || job?.totalPay || 0,
+        status: getShiftStatusLabel(cell),
+        assignedStaffId: cell?.staffId || null,
+      });
+
+      if (!isViewOnly && cell?.status === 'empty' && anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        setPopoverAnchor({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+        setPopoverShiftLabel(label);
+        setPopoverCellKey({ categoryId, jobId, shiftId, date });
+        setSearchQuery('');
+        setSelectedStaffId(nearestStaffList[0]?.id ?? null);
+      } else {
+        setPopoverAnchor(null);
+      }
+    },
+    [isViewOnly, job, nearestStaffList, visibleCategories]
+  );
+
+  const handlePopoverSelectStaff = useCallback(
+    async (staffId) => {
+      setSelectedStaffId(staffId);
+      if (!popoverCellKey || assigning) return;
+
+      const staffMember = findStaffById(assignStaffList, staffId);
+      if (!staffMember) {
+        toast.error('Staff member not found');
+        return;
+      }
+
+      const ok = await persistAssignment(staffMember);
+      if (!ok) return;
+
+      const { categoryId, jobId, shiftId, date } = popoverCellKey;
+      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId);
       setSelectedShift((prev) => ({
         ...prev,
         assignedStaffId: staffId,
         status: 'Upcoming Shift',
       }));
-
       setPopoverAnchor(null);
     },
-    [popoverCellKey]
+    [applyLocalAssignment, assignStaffList, assigning, persistAssignment, popoverCellKey]
   );
 
   return (
@@ -508,24 +628,17 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
               <Iconify icon="eva:arrow-back-fill" width={22} />
             </IconButton>
             <Typography variant="h6" fontWeight={700}>
-              {isViewOnly ? 'View Staff' : 'Jobs'}
+              {isViewOnly ? 'View Staff' : 'Assign Staff'}
             </Typography>
           </Stack>
 
           <Box sx={{ px: 2, mb: 2 }}>
-            <FormControl fullWidth size="small">
-              <Select
-                value={agency}
-                onChange={(e) => setAgency(e.target.value)}
-                sx={{ borderRadius: 1.5, fontSize: '0.875rem' }}
-              >
-                {ASSIGN_AGENCIES.map((item) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
+              {jobMeta.title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap display="block">
+              {jobMeta.postedBy?.name || 'Employer'}
+            </Typography>
           </Box>
 
           <Box
@@ -569,9 +682,9 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
 
           <Stack direction="row" justifyContent="space-between" sx={{ px: 2, mb: 2 }}>
             {[
-              { label: 'Total Hours', value: agencyStats.hours },
-              { label: 'Total Cost', value: agencyStats.cost },
-              { label: 'Total Shifts', value: agencyStats.shifts },
+              { label: 'Shifts', value: shiftCountLabel },
+              { label: 'Rate', value: fCurrency(jobMeta.hourlyRate) },
+              { label: 'Pay', value: fCurrency(jobMeta.totalPay) },
             ].map((stat) => (
               <Box key={stat.label} sx={{ textAlign: 'center' }}>
                 <Typography variant="subtitle2" fontWeight={700}>
@@ -586,7 +699,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
 
           <Box sx={{ mx: 2, mb: 1.5, bgcolor: '#eeeeee', borderRadius: 1.5, p: 2 }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-              {selectedShift?.label}
+              {selectedShift?.label || '—'}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Total Earning {fCurrency(selectedShift?.earning)}
@@ -626,7 +739,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                 </>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  No active staff yet
+                  {isViewOnly ? 'No staff assigned yet' : 'Select staff to assign'}
                 </Typography>
               )}
             </Stack>
@@ -663,21 +776,8 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                           : '#4caf50',
                 }}
               />
-              <Typography
-                variant="caption"
-                fontWeight={600}
-                sx={{
-                  color:
-                    selectedShift?.status === 'Needs Replacement'
-                      ? '#f44336'
-                      : selectedShift?.status === 'Pending Request'
-                        ? '#fbc02d'
-                        : selectedShift?.status === 'Staff Did Not Appear'
-                          ? '#ff9800'
-                          : '#4caf50',
-                }}
-              >
-                {selectedShift?.status}
+              <Typography variant="caption" fontWeight={600}>
+                {selectedShift?.status || 'Shift'}
               </Typography>
             </Stack>
           </Box>
@@ -686,7 +786,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
             <Stack spacing={1.5}>
               <JobMediaThumb
                 image={jobMeta.image}
-                alt={job?.title || job?.role || 'Job'}
+                alt={jobMeta.title}
                 width="100%"
                 height={140}
               />
@@ -703,7 +803,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                   Job location
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                  {jobMeta.address}
+                  {jobMeta.address || '—'}
                 </Typography>
               </Box>
 
@@ -731,7 +831,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                   ) : null}
                   {nearestStaffList.map((staff, index) => {
                     const isNearest = index === 0;
-                    const isSelected = staff.id === assignedStaff?.id;
+                    const isSelected = String(staff.id) === String(assignedStaff?.id || '');
 
                     return (
                       <Stack
@@ -752,35 +852,13 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                             }`,
                         }}
                       >
-                        <Avatar
-                          src={staff.avatarUrl}
-                          sx={{ width: 28, height: 28, fontSize: 11 }}
-                        >
+                        <Avatar src={staff.avatarUrl} sx={{ width: 28, height: 28, fontSize: 11 }}>
                           {staff.initials}
                         </Avatar>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap>
-                            <Typography variant="caption" fontWeight={700} noWrap>
-                              {index + 1}. {staff.name}
-                            </Typography>
-                            {isNearest && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  px: 0.5,
-                                  py: 0.1,
-                                  borderRadius: 0.5,
-                                  bgcolor: 'success.main',
-                                  color: 'common.white',
-                                  fontWeight: 700,
-                                  fontSize: '0.6rem',
-                                  lineHeight: 1.4,
-                                }}
-                              >
-                                NEAREST
-                              </Typography>
-                            )}
-                          </Stack>
+                          <Typography variant="caption" fontWeight={700} noWrap>
+                            {index + 1}. {staff.name}
+                          </Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                             {staff.hours}
                           </Typography>
@@ -802,7 +880,7 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                 <Typography variant="caption" color="text.secondary">
                   Gender
                 </Typography>
-                <Typography variant="body2">{jobMeta.gender}</Typography>
+                <Typography variant="body2">{jobMeta.gender || '—'}</Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
@@ -814,41 +892,11 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                   </Avatar>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle2" fontWeight={700}>
-                      {jobMeta.postedBy.name}
+                      {jobMeta.postedBy.name || '—'}
                     </Typography>
                     <Typography variant="caption">
                       ({jobMeta.rating} ★) ({jobMeta.reviewCount} reviews)
                     </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                      <Box
-                        sx={{
-                          px: 1.5,
-                          py: 0.75,
-                          bgcolor: '#e0e0e0',
-                          borderRadius: 1,
-                          minWidth: 72,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography sx={{ fontWeight: 900, fontSize: '1.125rem', lineHeight: 1.2 }}>
-                          {fCurrency(jobMeta.totalPay)}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          px: 1.5,
-                          py: 0.75,
-                          bgcolor: '#e0e0e0',
-                          borderRadius: 1,
-                          minWidth: 72,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography sx={{ fontWeight: 900, fontSize: '1.125rem', lineHeight: 1.2 }}>
-                          {fCurrency(jobMeta.hourlyRate)}/h
-                        </Typography>
-                      </Box>
-                    </Stack>
                   </Box>
                 </Stack>
               </Box>
@@ -885,9 +933,6 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                   color: 'text.primary',
                   bgcolor: viewMode === 'calendar' ? '#e3f2fd' : 'background.paper',
                   borderRight: (theme) => `1px solid ${theme.vars.palette.divider}`,
-                  '&:hover': {
-                    bgcolor: viewMode === 'calendar' ? '#e3f2fd' : 'action.hover',
-                  },
                 }}
               >
                 Shift Calendar
@@ -903,43 +948,49 @@ export function AgencyAssignStaffView({ job, currentTab = 'active', onBack, onTa
                   fontWeight: viewMode === 'agency' ? 700 : 500,
                   color: 'text.primary',
                   bgcolor: viewMode === 'agency' ? '#e3f2fd' : 'background.paper',
-                  '&:hover': {
-                    bgcolor: viewMode === 'agency' ? '#e3f2fd' : 'action.hover',
-                  },
                 }}
               >
                 Agency Grid
               </Button>
             </Box>
 
-            <ShiftLegend items={SHIFT_LEGEND} />
+            <Stack direction="row" alignItems="center" spacing={1}>
+              {assigning ? <CircularProgress size={18} /> : null}
+              <ShiftLegend items={SHIFT_LEGEND} />
+            </Stack>
           </Stack>
 
           <Box sx={{ px: 1, pb: 3 }}>
-            {visibleCategories.map((category) => (
-              <JobCategorySection
-                key={category.id}
-                category={category}
-                days={visibleDays}
-                dateRangeLabel={dateRangeLabel}
-                viewMode={viewMode}
-                activeJobId={job?.id}
-                expanded={Boolean(expandedCategories[category.id])}
-                onToggle={() => toggleCategory(category.id)}
-                onPrevPeriod={handlePrevPeriod}
-                onNextPeriod={handleNextPeriod}
-                jobShiftSelection={jobShiftSelection}
-                onSelectShift={handleSelectShift}
-                assignments={assignments}
-                onAssign={handleAssign}
-                onCellSelect={handleCellSelect}
-                gridCells={gridCells}
-                onCalendarCellClick={handleCalendarCellClick}
-                cellRefs={cellRefs}
-                readOnly={isViewOnly}
-                staffList={isViewOnly ? viewStaffList : assignStaffList}
-              />
-            ))}
+            {!visibleCategories.length ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                No shift data on this job yet.
+              </Typography>
+            ) : (
+              visibleCategories.map((category) => (
+                <JobCategorySection
+                  key={category.id}
+                  category={category}
+                  days={visibleDays}
+                  dateRangeLabel={dateRangeLabel}
+                  viewMode={viewMode}
+                  expanded={Boolean(expandedCategories[category.id])}
+                  onToggle={() => toggleCategory(category.id)}
+                  onPrevPeriod={handlePrevPeriod}
+                  onNextPeriod={handleNextPeriod}
+                  jobShiftSelection={jobShiftSelection}
+                  onSelectShift={handleSelectShift}
+                  assignments={assignments}
+                  onAssign={handleAssign}
+                  onCellSelect={handleCellSelect}
+                  gridCells={gridCells}
+                  onCalendarCellClick={handleCalendarCellClick}
+                  cellRefs={cellRefs}
+                  readOnly={isViewOnly}
+                  staffList={assignStaffList}
+                  assigning={assigning}
+                />
+              ))
+            )}
           </Box>
         </Box>
       </Box>

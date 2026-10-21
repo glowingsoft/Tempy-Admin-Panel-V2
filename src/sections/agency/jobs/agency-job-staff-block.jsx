@@ -11,14 +11,9 @@ import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { hideScrollX } from 'src/theme/styles/mixins';
 
-import {
-  STAFF_CONFLICTS,
-  STAFF_OTHER_ASSIGNMENTS,
-  withStaffDistances,
-} from 'src/_mock/_agency-assign-staff';
+import { withStaffDistances } from './agency-assign-staff-utils';
 import { isStaffBusyOnDate } from 'src/sections/agency/shifts/agency-staff-availability';
 
-// ----------------------------------------------------------------------
 
 const STAFF_COL_W = 188;
 const DAY_COL_W = 56;
@@ -160,9 +155,8 @@ export function AgencyJobStaffBlock({
 
   const resolveCell = (staffId, dateKey) => {
     const shiftLabel = selectedShift?.label || '';
-    const conflictCat = STAFF_CONFLICTS[staffId]?.[dateKey];
-    const other = STAFF_OTHER_ASSIGNMENTS[staffId]?.[dateKey];
     const slotStaff = shiftAssignments[dateKey];
+    const staffKey = String(staffId);
 
     if (isStaffBusyOnDate(staffId, dateKey)) {
       return {
@@ -172,15 +166,7 @@ export function AgencyJobStaffBlock({
       };
     }
 
-    if (conflictCat) {
-      return {
-        type: 'conflict',
-        line1: `${shiftLabel} +1`,
-        line2: conflictCat,
-      };
-    }
-
-    if (slotStaff === staffId) {
+    if (slotStaff != null && String(slotStaff) === staffKey) {
       return {
         type: 'assigned',
         line1: shiftLabel,
@@ -188,17 +174,6 @@ export function AgencyJobStaffBlock({
       };
     }
 
-    if (other) {
-      return {
-        type: 'other',
-        line1: other.shiftLabel,
-        line2: other.categoryTitle,
-      };
-    }
-
-    // Only dates that need filling stay clickable.
-    // If another staff is already selected on this date, keep the cell available
-    // so the user can switch assignment instead of greying out the whole column.
     if (!enabledDates.has(dateKey)) {
       return { type: 'disabled', line1: '', line2: '' };
     }

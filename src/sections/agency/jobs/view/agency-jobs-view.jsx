@@ -2119,6 +2119,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return (
       <AgencyAssignStaffView
         job={jobDetail}
+        mode={mode}
         currentTab={tabs.value}
         onBack={handleBackFromDetail}
         onTabChange={handleDetailTabChange}

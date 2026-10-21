@@ -9,9 +9,8 @@ import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { hideScrollX } from 'src/theme/styles/mixins';
 
-import { getStaffById } from 'src/_mock/_agency-assign-staff';
+import { findStaffById } from './agency-assign-staff-utils';
 
-// ----------------------------------------------------------------------
 
 const ROW_LABEL_W = 72;
 const DAY_COL_W = 52;
@@ -28,6 +27,21 @@ const CELL_STYLES = {
 };
 
 function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
+  if (!cell) {
+    return (
+      <Box
+        sx={{
+          width: DAY_COL_W,
+          height: CELL_H,
+          flexShrink: 0,
+          mx: 0.25,
+          borderRadius: 1,
+          bgcolor: 'transparent',
+        }}
+      />
+    );
+  }
+
   const style = CELL_STYLES[cell?.status] || CELL_STYLES.empty;
   const isEmpty = cell?.status === 'empty';
   const isInteractive = !readOnly || !isEmpty;
@@ -99,7 +113,6 @@ function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
   );
 }
 
-/** Calendar view — shift rows × days, grey + opens staff popover */
 export function AgencyJobCalendarBlock({
   categoryId,
   jobItem,
@@ -108,6 +121,7 @@ export function AgencyJobCalendarBlock({
   onCellClick,
   cellRefs,
   readOnly = false,
+  staffList = [],
 }) {
   return (
     <Box sx={{ mb: 2.5 }}>
@@ -155,8 +169,10 @@ export function AgencyJobCalendarBlock({
               {days.map((day) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const cell =
-                  gridCells[categoryId]?.[jobItem.id]?.[row.id]?.[dateKey] || row.cells[dateKey];
-                const staff = cell?.staffId ? getStaffById(cell.staffId) : null;
+                  gridCells[categoryId]?.[jobItem.id]?.[row.id]?.[dateKey] ||
+                  row.cells?.[dateKey] ||
+                  (row.date === dateKey ? { status: 'empty' } : null);
+                const staff = cell?.staffId ? findStaffById(staffList, cell.staffId) : null;
                 const refKey = `${categoryId}-${jobItem.id}-${row.id}-${dateKey}`;
 
                 return (

@@ -75,6 +75,40 @@ export const userJobsApi = createApi({
         result?.data?.length ? [...result.data.map((item) => ({ type: 'UserJobType', id: item.id })), { type: 'UserJobType', id: 'LIST' }] : [{ type: 'UserJobType', id: 'LIST' }],
     }),
 
+    createUserJobType: builder.mutation({
+      query: (body) => ({
+        url: API_ROUTES.USER_JOB_TYPES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: [{ type: 'UserJobType', id: 'LIST' }],
+    }),
+
+    updateUserJobType: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.USER_JOB_TYPES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'UserJobType', id },
+        { type: 'UserJobType', id: 'LIST' },
+      ],
+    }),
+
+    deleteUserJobType: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.USER_JOB_TYPES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'UserJobType', id },
+        { type: 'UserJobType', id: 'LIST' },
+      ],
+    }),
+
     createUserJob: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.USER_JOBS,
@@ -260,6 +294,9 @@ export const {
   useGetUserJobByIdQuery,
   useLazyGetUserJobByIdQuery,
   useGetUserJobTypesQuery,
+  useCreateUserJobTypeMutation,
+  useUpdateUserJobTypeMutation,
+  useDeleteUserJobTypeMutation,
   useCreateUserJobMutation,
   useUpdateUserJobMutation,
   useDeleteUserJobMutation,

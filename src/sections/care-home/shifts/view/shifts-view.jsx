@@ -59,9 +59,10 @@ import { useRouter } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
 import { EmptyContent } from 'src/components/empty-content';
 import {
-  mapCompanyRosterToShiftTeams,
+  mapDashboardStaffToShiftTeams,
   resolveRosterAccountKey,
 } from 'src/sections/staff/company-roster-store';
+import { useGetDashboardStaffQuery } from 'src/store/Reducer/staff-api';
 
 import { Iconify } from 'src/components/iconify';
 import { ModuleLoading } from 'src/components/loading-screen';
@@ -3066,23 +3067,26 @@ function ShiftsViewContent({
   const [calendarMeta, setCalendarMeta] = useState(null);
   const [calendarDayWeather, setCalendarDayWeather] = useState({});
   const [calendarSynced, setCalendarSynced] = useState(false);
-  const [rosterVersion, setRosterVersion] = useState(0);
   const rosterAccountKey = resolveRosterAccountKey(apiRole);
 
-  useEffect(() => {
-    const bump = () => setRosterVersion((value) => value + 1);
-    window.addEventListener('focus', bump);
-    return () => window.removeEventListener('focus', bump);
-  }, []);
+  const dashboardStaffQuery = useGetDashboardStaffQuery(
+    { accountKey: rosterAccountKey, page: 0, limit: 200, status: 'active' },
+    {
+      skip: !useCalendarApi,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
+  );
 
-  const companyRosterTeams = useMemo(
-    () => (useCalendarApi ? mapCompanyRosterToShiftTeams(rosterAccountKey) : []),
-    [useCalendarApi, rosterAccountKey, rosterVersion]
+  const staffApiTeams = useMemo(
+    () => (useCalendarApi ? mapDashboardStaffToShiftTeams(dashboardStaffQuery.data?.data) : []),
+    [useCalendarApi, dashboardStaffQuery.data?.data]
   );
 
   if (useCalendarApi) {
     const apiTeams = calendarSynced && Array.isArray(calendarTeams) ? calendarTeams : [];
-    TEAMS = apiTeams.length > 0 ? apiTeams : companyRosterTeams;
+    // Prefer booking-calendar role groups; if empty after sync, fall back to staff API (not localStorage).
+    TEAMS = calendarSynced ? (apiTeams.length > 0 ? apiTeams : staffApiTeams) : [];
     const maps = deriveStaffMaps(TEAMS);
     ALL_STAFF = maps.allStaff;
     STAFF_TEAM_MAP = maps.staffTeamMap;

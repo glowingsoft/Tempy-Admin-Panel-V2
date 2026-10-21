@@ -24,11 +24,6 @@ const JOB_SORT_VALUES = ['rate_asc', 'rate_desc'];
 const JOB_BIDS_VALUES = ['filled', 'unfilled'];
 const YMD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * Filters shared by every GET {prefix}/job list (customers and suppliers):
- * startDate / endDate (YYYY-MM-DD, local, inclusive), jobRoles (comma-separated ids),
- * sort=rate_asc|rate_desc, bids=filled|unfilled. Blank values are left out.
- */
 export function applyJobListFilters(params, { startDate = '', endDate = '', jobRoles = [], sort = '', bids = '' } = {}) {
   if (YMD_PATTERN.test(String(startDate))) params.startDate = startDate;
   if (YMD_PATTERN.test(String(endDate))) params.endDate = endDate;
@@ -41,7 +36,6 @@ export function applyJobListFilters(params, { startDate = '', endDate = '', jobR
   return params;
 }
 
-/** Query params for GET job lists. Backend: dateFilter=next6Hours|next12Hours|next24Hours|next3Days|next7Days */
 export function buildJobListParams({ page = 0, limit = 50, status = '', keyword = '', horizon = '', dateFilter = '', ...filters } = {}) {
   const params = {
     page: page + 1,
@@ -54,7 +48,6 @@ export function buildJobListParams({ page = 0, limit = 50, status = '', keyword 
   return applyJobListFilters(params, filters);
 }
 
-/** Query params for GET job bid lists. Backend: status, job, dateFilter */
 export function buildJobBidListParams({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) {
   const params = {
     page: page + 1,
@@ -114,7 +107,6 @@ const JOB_API_ERROR_MESSAGES = {
   invalid_bids_filter: 'That filled / unfilled filter is not supported.',
 };
 
-/** Friendly text for the job API's error codes; null when the error is not one of them. */
 export function getJobApiErrorMessage(err) {
   const candidates = [err?.data?.code, err?.data?.error, err?.data?.message, err?.message];
   for (const value of candidates) {
@@ -125,7 +117,6 @@ export function getJobApiErrorMessage(err) {
   return null;
 }
 
-/** API rate → positive number rounded to 2dp, or null. */
 export function toJobRate(value) {
   if (value === null || value === undefined || value === '') return null;
   const num = Number(value);
@@ -211,8 +202,6 @@ function pickJobImage(item = {}) {
 }
 
 function pickHourlyRate(item = {}) {
-  // Only the rate saved on the job. Copying the job type or shift rate made a
-  // create with no rate look like one had been entered.
   return pickPositiveNumber(
     item.hourlyRate,
     item.ratePerHour,
@@ -262,13 +251,17 @@ function resolveTypeTitle(type, fallback = '') {
 export function mapCareHomeJobTypeFromApi(item = {}) {
   const id = String(item._id || item.id || '');
   const title = String(item.title || item.name || '').trim();
-  const department = String(item.department || '').trim();
+  const department = String(item.department || item.category || '').trim();
+  const description = String(item.description || item.details || '').trim();
 
   return {
     id,
     _id: id,
     title,
+    name: title,
     department,
+    category: department,
+    description,
     status: String(item.status || '').toLowerCase(),
     label: department ? `${department} · ${title}` : title || id,
     createdAt: item.createdAt || '',
@@ -347,11 +340,9 @@ export function mapCareHomeJobFromApi(item = {}) {
     postedAt: formatPostedAt(item.createdAt),
     createdAt: item.createdAt || '',
     hourlyRate: pickHourlyRate(item, primaryShift),
-    // Job-level rate the customer offers; null when not set. `hasRateField` → the API sent it.
     rate: toJobRate(item.rate),
     hasRateField: Object.prototype.hasOwnProperty.call(item, 'rate'),
     isFilled: Boolean(item.isFilled),
-    // Only on job details; assume editable when absent (the API still enforces it).
     canEditRateAndShiftTimes: item.canEditRateAndShiftTimes !== false,
     bidCount: Number(item.bidsCount ?? item.bidCount ?? 0) || 0,
     acceptedBidsCount: Number(item.acceptedBidsCount ?? item.acceptedBidCount ?? 0) || 0,
@@ -364,7 +355,6 @@ export function mapCareHomeJobFromApi(item = {}) {
     agencyId: item.agencyId || item.agency?._id || item.agency?.id || '',
     bookingId: bookingId || item.bookingId || item.booking?._id || item.booking?.id || item.acceptedBookingId || '',
     requestFromAgency: Boolean(item.requestFromAgency),
-    // Care details (edit form reads these back)
     careNotes: String(item.notes || item.careNotes || '').trim(),
     instructions: String(item.instructions || '').trim(),
     contactName: String(contact.name || '').trim(),
@@ -394,15 +384,10 @@ export function mapCareHomeJobFromApi(item = {}) {
 }
 
 /**
- * Body for POST / PUT `/web/{customer}/job`:
- * { name, type, location, shift[], description, gender, image, instructions, notes,
- *   documents[], contactDetails, emergencyContact, branch | address, worker?, employer? }
- * (`userId` is added by the base query.)
  *
  * @param {object} draft
- * @param {object|null} branch  selected branch — or, for individual users, the saved address
+ * @param {object|null} branch 
  * @param {{ includeStatus?: boolean, isUser?: boolean }} [options]
- *   isUser: the location is one of the user's saved addresses → sent as `address`, not `branch`
  */
 export function buildCareHomeJobPayload(draft = {}, branch = null, options = {}) {
   const locationSource =
@@ -436,7 +421,6 @@ export function buildCareHomeJobPayload(draft = {}, branch = null, options = {})
     type: text(draft.typeId),
     location,
     shift: (draft.schedules || []).map((entry) => {
-      // The backend rejects isBreak: true without breakMin, so a break needs minutes.
       const breakMin = entry.breakIncluded !== false ? Number(entry.breakMins) || 0 : 0;
       const shift = {
         date: entry.date,
@@ -448,7 +432,6 @@ export function buildCareHomeJobPayload(draft = {}, branch = null, options = {})
         isBiddingAllowed: entry.receivingBids !== false,
       };
 
-      // Editing: existing shifts keep their _id, new ones have none.
       const shiftId = text(entry.id || entry._id);
       if (isMongoObjectId(shiftId)) {
         shift._id = shiftId;
@@ -472,8 +455,6 @@ export function buildCareHomeJobPayload(draft = {}, branch = null, options = {})
     },
   };
 
-  // rate: optional on create; on edit a number sets it and null removes it. Left out while
-  // locked — the API rejects rate changes once the job is booked or has bids.
   const rate = toJobRate(draft.hourlyRate);
   if (!draft.id) {
     if (rate != null) body.rate = rate;
