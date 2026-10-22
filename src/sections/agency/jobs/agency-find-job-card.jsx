@@ -150,6 +150,29 @@ function getShiftRows(job) {
 
   return [];
 }
+
+function formatBreakLabel(job) {
+  const hasMins = job?.breakMin != null && job.breakMin !== '';
+  const type = String(job?.breakType || '').trim();
+  if (hasMins && type) return `${job.breakMin} min · ${type}`;
+  if (hasMins) return `${job.breakMin} min`;
+  if (type) return type;
+  return '—';
+}
+
+function getAllowedPersons(job) {
+  // Prefer this card's shift (expanded rows), then job-level API field
+  const fromShift = Number(job?.shiftRows?.[0]?.allowedPersons);
+  if (Number.isFinite(fromShift) && fromShift > 0) return fromShift;
+  const fromJob = Number(job?.allowedPersons);
+  if (Number.isFinite(fromJob) && fromJob > 0) return fromJob;
+  return null;
+}
+
+function getAllShiftRows(job) {
+  if (Array.isArray(job?.allShiftRows) && job.allShiftRows.length) return job.allShiftRows;
+  return getShiftRows(job);
+}
 function hasJobDistance(job) {
   return job?.distance != null && job.distance !== '';
 }
@@ -159,7 +182,7 @@ const metaChipSx = {
   fontSize: 9,
   fontWeight: 600,
   border: 'none',
-  bgcolor: 'grey.100',
+  bgcolor: 'action.hover',
   color: 'text.primary',
   '&:hover': {
     border: 'none',
@@ -187,6 +210,9 @@ const shiftDateChipSx = {
 };
 
 function JobMetaChips({ job, postedAt }) {
+  const bidsCount = Number(job?.bidsCount) || 0;
+  const allowedPersons = getAllowedPersons(job);
+
   return (
     <Stack
       direction="row"
@@ -205,6 +231,22 @@ function JobMetaChips({ job, postedAt }) {
             maxWidth: 110,
             '& .MuiChip-label': { px: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
           }}
+        />
+      ) : null}
+      {bidsCount > 0 ? (
+        <Chip
+          label={`${bidsCount} bid${bidsCount === 1 ? '' : 's'}`}
+          size="small"
+          variant="outlined"
+          sx={{ ...metaChipSx, flexShrink: 0 }}
+        />
+      ) : null}
+      {allowedPersons ? (
+        <Chip
+          label={`${allowedPersons} staff`}
+          size="small"
+          variant="outlined"
+          sx={{ ...metaChipSx, flexShrink: 0 }}
         />
       ) : null}
       {postedAt ? (
@@ -330,7 +372,7 @@ function PostedByFooter({ job, postedBy, isCareHome }) {
             width: 24,
             height: 24,
             borderRadius: '50%',
-            bgcolor: 'grey.100',
+            bgcolor: 'action.hover',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -672,12 +714,36 @@ function JobActionButtons({
     const row = shiftRow || job?.shiftRows?.[0] || null;
     if (existingBid) {
       const bidStatus = normalizeAgencyBidStatus(existingBid.status);
+      const bidAmount = Number(existingBid.bidAmount);
+      const bidNote = String(existingBid.notes || existingBid.note || '').trim();
+      const bidSummary = (
+        <Box sx={{ minWidth: 0, mr: 0.5, textAlign: 'right' }}>
+          {Number.isFinite(bidAmount) && bidAmount > 0 ? (
+            <Typography variant="caption" fontWeight={700} color="primary.main" display="block" sx={{ fontSize: 10, lineHeight: 1.2 }}>
+              {fCurrency(bidAmount)}
+            </Typography>
+          ) : null}
+          {bidNote ? (
+            <Tooltip title={bidNote} arrow>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ fontSize: 9, maxWidth: 88, display: 'block' }}
+              >
+                {bidNote}
+              </Typography>
+            </Tooltip>
+          ) : null}
+        </Box>
+      );
       if (['withdrawn', 'deleted', 'cancelled', 'canceled'].includes(bidStatus)) {
       } else if (!canEditAgencyBid(existingBid)) {
         const isDeclined = bidStatus === 'rejected' || bidStatus === 'declined';
         const closedLabel = isDeclined ? 'Declined' : bidStatus === 'accepted' ? 'Accepted' : 'Closed';
         return (
           <Stack direction="row" spacing={0.25} alignItems="center" sx={{ flexShrink: 0, ...sx }}>
+            {bidSummary}
             <Chip
               size="small"
               color={bidStatus === 'accepted' ? 'success' : isDeclined ? 'error' : 'default'}
@@ -690,6 +756,7 @@ function JobActionButtons({
       } else {
         return (
           <Stack direction="row" spacing={0.25} alignItems="center" sx={{ flexShrink: 0, ...sx }}>
+            {bidSummary}
             <Tooltip title="Edit bid">
               <IconButton
                 size="small"
@@ -855,7 +922,8 @@ function JobActionButtons({
                 width: 22,
                 height: 22,
                 fontSize: 10,
-                border: '2px solid #fff',
+                border: '2px solid',
+                borderColor: 'background.paper',
               },
             }}
           >
@@ -906,8 +974,11 @@ export function AgencyFindJobCard({
 
   const attendance = resolveJobAttendance(job, liveAttendance);
   const shiftRows = getShiftRows(job);
-  const hasMultipleSchedules = shiftRows.length > 1;
+  const allShiftRows = getAllShiftRows(job);
+  const hasMultipleSchedules = allShiftRows.length > 1;
   const primaryShift = shiftRows[0];
+  const allowedPersons = getAllowedPersons(job);
+  const bidsCount = Number(job?.bidsCount) || 0;
 
   const shiftCompleted = primaryShift?.status === 'completed' || variant === 'completed';
   const bookingStatus = attendance?.bookingStatus || job?.bookingStatus || '';
@@ -1037,7 +1108,7 @@ export function AgencyFindJobCard({
                       onClick={() => onViewAllSchedules?.(job)}
                       sx={{ minWidth: 'auto', px: 0.5, py: 0, fontSize: 9, fontWeight: 700 }}
                     >
-                      +{shiftRows.length - 1} more
+                      +{allShiftRows.length - 1} more
                     </Button>
                   )}
                 </Stack>
@@ -1073,7 +1144,16 @@ export function AgencyFindJobCard({
               </Typography>
             ) : null}
             <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
-              {job.gender ? `Gender: ${job.gender}` : null}
+              Break: {formatBreakLabel(job)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
+              {[
+                job.gender ? `Gender: ${job.gender}` : null,
+                bidsCount > 0 ? `${bidsCount} bid${bidsCount === 1 ? '' : 's'}` : null,
+                allowedPersons ? `${allowedPersons} staff` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ') || null}
             </Typography>
           </Stack>
 
@@ -1327,7 +1407,7 @@ export function AgencyFindJobCard({
         <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
           Break:{' '}
           <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            {job.breakMin != null && job.breakMin !== '' ? `${job.breakMin} min` : '—'}
+            {formatBreakLabel(job)}
           </Box>
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
@@ -1336,6 +1416,14 @@ export function AgencyFindJobCard({
             {job.gender || '—'}
           </Box>
         </Typography>
+        {allowedPersons ? (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 10 }}>
+            Staff needed:{' '}
+            <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+              {allowedPersons}
+            </Box>
+          </Typography>
+        ) : null}
         {(showAttendance || showNotCheckedIn) && (
           <Box sx={{ ml: 'auto' }}>
             <AttendanceSpot

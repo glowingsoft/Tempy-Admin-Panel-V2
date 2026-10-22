@@ -11,9 +11,8 @@ import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { hideScrollX } from 'src/theme/styles/mixins';
 
-import { withStaffDistances } from './agency-assign-staff-utils';
-import { isStaffBusyOnDate } from 'src/sections/agency/shifts/agency-staff-availability';
-
+import { getAssignStaffDayCellSx, withStaffDistances } from './agency-assign-staff-utils';
+import { isStaffBusyOnDateInSet } from 'src/sections/agency/shifts/agency-availability-api-utils';
 
 const STAFF_COL_W = 188;
 const DAY_COL_W = 56;
@@ -37,27 +36,7 @@ function getInitialAssignments(shiftRow) {
 
 function StaffDayCell({ cellData, onClick, readOnly }) {
   const { type, line1, line2 } = cellData;
-
-  const styles = {
-    disabled: { bgcolor: '#e0e0e0', border: '1px solid #d0d0d0', cursor: 'default' },
-    available: {
-      bgcolor: '#fff',
-      border: '1px solid #bdbdbd',
-      cursor: readOnly ? 'default' : 'pointer',
-    },
-    assigned: {
-      bgcolor: '#c8e6c9',
-      border: '2px solid #4caf50',
-      cursor: readOnly ? 'default' : 'pointer',
-    },
-    other: { bgcolor: '#fff', border: '1px solid #9e9e9e', cursor: 'default' },
-    conflict: { bgcolor: '#fffde7', border: '1px solid #fbc02d', cursor: 'default' },
-    busy: { bgcolor: '#eceff1', border: '1px solid #90a4ae', cursor: 'default' },
-  };
-
-  const style = styles[type] || styles.disabled;
-  const clickable =
-    !readOnly && (type === 'available' || type === 'assigned');
+  const clickable = !readOnly && (type === 'available' || type === 'assigned');
   const viewable = readOnly && type === 'assigned';
 
   return (
@@ -75,9 +54,11 @@ function StaffDayCell({ cellData, onClick, readOnly }) {
         justifyContent: 'center',
         px: 0.25,
         textAlign: 'center',
-        ...style,
+        ...getAssignStaffDayCellSx(type, { readOnly }),
         '&:hover':
-          type === 'available' && !readOnly ? { bgcolor: '#f5f5f5', borderColor: '#757575' } : undefined,
+          type === 'available' && !readOnly
+            ? { bgcolor: 'action.hover', borderColor: 'text.secondary' }
+            : undefined,
       }}
     >
       {line1 && (
@@ -87,7 +68,7 @@ function StaffDayCell({ cellData, onClick, readOnly }) {
             fontSize: '0.58rem',
             fontWeight: 700,
             lineHeight: 1.15,
-            color: type === 'assigned' ? '#2e7d32' : 'text.primary',
+            color: type === 'assigned' ? 'success.dark' : 'text.primary',
           }}
         >
           {line1}
@@ -125,6 +106,7 @@ export function AgencyJobStaffBlock({
   onCellSelect,
   readOnly = false,
   staffList,
+  busyDateKeys = null,
 }) {
   const selectedShift = jobItem.shiftRows.find((row) => row.id === selectedShiftId) || jobItem.shiftRows[0];
   const assignmentKey = `${categoryId}-${jobItem.id}-${selectedShift?.id}`;
@@ -158,19 +140,19 @@ export function AgencyJobStaffBlock({
     const slotStaff = shiftAssignments[dateKey];
     const staffKey = String(staffId);
 
-    if (isStaffBusyOnDate(staffId, dateKey)) {
-      return {
-        type: 'busy',
-        line1: 'Busy',
-        line2: 'No auto-accept',
-      };
-    }
-
     if (slotStaff != null && String(slotStaff) === staffKey) {
       return {
         type: 'assigned',
         line1: shiftLabel,
         line2: categoryTitle,
+      };
+    }
+
+    if (isStaffBusyOnDateInSet(busyDateKeys, staffId, dateKey)) {
+      return {
+        type: 'busy',
+        line1: 'Busy',
+        line2: 'No auto-accept',
       };
     }
 
@@ -229,7 +211,7 @@ export function AgencyJobStaffBlock({
 
   return (
     <Box sx={{ mb: 1.5 }}>
-      <Box sx={{ bgcolor: '#e8e8e8', borderRadius: 1, p: 1.25, mb: 1 }}>
+      <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, p: 1.25, mb: 1 }}>
         <Stack direction="row" alignItems="flex-start" spacing={1}>
           <JobMediaThumb image={jobItem.image} alt={categoryTitle || 'Job'} width={48} height={48} />
           <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -282,13 +264,20 @@ export function AgencyJobStaffBlock({
                 fontSize: '0.75rem',
                 borderRadius: 1,
                 border: '2px solid',
-                borderColor: isSelected ? '#4caf50' : '#bdbdbd',
-                bgcolor: isSelected ? '#c8e6c9' : hasData ? '#e8f5e9' : '#fff',
+                borderColor: isSelected ? 'success.main' : 'divider',
+                bgcolor: isSelected
+                  ? 'success.lighter'
+                  : hasData
+                    ? 'success.lighter'
+                    : 'background.paper',
                 color: 'text.primary',
                 boxShadow: 'none',
                 textTransform: 'none',
                 py: 0.5,
-                '&:hover': { bgcolor: isSelected ? '#a5d6a7' : '#f5f5f5' },
+                opacity: isSelected ? 1 : hasData ? 0.85 : 1,
+                '&:hover': {
+                  bgcolor: isSelected ? 'success.light' : 'action.hover',
+                },
               }}
             >
               {shift.label}
@@ -315,7 +304,7 @@ export function AgencyJobStaffBlock({
             ))}
           </Stack>
 
-          {visibleStaff.map((staff) => (
+          {visibleStaff.map((staff, index) => (
             <Stack
               key={staff.id}
               direction="row"
@@ -324,7 +313,7 @@ export function AgencyJobStaffBlock({
                 mb: 0.35,
                 py: 0.35,
                 borderRadius: 1,
-                bgcolor: staff.rowBg || '#f5f8fb',
+                bgcolor: index % 2 === 0 ? 'primary.lighter' : 'success.lighter',
               }}
             >
               <Box
@@ -344,7 +333,7 @@ export function AgencyJobStaffBlock({
                       {staff.name}
                     </Typography>
                     <Stack direction="row" alignItems="center" spacing={0.2}>
-                      <Iconify icon="material-symbols:star" width={11} sx={{ color: '#FFB800' }} />
+                      <Iconify icon="material-symbols:star" width={11} sx={{ color: 'warning.main' }} />
                       <Typography variant="caption" sx={{ fontSize: '0.58rem', lineHeight: 1.2 }}>
                         {staff.rating} ({staff.reviews})
                       </Typography>

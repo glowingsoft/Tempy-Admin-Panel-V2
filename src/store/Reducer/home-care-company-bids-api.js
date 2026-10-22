@@ -20,7 +20,7 @@ export const homeCareCompanyBidsApi = createApi({
     getHomeCareCompanyBids: builder.query({
       query: ({
         page = 0,
-        limit = 100,
+        limit = 500,
         status = '',
         keyword = '',
         shift = '',

@@ -613,6 +613,7 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
     totalPay,
     breakType: mapBreakType(primaryShift || shifts[0]),
     breakMin: Number(primaryShift?.breakMin ?? item.breakMin) || 0,
+    allowedPersons: pickNumber(primaryShift?.allowedPersons, item.allowedPersons),
     gender: item.gender || '',
     description,
     careNotes: String(item.careNotes || item.notes || '').trim(),

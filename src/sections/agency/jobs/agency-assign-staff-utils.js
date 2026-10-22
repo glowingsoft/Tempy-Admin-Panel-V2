@@ -4,13 +4,96 @@ import { addDays, eachDayOfInterval, format, parseISO } from 'date-fns';
 export const ASSIGN_DAY_WINDOW = 14;
 
 export const SHIFT_LEGEND = [
-  { label: 'Accepted/Upcoming', color: '#2196f3' },
-  { label: 'Completed successfully', color: '#4caf50' },
-  { label: 'Needs to be filled', color: '#bdbdbd' },
-  { label: 'Needs replacement', color: '#f44336' },
-  { label: 'Staff did not appear', color: '#ff9800' },
-  { label: 'Pending shift requests', color: '#ffeb3b' },
+  { label: 'Accepted/Upcoming', color: 'info.main' },
+  { label: 'Completed successfully', color: 'success.main' },
+  { label: 'Needs to be filled', color: 'grey.400', bordered: true },
+  { label: 'Needs replacement', color: 'error.main' },
+  { label: 'Staff did not appear', color: 'warning.main' },
+  { label: 'Pending shift requests', color: 'warning.light', bordered: true },
 ];
+
+export function getAssignStaffDayCellSx(type, { readOnly = false } = {}) {
+  const base = {
+    disabled: {
+      bgcolor: 'action.disabledBackground',
+      border: '1px solid',
+      borderColor: 'divider',
+      cursor: 'default',
+    },
+    available: {
+      bgcolor: 'background.paper',
+      border: '1px solid',
+      borderColor: 'divider',
+      cursor: readOnly ? 'default' : 'pointer',
+    },
+    assigned: {
+      bgcolor: 'success.lighter',
+      border: '2px solid',
+      borderColor: 'success.main',
+      cursor: readOnly ? 'default' : 'pointer',
+    },
+    other: {
+      bgcolor: 'background.paper',
+      border: '1px solid',
+      borderColor: 'text.disabled',
+      cursor: 'default',
+    },
+    conflict: {
+      bgcolor: 'warning.lighter',
+      border: '1px solid',
+      borderColor: 'warning.main',
+      cursor: 'default',
+    },
+    busy: {
+      bgcolor: 'action.hover',
+      border: '1px solid',
+      borderColor: 'text.disabled',
+      cursor: 'default',
+    },
+  };
+  return base[type] || base.disabled;
+}
+
+export function getAssignCalendarCellSx(status) {
+  const map = {
+    empty: {
+      bgcolor: 'action.disabledBackground',
+      border: '1px solid',
+      borderColor: 'divider',
+    },
+    assigned: {
+      bgcolor: 'background.paper',
+      border: '1px solid',
+      borderColor: 'divider',
+    },
+    upcoming: {
+      bgcolor: 'info.lighter',
+      border: '2px solid',
+      borderColor: 'info.main',
+    },
+    completed: {
+      bgcolor: 'success.lighter',
+      border: '2px solid',
+      borderColor: 'success.main',
+    },
+    replacement: {
+      bgcolor: 'error.lighter',
+      border: '2px solid',
+      borderColor: 'error.main',
+    },
+    noshow: {
+      bgcolor: 'warning.lighter',
+      border: '2px solid',
+      borderColor: 'warning.main',
+    },
+    pending: {
+      bgcolor: 'warning.lighter',
+      border: '2px solid',
+      borderColor: 'warning.light',
+    },
+  };
+  return map[status] || map.empty;
+}
 
 const CELL_STATUS_LABELS = {
   upcoming: 'Upcoming Shift',
@@ -106,6 +189,24 @@ export function findStaffById(staffList, id) {
 export function getShiftStatusLabel(cell) {
   if (!cell?.status) return 'Shift';
   return CELL_STATUS_LABELS[cell.status] || 'Shift';
+}
+
+export function getShiftStatusColor(statusLabel) {
+  switch (statusLabel) {
+    case 'Needs Replacement':
+      return 'error.main';
+    case 'Pending Request':
+      return 'warning.light';
+    case 'Staff Did Not Appear':
+      return 'warning.main';
+    case 'Upcoming Shift':
+      return 'info.main';
+    case 'Completed Shift':
+    case 'Assigned Shift':
+      return 'success.main';
+    default:
+      return 'success.main';
+  }
 }
 
 export function resolveAssignViewMode(job) {

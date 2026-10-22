@@ -159,7 +159,8 @@ function ActiveJobFooter({ job, onAssignStaff, onViewStaff }) {
                 width: 32,
                 height: 32,
                 fontSize: 12,
-                border: '2px solid #fff',
+                border: '2px solid',
+                borderColor: 'background.paper',
               },
             }}
           >
@@ -231,7 +232,7 @@ export function AgencyJobCard({
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 2,
-        bgcolor: (theme) => theme.vars.palette.grey[100],
+        bgcolor: 'background.neutral',
         border: (theme) => `1px solid ${theme.vars.palette.divider}`,
       }}
     >

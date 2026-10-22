@@ -17,18 +17,41 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { hideScrollY } from 'src/theme/styles/mixins';
 import { fCurrency } from 'src/utils/format-number';
 
+import { handleApiError } from 'src/store/handleApiError';
 import { getJobApiErrorMessage } from 'src/sections/care-home/jobs/care-home-job-api-utils';
+
+function pickApiToastMessage(payload, fallback) {
+  const candidates = [
+    payload?.message,
+    payload?.data?.message,
+    typeof payload?.data === 'string' ? payload.data : '',
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return fallback;
+}
+
+function pickApiErrorToast(err, fallback) {
+  const raw = err?.data?.message;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  return getJobApiErrorMessage(err) || handleApiError(err) || fallback;
+}
 
 import { useGetAgencyStaffQuery } from 'src/store/Reducer/agency-staff-api';
 import { useGetHomeCareCompanyStaffQuery } from 'src/store/Reducer/home-care-company-staff-api';
 import {
   agencyAvailabilityApi,
   useCreateAgencyBookingMutation,
+  useGetAgencyAvailabilityQuery,
 } from 'src/store/Reducer/agency-availability-api';
 import {
   homeCareCompanyAvailabilityApi,
   useCreateHomeCareCompanyBookingMutation,
+  useGetHomeCareCompanyAvailabilityQuery,
 } from 'src/store/Reducer/home-care-company-availability-api';
+import { buildStaffBusyDateSet } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import { format as formatDateFns } from 'date-fns';
 import { agencyJobsApi } from 'src/store/Reducer/agency-jobs-api';
 import { agencyBidsApi } from 'src/store/Reducer/agency-bids-api';
 import { homeCareCompanyJobsApi } from 'src/store/Reducer/home-care-company-jobs-api';
@@ -92,7 +115,7 @@ function resolveWorkerId(staff) {
 function mapApiStaffToAssignRoster(list = []) {
   return (Array.isArray(list) ? list : [])
     .filter((member) => member?.id && !member?.isVacant)
-    .map((member, index) => {
+    .map((member) => {
       const worked = Number(member.totalHoursWorked ?? member.weeklyHours ?? 0) || 0;
       const allowed = Number(member.hoursAllowed ?? 60) || 60;
       const lat = Number(member.latitude);
@@ -174,6 +197,7 @@ function JobCategorySection({
   readOnly,
   staffList,
   assigning,
+  busyDateKeys,
 }) {
   return (
     <Box sx={{ mb: 1 }}>
@@ -241,6 +265,7 @@ function JobCategorySection({
                 onCellSelect={onCellSelect}
                 readOnly={readOnly}
                 staffList={staffList}
+                busyDateKeys={busyDateKeys}
               />
             ) : (
               <AgencyJobCalendarBlock
@@ -262,7 +287,6 @@ function JobCategorySection({
   );
 }
 
-// ----------------------------------------------------------------------
 
 export function AgencyAssignStaffView({
   job,
@@ -285,8 +309,10 @@ export function AgencyAssignStaffView({
     { skip: !isHomeCareCompany }
   );
 
-  const staffResponse = isHomeCareCompany ? hccStaffQuery.data : agencyStaffQuery.data;
-  const staffLoading = isHomeCareCompany ? hccStaffQuery.isFetching : agencyStaffQuery.isFetching;
+  const staffQuery = isHomeCareCompany ? hccStaffQuery : agencyStaffQuery;
+  const staffResponse = staffQuery.data;
+  const staffLoading = staffQuery.isLoading;
+  const staffError = staffQuery.isError;
 
   const [createAgencyBooking, agencyAssignState] = useCreateAgencyBookingMutation();
   const [createHccBooking, hccAssignState] = useCreateHomeCareCompanyBookingMutation();
@@ -303,6 +329,50 @@ export function AgencyAssignStaffView({
   const visibleDays = useMemo(() => getDaysForJob(job, dayOffset), [job, dayOffset]);
   const dateRangeLabel = useMemo(() => formatDayRangeLabel(visibleDays), [visibleDays]);
   const acceptedBidId = useMemo(() => readAcceptedBidId(job), [job]);
+
+  const availabilityRange = useMemo(() => {
+    if (!visibleDays.length) return null;
+    return {
+      startDate: formatDateFns(visibleDays[0], 'yyyy-MM-dd'),
+      endDate: formatDateFns(visibleDays[visibleDays.length - 1], 'yyyy-MM-dd'),
+    };
+  }, [visibleDays]);
+
+  const agencyAvailabilityQuery = useGetAgencyAvailabilityQuery(
+    {
+      page: 0,
+      limit: 200,
+      startDate: availabilityRange?.startDate || '',
+      endDate: availabilityRange?.endDate || '',
+    },
+    {
+      skip: isHomeCareCompany || !availabilityRange,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
+  );
+  const hccAvailabilityQuery = useGetHomeCareCompanyAvailabilityQuery(
+    {
+      page: 0,
+      limit: 200,
+      startDate: availabilityRange?.startDate || '',
+      endDate: availabilityRange?.endDate || '',
+    },
+    {
+      skip: !isHomeCareCompany || !availabilityRange,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+    }
+  );
+
+  const availabilityList = isHomeCareCompany
+    ? hccAvailabilityQuery.data?.data
+    : agencyAvailabilityQuery.data?.data;
+
+  const busyDateKeys = useMemo(
+    () => buildStaffBusyDateSet(availabilityList, assignStaffList),
+    [availabilityList, assignStaffList]
+  );
 
   const jobMeta = useMemo(
     () => ({
@@ -447,8 +517,9 @@ export function AgencyAssignStaffView({
 
       try {
         const body = { bid: acceptedBidId, worker: workerId };
+        let result;
         if (isHomeCareCompany) {
-          await createHccBooking(body).unwrap();
+          result = await createHccBooking(body).unwrap();
           dispatch(
             homeCareCompanyAvailabilityApi.util.invalidateTags([
               { type: 'HomeCareCompanyBookingCalendar', id: 'LIST' },
@@ -457,23 +528,17 @@ export function AgencyAssignStaffView({
           dispatch(homeCareCompanyJobsApi.util.invalidateTags([{ type: 'HomeCareCompanyJob', id: 'LIST' }]));
           dispatch(homeCareCompanyBidsApi.util.invalidateTags([{ type: 'HomeCareCompanyBid', id: 'LIST' }]));
         } else {
-          await createAgencyBooking(body).unwrap();
+          result = await createAgencyBooking(body).unwrap();
           dispatch(
             agencyAvailabilityApi.util.invalidateTags([{ type: 'AgencyBookingCalendar', id: 'LIST' }])
           );
           dispatch(agencyJobsApi.util.invalidateTags([{ type: 'AgencyJob', id: 'LIST' }]));
           dispatch(agencyBidsApi.util.invalidateTags([{ type: 'AgencyBid', id: 'LIST' }]));
         }
-        toast.success('Staff assigned — check Shifts calendar');
+        toast.success(pickApiToastMessage(result, 'Staff assigned — check Shifts calendar'));
         return true;
       } catch (err) {
-        toast.error(
-          getJobApiErrorMessage(err) ||
-          err?.data?.message ||
-          err?.error ||
-          err?.message ||
-          'Failed to assign staff'
-        );
+        toast.error(pickApiErrorToast(err, 'Failed to assign staff'));
         return false;
       }
     },
@@ -485,7 +550,7 @@ export function AgencyAssignStaffView({
       if (isViewOnly || assigning) return;
 
       if (staffId == null) {
-        applyLocalAssignment(categoryId, jobId, shiftId, date, null);
+        toast.info('Unassign from the booking actions on Active jobs — grid clear is not saved to the server.');
         return;
       }
 
@@ -808,12 +873,15 @@ export function AgencyAssignStaffView({
               </Box>
 
               <Box>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
                   <Iconify icon="solar:routing-2-bold" width={16} sx={{ color: 'primary.main' }} />
                   <Typography variant="caption" fontWeight={700} color="text.primary">
                     Nearest staff
                   </Typography>
                 </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontSize: 9 }}>
+                  Distance reference only — assign from the grid or calendar
+                </Typography>
 
                 <Stack spacing={0.75}>
                   {staffLoading && !nearestStaffList.length ? (
@@ -824,7 +892,23 @@ export function AgencyAssignStaffView({
                       </Typography>
                     </Stack>
                   ) : null}
-                  {!staffLoading && !nearestStaffList.length ? (
+                  {staffError && !staffLoading ? (
+                    <Stack spacing={0.75}>
+                      <Typography variant="caption" color="error.main">
+                        Could not load staff. Please try again.
+                      </Typography>
+                      <Button
+                        size="small"
+                        color="inherit"
+                        startIcon={<Iconify icon="eva:refresh-fill" width={14} />}
+                        onClick={() => staffQuery.refetch()}
+                        sx={{ alignSelf: 'flex-start', px: 0.5 }}
+                      >
+                        Retry
+                      </Button>
+                    </Stack>
+                  ) : null}
+                  {!staffLoading && !staffError && !nearestStaffList.length ? (
                     <Typography variant="caption" color="text.secondary">
                       No active staff found
                     </Typography>
@@ -988,6 +1072,7 @@ export function AgencyAssignStaffView({
                   readOnly={isViewOnly}
                   staffList={assignStaffList}
                   assigning={assigning}
+                  busyDateKeys={busyDateKeys}
                 />
               ))
             )}
@@ -1005,6 +1090,9 @@ export function AgencyAssignStaffView({
           selectedStaffId={selectedStaffId}
           onSelectStaff={handlePopoverSelectStaff}
           onClose={() => setPopoverAnchor(null)}
+          assigning={assigning}
+          busyDateKeys={busyDateKeys}
+          dateKey={popoverCellKey?.date || ''}
         />
       )}
     </DashboardContent>
