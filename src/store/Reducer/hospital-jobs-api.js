@@ -14,22 +14,12 @@ import { mapJobAlertFromApi, patchJobAlert } from 'src/sections/care-home/jobs/j
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
-/**
- * Hospital dashboard jobs / bids — same shape as care-home, hospital routes.
- * POST/GET /web/hospital/job
- * PUT/DELETE /web/hospital/job/:id
- * GET /web/hospital/job/type
- * GET /web/hospital/job/bids
- * PUT /web/hospital/job/bids/:id
- * GET /web/hospital/booking/calender
- */
 export const hospitalJobsApi = createApi({
   reducerPath: 'hospitalJobsApi',
   baseQuery: createCustomFetchBaseQuery(),
   tagTypes: ['HospitalJob', 'HospitalJobType', 'HospitalJobBid', 'HospitalBookingCalendar'],
 
   endpoints: (builder) => ({
-    /** GET /web/hospital/job */
     getHospitalJobs: builder.query({
       query: ({ page = 0, limit = 50, status = '', keyword = '', horizon = '', dateFilter = '', ...filters } = {}) => ({
         url: API_ROUTES.HOSPITAL_JOBS,
@@ -52,7 +42,6 @@ export const hospitalJobsApi = createApi({
         result?.data?.length ? [...result.data.map((job) => ({ type: 'HospitalJob', id: job.id })), { type: 'HospitalJob', id: 'LIST' }] : [{ type: 'HospitalJob', id: 'LIST' }],
     }),
 
-    /** GET /web/hospital/job/type */
     getHospitalJobTypes: builder.query({
       query: ({ page = 0, limit = 100, status = 'active', keyword = '' } = {}) => {
         const params = {
@@ -86,7 +75,40 @@ export const hospitalJobsApi = createApi({
           : [{ type: 'HospitalJobType', id: 'LIST' }],
     }),
 
-    /** POST /web/hospital/job */
+    createHospitalJobType: builder.mutation({
+      query: (body) => ({
+        url: API_ROUTES.HOSPITAL_JOB_TYPES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: [{ type: 'HospitalJobType', id: 'LIST' }],
+    }),
+
+    updateHospitalJobType: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.HOSPITAL_JOB_TYPES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'HospitalJobType', id },
+        { type: 'HospitalJobType', id: 'LIST' },
+      ],
+    }),
+
+    deleteHospitalJobType: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.HOSPITAL_JOB_TYPES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'HospitalJobType', id },
+        { type: 'HospitalJobType', id: 'LIST' },
+      ],
+    }),
+
     createHospitalJob: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.HOSPITAL_JOBS,
@@ -125,12 +147,10 @@ export const hospitalJobsApi = createApi({
             );
           });
         } catch {
-          // create failed
         }
       },
     }),
 
-    /** GET /web/hospital/job/:id */
     getHospitalJobById: builder.query({
       query: (id) => ({
         url: API_ROUTES.HOSPITAL_JOBS_BY_ID(id),
@@ -144,7 +164,6 @@ export const hospitalJobsApi = createApi({
       providesTags: (_result, _error, id) => [{ type: 'HospitalJob', id }],
     }),
 
-    /** PUT /web/hospital/job/:id */
     updateHospitalJob: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.HOSPITAL_JOBS_BY_ID(id),
@@ -157,7 +176,6 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
-    /** DELETE /web/hospital/job/:id */
     deleteHospitalJob: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.HOSPITAL_JOBS_BY_ID(id),
@@ -169,10 +187,6 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
-    /**
-     * PUT /web/hospital/job/:id/alert — shift alert settings
-     * Body: { enabled, phoneNumber: { code, number }, hoursBefore, minutesBefore }
-     */
     updateHospitalJobAlert: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.HOSPITAL_JOB_ALERT(id),
@@ -185,12 +199,10 @@ export const hospitalJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(hospitalJobsApi.util.updateQueryData('getHospitalJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // save failed — the form shows the error
         }
       },
     }),
 
-    /** DELETE /web/hospital/job/:id/alert — reset the alert to off */
     clearHospitalJobAlert: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.HOSPITAL_JOB_ALERT(id),
@@ -202,12 +214,10 @@ export const hospitalJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(hospitalJobsApi.util.updateQueryData('getHospitalJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // clear failed — the form shows the error
         }
       },
     }),
 
-    /** GET /web/hospital/job/bids */
     getHospitalJobBids: builder.query({
       query: ({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) => ({
         url: API_ROUTES.HOSPITAL_JOB_BIDS,
@@ -232,7 +242,6 @@ export const hospitalJobsApi = createApi({
           : [{ type: 'HospitalJobBid', id: 'LIST' }],
     }),
 
-    /** PUT /web/hospital/job/bids/:id — accept / reject / status */
     updateHospitalJobBid: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.HOSPITAL_JOB_BIDS_BY_ID(id),
@@ -246,7 +255,6 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
-    /** POST /web/hospital/booking — accept bid + create booking { bid, worker } */
     createHospitalBooking: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.HOSPITAL_BOOKING,
@@ -260,10 +268,6 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
-    /**
-     * GET /web/hospital/booking/calender
-     * Query: latitude, longitude, startDate, endDate, branch?
-     */
     getHospitalBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -291,6 +295,9 @@ export const {
   useGetHospitalJobByIdQuery,
   useLazyGetHospitalJobByIdQuery,
   useGetHospitalJobTypesQuery,
+  useCreateHospitalJobTypeMutation,
+  useUpdateHospitalJobTypeMutation,
+  useDeleteHospitalJobTypeMutation,
   useCreateHospitalJobMutation,
   useUpdateHospitalJobMutation,
   useDeleteHospitalJobMutation,

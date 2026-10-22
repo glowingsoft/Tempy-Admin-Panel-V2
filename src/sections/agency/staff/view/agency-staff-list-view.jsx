@@ -46,7 +46,6 @@ import { AgencyStaffFormDialog } from '../agency-staff-form-dialog';
 import { AgencyStaffDetailsDialog } from '../agency-staff-details-dialog';
 import { StaffTableToolbar } from 'src/sections/staff/staff-table-toolbar';
 import { StaffImportDialog } from 'src/sections/staff/staff-import-dialog';
-import { saveCompanyRosterStaff } from 'src/sections/staff/company-roster-store';
 import { saveTemplateResponse } from 'src/sections/staff/staff-import-utils';
 import { AGENCY_STAFF_TABLE_HEAD, STAFF_TABLE_SX } from 'src/sections/staff/staff-table-styles';
 
@@ -260,13 +259,7 @@ export function AgencyStaffListView() {
       setImporting(true);
       try {
         const response = await importAgencyStaff(file).unwrap();
-        // Keep the local rota roster in step — Shifts reads teams from it.
-        saveCompanyRosterStaff('agency', rows, { merge: true });
-        const teams = new Set(rows.map((row) => row.team || row.role).filter(Boolean));
-        toast.success(
-          response?.message ||
-          `Imported ${rows.length} staff · ${teams.size} team${teams.size === 1 ? '' : 's'} for your rota. Open Shifts to review.`
-        );
+        toast.success(response?.message || `Imported ${rows.length} staff`);
         importDialog.onFalse();
         // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (error) {

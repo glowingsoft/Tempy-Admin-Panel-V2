@@ -14,22 +14,12 @@ import { mapJobAlertFromApi, patchJobAlert } from 'src/sections/care-home/jobs/j
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
-/**
- * Local authority dashboard jobs / bids — same shape as care-home.
- * POST/GET /web/local-authority/job
- * PUT/DELETE /web/local-authority/job/:id
- * GET /web/local-authority/job/type
- * GET /web/local-authority/job/bids
- * PUT /web/local-authority/job/bids/:id
- * GET /web/local-authority/booking/calender
- */
 export const localAuthorityJobsApi = createApi({
   reducerPath: 'localAuthorityJobsApi',
   baseQuery: createCustomFetchBaseQuery(),
   tagTypes: ['LocalAuthorityJob', 'LocalAuthorityJobType', 'LocalAuthorityJobBid', 'LocalAuthorityBookingCalendar'],
 
   endpoints: (builder) => ({
-    /** GET /web/local-authority/job */
     getLocalAuthorityJobs: builder.query({
       query: ({ page = 0, limit = 50, status = '', keyword = '', horizon = '', dateFilter = '', ...filters } = {}) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOBS,
@@ -54,7 +44,6 @@ export const localAuthorityJobsApi = createApi({
           : [{ type: 'LocalAuthorityJob', id: 'LIST' }],
     }),
 
-    /** GET /web/local-authority/job/type */
     getLocalAuthorityJobTypes: builder.query({
       query: ({ page = 0, limit = 100, status = 'active', keyword = '' } = {}) => {
         const params = {
@@ -88,7 +77,40 @@ export const localAuthorityJobsApi = createApi({
           : [{ type: 'LocalAuthorityJobType', id: 'LIST' }],
     }),
 
-    /** POST /web/local-authority/job */
+    createLocalAuthorityJobType: builder.mutation({
+      query: (body) => ({
+        url: API_ROUTES.LOCAL_AUTHORITY_JOB_TYPES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: [{ type: 'LocalAuthorityJobType', id: 'LIST' }],
+    }),
+
+    updateLocalAuthorityJobType: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.LOCAL_AUTHORITY_JOB_TYPES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'LocalAuthorityJobType', id },
+        { type: 'LocalAuthorityJobType', id: 'LIST' },
+      ],
+    }),
+
+    deleteLocalAuthorityJobType: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.LOCAL_AUTHORITY_JOB_TYPES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'LocalAuthorityJobType', id },
+        { type: 'LocalAuthorityJobType', id: 'LIST' },
+      ],
+    }),
+
     createLocalAuthorityJob: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOBS,
@@ -127,12 +149,10 @@ export const localAuthorityJobsApi = createApi({
             );
           });
         } catch {
-          // create failed
         }
       },
     }),
 
-    /** GET /web/local-authority/job/:id */
     getLocalAuthorityJobById: builder.query({
       query: (id) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOBS_BY_ID(id),
@@ -146,7 +166,6 @@ export const localAuthorityJobsApi = createApi({
       providesTags: (_result, _error, id) => [{ type: 'LocalAuthorityJob', id }],
     }),
 
-    /** PUT /web/local-authority/job/:id */
     updateLocalAuthorityJob: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOBS_BY_ID(id),
@@ -159,7 +178,6 @@ export const localAuthorityJobsApi = createApi({
       ],
     }),
 
-    /** DELETE /web/local-authority/job/:id */
     deleteLocalAuthorityJob: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOBS_BY_ID(id),
@@ -171,10 +189,7 @@ export const localAuthorityJobsApi = createApi({
       ],
     }),
 
-    /**
-     * PUT /web/local-authority/job/:id/alert — shift alert settings
-     * Body: { enabled, phoneNumber: { code, number }, hoursBefore, minutesBefore }
-     */
+    
     updateLocalAuthorityJobAlert: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOB_ALERT(id),
@@ -187,12 +202,10 @@ export const localAuthorityJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(localAuthorityJobsApi.util.updateQueryData('getLocalAuthorityJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // save failed — the form shows the error
         }
       },
     }),
 
-    /** DELETE /web/local-authority/job/:id/alert — reset the alert to off */
     clearLocalAuthorityJobAlert: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOB_ALERT(id),
@@ -204,12 +217,10 @@ export const localAuthorityJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(localAuthorityJobsApi.util.updateQueryData('getLocalAuthorityJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // clear failed — the form shows the error
         }
       },
     }),
 
-    /** GET /web/local-authority/job/bids */
     getLocalAuthorityJobBids: builder.query({
       query: ({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOB_BIDS,
@@ -234,7 +245,6 @@ export const localAuthorityJobsApi = createApi({
           : [{ type: 'LocalAuthorityJobBid', id: 'LIST' }],
     }),
 
-    /** PUT /web/local-authority/job/bids/:id — accept / reject / status */
     updateLocalAuthorityJobBid: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_JOB_BIDS_BY_ID(id),
@@ -248,7 +258,6 @@ export const localAuthorityJobsApi = createApi({
       ],
     }),
 
-    /** POST /web/local-authority/booking — accept bid + create booking { bid, worker } */
     createLocalAuthorityBooking: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.LOCAL_AUTHORITY_BOOKING,
@@ -262,10 +271,6 @@ export const localAuthorityJobsApi = createApi({
       ],
     }),
 
-    /**
-     * GET /web/local-authority/booking/calender
-     * Query: latitude, longitude, startDate, endDate, branch?
-     */
     getLocalAuthorityBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -293,6 +298,9 @@ export const {
   useGetLocalAuthorityJobByIdQuery,
   useLazyGetLocalAuthorityJobByIdQuery,
   useGetLocalAuthorityJobTypesQuery,
+  useCreateLocalAuthorityJobTypeMutation,
+  useUpdateLocalAuthorityJobTypeMutation,
+  useDeleteLocalAuthorityJobTypeMutation,
   useCreateLocalAuthorityJobMutation,
   useUpdateLocalAuthorityJobMutation,
   useDeleteLocalAuthorityJobMutation,

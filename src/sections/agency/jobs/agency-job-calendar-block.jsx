@@ -9,26 +9,28 @@ import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
 import { hideScrollX } from 'src/theme/styles/mixins';
 
-import { getStaffById } from 'src/_mock/_agency-assign-staff';
-
-// ----------------------------------------------------------------------
+import { findStaffById, getAssignCalendarCellSx } from './agency-assign-staff-utils';
 
 const ROW_LABEL_W = 72;
 const DAY_COL_W = 52;
 const CELL_H = 44;
 
-const CELL_STYLES = {
-  empty: { bgcolor: '#e0e0e0', border: '1px solid #bdbdbd' },
-  assigned: { bgcolor: '#fff', border: '1px solid #e0e0e0' },
-  upcoming: { bgcolor: '#e3f2fd', border: '2px solid #2196f3' },
-  completed: { bgcolor: '#e8f5e9', border: '2px solid #4caf50' },
-  replacement: { bgcolor: '#ffebee', border: '2px solid #f44336' },
-  noshow: { bgcolor: '#fff3e0', border: '2px solid #ff9800' },
-  pending: { bgcolor: '#fffde7', border: '2px solid #ffeb3b' },
-};
-
 function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
-  const style = CELL_STYLES[cell?.status] || CELL_STYLES.empty;
+  if (!cell) {
+    return (
+      <Box
+        sx={{
+          width: DAY_COL_W,
+          height: CELL_H,
+          flexShrink: 0,
+          mx: 0.25,
+          borderRadius: 1,
+          bgcolor: 'transparent',
+        }}
+      />
+    );
+  }
+
   const isEmpty = cell?.status === 'empty';
   const isInteractive = !readOnly || !isEmpty;
 
@@ -46,7 +48,7 @@ function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
         borderRadius: 1,
         cursor: isInteractive ? 'pointer' : 'default',
         mx: 0.25,
-        ...style,
+        ...getAssignCalendarCellSx(cell?.status),
         '&:hover': isInteractive ? { opacity: 0.9 } : undefined,
       }}
     >
@@ -58,7 +60,7 @@ function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
           <Avatar src={staff?.avatarUrl} sx={{ width: 28, height: 28, fontSize: 10 }}>
             {staff?.initials}
           </Avatar>
-          <Iconify icon="eva:checkmark-fill" width={12} sx={{ color: '#4caf50', mt: -0.5 }} />
+          <Iconify icon="eva:checkmark-fill" width={12} sx={{ color: 'success.main', mt: -0.5 }} />
         </Stack>
       )}
       {cell?.status === 'replacement' && (
@@ -66,7 +68,7 @@ function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
           <Avatar src={staff?.avatarUrl} sx={{ width: 28, height: 28, fontSize: 10 }}>
             {staff?.initials}
           </Avatar>
-          <Iconify icon="eva:sync-fill" width={12} sx={{ color: '#f44336', mt: -0.5 }} />
+          <Iconify icon="eva:sync-fill" width={12} sx={{ color: 'error.main', mt: -0.5 }} />
         </Stack>
       )}
       {cell?.status === 'noshow' && (
@@ -77,29 +79,29 @@ function ShiftGridCell({ cell, staff, onClick, cellRef, readOnly }) {
       {cell?.status === 'pending' && (
         <Avatar
           src={staff?.avatarUrl}
-          sx={{ width: 28, height: 28, fontSize: 10, border: '2px solid #ffeb3b' }}
+          sx={{ width: 28, height: 28, fontSize: 10, border: '2px solid', borderColor: 'warning.light' }}
         >
           {staff?.initials}
         </Avatar>
       )}
-      {(cell?.status === 'assigned' || cell?.status === 'upcoming') && staff && (
+      {(cell?.status === 'assigned' || cell?.status === 'upcoming') && (
         <Avatar
-          src={staff.avatarUrl}
+          src={staff?.avatarUrl}
           sx={{
             width: 30,
             height: 30,
             fontSize: 11,
-            border: cell.status === 'upcoming' ? '2px solid #2196f3' : 'none',
+            border: cell.status === 'upcoming' ? '2px solid' : 'none',
+            borderColor: cell.status === 'upcoming' ? 'info.main' : undefined,
           }}
         >
-          {staff.initials}
+          {staff?.initials || '?'}
         </Avatar>
       )}
     </Box>
   );
 }
 
-/** Calendar view — shift rows × days, grey + opens staff popover */
 export function AgencyJobCalendarBlock({
   categoryId,
   jobItem,
@@ -108,10 +110,11 @@ export function AgencyJobCalendarBlock({
   onCellClick,
   cellRefs,
   readOnly = false,
+  staffList = [],
 }) {
   return (
     <Box sx={{ mb: 2.5 }}>
-      <Box sx={{ bgcolor: '#e8e8e8', borderRadius: 1, p: 1.5, mb: 1.5 }}>
+      <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, p: 1.5, mb: 1.5 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <JobMediaThumb image={jobItem.image} alt={`Job ${jobItem.id}`} width={48} height={48} />
           <Box sx={{ minWidth: 0 }}>
@@ -155,8 +158,10 @@ export function AgencyJobCalendarBlock({
               {days.map((day) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const cell =
-                  gridCells[categoryId]?.[jobItem.id]?.[row.id]?.[dateKey] || row.cells[dateKey];
-                const staff = cell?.staffId ? getStaffById(cell.staffId) : null;
+                  gridCells[categoryId]?.[jobItem.id]?.[row.id]?.[dateKey] ||
+                  row.cells?.[dateKey] ||
+                  (row.date === dateKey ? { status: 'empty' } : null);
+                const staff = cell?.staffId ? findStaffById(staffList, cell.staffId) : null;
                 const refKey = `${categoryId}-${jobItem.id}-${row.id}-${dateKey}`;
 
                 return (

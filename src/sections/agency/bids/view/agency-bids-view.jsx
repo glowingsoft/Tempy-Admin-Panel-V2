@@ -64,6 +64,7 @@ import {
   normalizeAgencyBidStatus,
 } from '../agency-bid-api-utils';
 import { selectUser } from 'src/store/slices/userSlice';
+import { handleApiError } from 'src/store/handleApiError';
 
 // ----------------------------------------------------------------------
 
@@ -349,21 +350,20 @@ export function AgencyBidsView({ mode = 'agency' }) {
       }
 
       try {
-        await updateAgencyBid({
+        const response = await updateAgencyBid({
           id: bidId,
           bid: Number(updates.bidAmount),
           note: updates.notes ?? editingBid.notes ?? editingBid.note ?? '',
         }).unwrap();
 
-        toast.success(`Bid updated to £${Number(updates.bidAmount).toFixed(2)}`);
+        toast.success(
+          response?.message ||
+            response?.data?.message ||
+            `Bid updated to £${Number(updates.bidAmount).toFixed(2)}`
+        );
         handleCloseEdit();
       } catch (error) {
-        const message =
-          error?.data?.message ||
-          error?.error ||
-          (typeof error?.data === 'string' ? error.data : null) ||
-          'Failed to update bid. Please try again.';
-        toast.error(message);
+        toast.error(handleApiError(error) || 'Failed to update bid. Please try again.');
       }
     },
     [editingBid, handleCloseEdit, updateAgencyBid]
@@ -379,19 +379,21 @@ export function AgencyBidsView({ mode = 'agency' }) {
     }
 
     try {
-      await updateAgencyBid({ id: String(bidId), status: 'withdraw' }).unwrap();
-      toast.success(`Bid withdrawn for ${bidToWithdraw.jobTitle}`);
+      const response = await updateAgencyBid({
+        id: String(bidId),
+        status: 'withdraw',
+      }).unwrap();
+      toast.success(
+        response?.message ||
+          response?.data?.message ||
+          `Bid withdrawn for ${bidToWithdraw.jobTitle}`
+      );
       withdrawDialog.onFalse();
       setBidToWithdraw(null);
       setSelectedBid(null);
       setEditingBid(null);
     } catch (error) {
-      const message =
-        error?.data?.message ||
-        error?.error ||
-        (typeof error?.data === 'string' ? error.data : null) ||
-        'Failed to withdraw bid. Please try again.';
-      toast.error(message);
+      toast.error(handleApiError(error) || 'Failed to withdraw bid. Please try again.');
     }
   }, [bidToWithdraw, updateAgencyBid, withdrawDialog]);
 
@@ -504,6 +506,21 @@ export function AgencyBidsView({ mode = 'agency' }) {
                               >
                                 {bid.jobRef}
                               </Typography>
+                              {(bid.notes || bid.note) && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    mt: 0.35,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {bid.notes || bid.note}
+                                </Typography>
+                              )}
                               <Stack
                                 direction="row"
                                 spacing={0.5}

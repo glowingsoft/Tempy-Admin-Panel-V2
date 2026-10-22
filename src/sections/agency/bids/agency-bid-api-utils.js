@@ -4,7 +4,8 @@ import { fToNow } from 'src/utils/format-time';
 import { formatShiftRowLabel } from 'src/components/jobs/job-date-filters';
 import { computeHourlyRate } from './bids-actions';
 
-// ----------------------------------------------------------------------
+export const AGENCY_BIDS_LIST_LIMIT = 500;
+
 
 function pickId(...values) {
   for (const value of values) {
@@ -24,16 +25,12 @@ function pickId(...values) {
   return '';
 }
 
-/** Pick bid document id from raw API item (shallow). */
 export function pickBidDocumentId(item = {}) {
   if (!item || typeof item !== 'object') return '';
   return pickId(item._id, item.id, item.bidId, item.bid_id);
 }
 
-/**
- * Unwrap POST/GET payloads that nest the bid doc under data / bid / result / etc.
- * Returns the first object that has a real document id.
- */
+
 export function unwrapBidDocument(response) {
   if (!response || typeof response !== 'object') return null;
 
@@ -73,14 +70,12 @@ export function unwrapBidDocument(response) {
     }
   }
 
-  // Fallback: plain data object even without id (for mapping fields)
   if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
     return response.data;
   }
   return response;
 }
 
-/** Pick shift id from raw API item. */
 export function pickBidShiftId(item = {}) {
   if (!item || typeof item !== 'object') return '';
   const shift = item.shift;
@@ -90,19 +85,14 @@ export function pickBidShiftId(item = {}) {
   return pickId(item.shiftId, item.shift_id, shift);
 }
 
-/** True when value looks like a real server bid id (not a local placeholder / shift date key). */
 export function isServerBidId(id) {
   if (id == null || id === '') return false;
   const s = String(id).trim();
   if (!s) return false;
   if (s.startsWith('local-') || s.startsWith('shift-bid-')) return false;
-  // Synthetic shift keys like "2026-07-23-09:00" must NOT count as bid ids
   if (/^\d{4}-\d{2}-\d{2}/.test(s) || s.includes(':')) return false;
-  // Mongo ObjectId
   if (/^[a-f\d]{24}$/i.test(s)) return true;
-  // UUID
   if (/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(s)) return true;
-  // Other opaque server ids (no spaces)
   return s.length >= 12 && !/\s/.test(s);
 }
 
@@ -145,7 +135,6 @@ function estimateHours(shift = {}) {
   return Math.round((mins / 60) * 100) / 100;
 }
 
-/** Map GET `/web/agency/bids` item → Bids table/card shape. */
 export function mapAgencyBidFromApi(item = {}) {
   const raw = unwrapBidDocument(item) || item || {};
   const job = raw.job && typeof raw.job === 'object' ? raw.job : {};
@@ -159,7 +148,6 @@ export function mapAgencyBidFromApi(item = {}) {
   const location =
     (job.location && typeof job.location === 'object' ? job.location : null) || snapshotLocation || {};
 
-  // Bidder who placed the offer — prefer Bid.user (not job.user / poster).
   const bidderRaw =
     raw.user ?? raw.worker ?? raw.bidder ?? raw.createdBy ?? raw.owner ?? item.user ?? null;
   const bidderObj = bidderRaw && typeof bidderRaw === 'object' ? bidderRaw : {};
@@ -299,10 +287,6 @@ export function mapAgencyBidFromApi(item = {}) {
   };
 }
 
-/**
- * Resolve real bid _id for PUT/DELETE via GET bids list
- * (optionally filtered by shift/job).
- */
 export async function resolveAgencyBidId({
   shiftId,
   jobId = '',
@@ -364,7 +348,6 @@ export const AGENCY_BID_API_STATUSES = [
   'cancelledByUser',
 ];
 
-/** Normalize API bid status to backend enum for UI + edit rules. */
 export function normalizeAgencyBidStatus(status) {
   const raw = String(status || '').trim();
   if (!raw) return 'pending';
@@ -377,7 +360,6 @@ export function normalizeAgencyBidStatus(status) {
   return 'pending';
 }
 
-/** True when bid is still active (not withdrawn/declined) — Bid Now should POST again after withdraw. */
 export function isActiveAgencyBid(bid) {
   if (!bid) return false;
   const status = normalizeAgencyBidStatus(bid.status);
@@ -395,7 +377,6 @@ export function isActiveAgencyBid(bid) {
   ].includes(status);
 }
 
-/** After poster accepts, a booking exists — bidder must not delete; Check In must not stay if bid is gone. */
 export function isAcceptedOrBookedBid(bid) {
   if (!bid) return false;
   if (String(bid.bookingId || '').trim()) return true;
@@ -403,20 +384,17 @@ export function isAcceptedOrBookedBid(bid) {
   return status === 'accepted' || status === 'assigned' || status === 'booked';
 }
 
-/** True when bidder may still change the offer (poster has not declined/accepted). */
 export function canEditAgencyBid(bid) {
   if (!bid) return false;
   if (isAcceptedOrBookedBid(bid)) return false;
   return normalizeAgencyBidStatus(bid.status) === 'pending';
 }
 
-/** Withdraw is only shown/allowed while the bid is still pending. */
 export function canWithdrawAgencyBid(bid) {
   if (!bid) return false;
   return normalizeAgencyBidStatus(bid.status) === 'pending';
 }
 
-/** Accepted bid that can be used for POST /booking { bid, worker }. */
 export function canAssignFromAgencyBid(bid) {
   if (!bid) return false;
   const id = String(bid.id || bid._id || '').trim();
@@ -425,10 +403,6 @@ export function canAssignFromAgencyBid(bid) {
   return normalizeAgencyBidStatus(bid.status) === 'accepted';
 }
 
-/**
- * Resolve bid for a Find Jobs card (shift map first, then same jobId fallback).
- * Avoids false "Bid unavailable" when shift id keys differ slightly.
- */
 export function findAgencyBidForJobCard(bidsByShiftId, { shiftId = '', jobId = '' } = {}) {
   const shiftKey = String(shiftId || '').trim();
   if (shiftKey && bidsByShiftId?.get) {
@@ -461,14 +435,7 @@ export function findAgencyBidForJobCard(bidsByShiftId, { shiftId = '', jobId = '
   return forJob[0] || null;
 }
 
-/**
- * Active-tab button state from job + linked bid.
- * - reassign: the worker declined (booking cancelledByWorker) — bid stays accepted
- * - awaitingWorker: booking is pending until the worker accepts the offer
- * - assigned: any other API booking on job/shift/bid
- * - assignStaff: our bid is accepted and not yet booked
- * - bidUnavailable: should not stay on Active (filter out) — no accepted bid for us
- */
+
 export function resolveAgencyAssignAction({ job, bid } = {}) {
   const bookingId = String(
     job?.bookingId ||
@@ -483,7 +450,6 @@ export function resolveAgencyAssignAction({ job, bid } = {}) {
     return { actionType: 'reassign', bookingId: '', canOpenAssign: true };
   }
 
-  // Never invent fake ids like "local-assigned" / "assigned"
   if (bookingId && bookingId !== 'local-assigned' && bookingId !== 'assigned') {
     const actionType = bookingStatus === 'pending' ? 'awaitingWorker' : 'assigned';
     return { actionType, bookingId, canOpenAssign: false };
@@ -496,7 +462,6 @@ export function resolveAgencyAssignAction({ job, bid } = {}) {
   return { actionType: 'bidUnavailable', bookingId: '', canOpenAssign: false };
 }
 
-/** True when bid row belongs to this shift (and optional job). */
 export function bidMatchesShift(bid, shiftId, jobId = '') {
   if (!bid || !shiftId) return false;
   const key = String(shiftId);
@@ -509,10 +474,7 @@ export function bidMatchesShift(bid, shiftId, jobId = '') {
   return false;
 }
 
-/**
- * Keep only bids placed by one of `userIds`.
- * `requireOwner` (admin impersonation): keep only rows with an explicit matching bidder id.
- */
+
 export function filterBidsOwnedByUser(bids = [], userIdOrIds, { requireOwner = false } = {}) {
   const allowed = new Set(
     (Array.isArray(userIdOrIds) ? userIdOrIds : [userIdOrIds])
@@ -541,7 +503,6 @@ export function filterBidsOwnedByUser(bids = [], userIdOrIds, { requireOwner = f
   return anyHasOwner ? owned : bids;
 }
 
-/** Normalize list payloads from GET /web/agency/bids */
 export function extractAgencyBidsList(response) {
   if (Array.isArray(response?.data)) return response.data;
   if (Array.isArray(response?.data?.docs)) return response.data.docs;
@@ -559,7 +520,6 @@ export function extractAgencyBidsList(response) {
   return [];
 }
 
-/** Build a local bid row right after POST (so Edit/Delete work before GET refreshes). */
 export function buildLocalBidFromCreate({ response, body, job, shiftRow }) {
   const raw = unwrapBidDocument(response) || {};
   const mapped = mapAgencyBidFromApi({
@@ -596,7 +556,6 @@ export function buildLocalBidFromCreate({ response, body, job, shiftRow }) {
   };
 }
 
-/** Body for POST `/web/agency/bids` — { shift, job, bid, note } */
 export function buildAgencyBidBody({ shiftId, jobId, bid, note = '' }) {
   return {
     shift: String(shiftId || ''),
@@ -606,19 +565,6 @@ export function buildAgencyBidBody({ shiftId, jobId, bid, note = '' }) {
   };
 }
 
-/**
- * Map PUT/POST success payload to local bid row.
- * Confirmed API shape:
- * {
- *   message: "Bid updated successfully",
- *   data: {
- *     _id,           // ← route id for PUT/DELETE /web/agency/bids/:id
- *     bid, note, status,
- *     job: "<jobId>",
- *     shift: { _id, date, startTime, endTime, ... }
- *   }
- * }
- */
 export function mapAgencyBidMutationResponse(response, fallback = {}) {
   const mapped = buildLocalBidFromCreate({
     response,

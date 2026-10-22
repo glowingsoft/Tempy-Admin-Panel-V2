@@ -107,6 +107,7 @@ import {
   useUpdateAgencyAvailabilityMutation,
 } from 'src/store/Reducer/agency-availability-api';
 import { useGetAgencyBidsQuery } from 'src/store/Reducer/agency-bids-api';
+import { canAssignFromAgencyBid } from 'src/sections/agency/bids/agency-bid-api-utils';
 import { useGetHomeCareCompanyBranchesQuery } from 'src/store/Reducer/home-care-company-branches-api';
 import {
   useCreateHomeCareCompanyAvailabilityMutation,
@@ -2581,14 +2582,25 @@ export function AgencyShiftsView({
   const [deleteNurseAvailability] = useDeleteNurseAvailabilityMutation();
 
   const { data: agencyBidsData, refetch: refetchAgencyBids } = useGetAgencyBidsQuery(
-    { page: 0, limit: 200, status: 'accepted' },
-    { skip: true }
+    {
+      page: 0,
+      limit: 200,
+      status: 'accepted',
+      ...(profileUserId ? { userId: profileUserId } : {}),
+    },
+    {
+      skip: !isAgencyApi,
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+      refetchOnReconnect: true,
+    }
   );
 
   const assignableBids = useMemo(() => {
     const list = Array.isArray(agencyBidsData?.data) ? agencyBidsData.data : [];
-    const unbooked = list.filter((bid) => bid?.id && !String(bid.bookingId || '').trim());
-    return (unbooked.length ? unbooked : list).filter((bid) => bid?.id);
+    const assignable = list.filter((bid) => canAssignFromAgencyBid(bid));
+    if (assignable.length) return assignable;
+    return list.filter((bid) => bid?.id && !String(bid.bookingId || '').trim());
   }, [agencyBidsData?.data]);
   const createAvailability = isNurseApi
     ? createNurseAvailability
@@ -2701,8 +2713,6 @@ export function AgencyShiftsView({
     enableAvailabilityApi ? ROSTER_SCOPE.ALL : ROSTER_SCOPE.CURRENT
   );
   const [lockToggled, setIsLocked] = useState(false);
-  // Admin viewing the account: the rota is always locked — no add, edit, paste or cancel —
-  // and there is nothing to unlock, so no "unlock to make changes" nudge either.
   const isLocked = lockToggled || viewOnly;
   const notifyLocked = () => {
     if (!viewOnly) toast.warning('Rota is locked — unlock to make changes');
@@ -3151,6 +3161,11 @@ export function AgencyShiftsView({
     });
   }, [shiftForm.open, shiftForm.staff?.id, shiftForm.date, getCellPosition]);
 
+  const sidebarActions = useMemo(() => {
+    if (shiftsCalendarOnly && !isAgencyApi) return CALENDAR_SIDEBAR_ACTIONS;
+    return SIDEBAR_ACTIONS;
+  }, [isAgencyApi, shiftsCalendarOnly]);
+
   const handleCellClick = useCallback(
     (anchor, shift, staff, date, team, options = {}) => {
       if (isLocked) {
@@ -3163,7 +3178,6 @@ export function AgencyShiftsView({
         return;
       }
 
-      // Empty job type row (saved type with no shifts yet) — there is no staff member to schedule.
       if (staff?.isPlaceholder) {
         toast.info('No shifts for this job type yet. Shifts will appear here once they are booked.');
         return;
@@ -3172,7 +3186,6 @@ export function AgencyShiftsView({
       const timed = getTimedDayShifts(shifts, staff.id, date);
       const status = getDayShifts(shifts, staff.id, date).find(isStatusBlock);
 
-      // Timed booked shift → details (unless explicitly adding another).
       if (isTimedWorkShift(shift) && !options?.addAnother && !status) {
         setShowStaffDetail(false);
         setDetailsState({
@@ -3190,7 +3203,6 @@ export function AgencyShiftsView({
       setFocusedShiftDate(date);
       setShowStaffDetail(true);
 
-      // Empty / Busy / status cells → open options on the cell (+), not left sidebar.
       if (!timed.length || status || options?.openActions) {
         closeShiftForm();
         setCellActionMenu({
@@ -3198,19 +3210,19 @@ export function AgencyShiftsView({
           staff,
           date,
           team,
-          actions: shiftsCalendarOnly ? CALENDAR_SIDEBAR_ACTIONS : SIDEBAR_ACTIONS,
+          actions: sidebarActions,
         });
         return;
       }
 
-      if (shiftsCalendarOnly) {
+      if (shiftsCalendarOnly && !isAgencyApi) {
         closeShiftForm();
         setCellActionMenu({
           anchorEl: anchor,
           staff,
           date,
           team,
-          actions: CALENDAR_SIDEBAR_ACTIONS,
+          actions: sidebarActions,
         });
         return;
       }
@@ -3225,7 +3237,7 @@ export function AgencyShiftsView({
         mode: timed.length && !status ? 'add' : shift ? 'edit' : 'add',
       });
     },
-    [closeShiftForm, isLocked, openShiftForm, shifts, shiftsCalendarOnly]
+    [closeShiftForm, isAgencyApi, isLocked, openShiftForm, shifts, shiftsCalendarOnly, sidebarActions]
   );
 
   const handleShiftClick = useCallback(
@@ -3244,7 +3256,7 @@ export function AgencyShiftsView({
   );
 
   const openAddShiftPopover = useCallback(() => {
-    if (shiftsCalendarOnly) {
+    if (shiftsCalendarOnly && !isAgencyApi) {
       return;
     }
     if (isLocked) {
@@ -3293,6 +3305,7 @@ export function AgencyShiftsView({
     openShiftForm,
     selectedStaff,
     shifts,
+    shiftsCalendarOnly,
   ]);
 
   const resolveApiStaffId = useCallback(
@@ -3363,8 +3376,10 @@ export function AgencyShiftsView({
 
         setAssigning(true);
         try {
-          await createAgencyBooking({ bid: bidId, worker: workerId }).unwrap();
-          toast.success('Shift assigned successfully');
+          const result = await createAgencyBooking({ bid: bidId, worker: workerId }).unwrap();
+          toast.success(
+            result?.message || result?.data?.message || 'Shift assigned successfully'
+          );
           try {
             await Promise.all([refetchAgencyBids(), refetchCalendar()]);
           } catch {
@@ -3372,7 +3387,11 @@ export function AgencyShiftsView({
           return;
         } catch (err) {
           toast.error(
-            getJobApiErrorMessage(err) || err?.data?.message || err?.error || err?.message || 'Failed to assign shift'
+            getJobApiErrorMessage(err) ||
+              err?.data?.message ||
+              err?.error ||
+              err?.message ||
+              'Failed to assign shift'
           );
           throw err;
         } finally {
@@ -3868,7 +3887,7 @@ export function AgencyShiftsView({
         }
       }
 
-      if (type === 'busy' || type === 'day-off' || type === 'add-leave') {
+      if (!useCalendarApi && (type === 'busy' || type === 'day-off' || type === 'add-leave')) {
         upsertAvailabilityBlock({
           staffId: staff.id,
           date: targetDate,
@@ -3999,7 +4018,11 @@ export function AgencyShiftsView({
           showStaffDetail={showStaffDetail}
           selectedStaff={selectedStaffWithHours}
           activeAction={activeSidebarAction}
-          shiftFormOpen={!shiftsCalendarOnly && shiftForm.open && activeSidebarAction === 'add-shift'}
+          shiftFormOpen={
+            (!shiftsCalendarOnly || isAgencyApi) &&
+            shiftForm.open &&
+            activeSidebarAction === 'add-shift'
+          }
           shiftFormProps={shiftFormCardProps}
           shiftTeam={shiftForm.team || STAFF_TEAM_MAP[selectedStaff?.id]}
           formPreview={formPreview}
@@ -4013,7 +4036,7 @@ export function AgencyShiftsView({
           onAddShift={openAddShiftPopover}
           onStaffAction={applySpecialShift}
           isMobile={isMobile}
-          actions={shiftsCalendarOnly ? CALENDAR_SIDEBAR_ACTIONS : SIDEBAR_ACTIONS}
+          actions={sidebarActions}
           postedJobs={postedJobs}
           postedJobsLoading={postedJobsLoading}
           postedJobsTitle={isHomeCareCompanyApi ? 'Jobs' : 'Jobs'}
@@ -4289,7 +4312,7 @@ export function AgencyShiftsView({
       </Menu>
 
       <AddShiftPopover
-        open={!shiftsCalendarOnly && shiftForm.open}
+        open={(!shiftsCalendarOnly || isAgencyApi) && shiftForm.open}
         position={shiftForm.position}
         onClose={closeShiftForm}
         formProps={shiftFormCardProps}

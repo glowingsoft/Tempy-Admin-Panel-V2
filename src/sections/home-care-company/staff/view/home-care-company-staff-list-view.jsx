@@ -43,7 +43,6 @@ import { AGENCY_STAFF_TABLE_HEAD, STAFF_TABLE_SX } from 'src/sections/staff/staf
 import { HomeCareCompanyStaffFormDialog } from '../home-care-company-staff-form-dialog';
 import { HomeCareCompanyStaffDetailsDialog } from '../home-care-company-staff-details-dialog';
 import { StaffImportDialog } from 'src/sections/staff/staff-import-dialog';
-import { saveCompanyRosterStaff } from 'src/sections/staff/company-roster-store';
 import { saveTemplateResponse } from 'src/sections/staff/staff-import-utils';
 
 const TABLE_HEAD = AGENCY_STAFF_TABLE_HEAD;
@@ -232,13 +231,7 @@ export function HomeCareCompanyStaffListView() {
       setImporting(true);
       try {
         const response = await importStaff(file).unwrap();
-        // Keep the local rota roster in step — Shifts reads teams from it.
-        saveCompanyRosterStaff('home_care_company', rows, { merge: true });
-        const teams = new Set(rows.map((row) => row.team || row.role).filter(Boolean));
-        toast.success(
-          response?.message ||
-          `Imported ${rows.length} staff · ${teams.size} team${teams.size === 1 ? '' : 's'} for your rota. Open Shifts to review.`
-        );
+        toast.success(response?.message || `Imported ${rows.length} staff`);
         importDialog.onFalse();
         // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (error) {

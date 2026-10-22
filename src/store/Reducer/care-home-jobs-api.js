@@ -20,7 +20,6 @@ export const careHomeJobsApi = createApi({
   tagTypes: ['CareHomeJob', 'CareHomeJobType', 'CareHomeJobBid', 'CareHomeBookingCalendar'],
 
   endpoints: (builder) => ({
-    /** GET /web/care-home/job */
     getCareHomeJobs: builder.query({
       query: ({ page = 0, limit = 50, status = '', keyword = '', horizon = '', dateFilter = '', ...filters } = {}) => ({
         url: API_ROUTES.CARE_HOME_JOBS,
@@ -43,7 +42,6 @@ export const careHomeJobsApi = createApi({
         result?.data?.length ? [...result.data.map((job) => ({ type: 'CareHomeJob', id: job.id })), { type: 'CareHomeJob', id: 'LIST' }] : [{ type: 'CareHomeJob', id: 'LIST' }],
     }),
 
-    /** GET /web/care-home/job/type — JobRole list for Add Job type select */
     getCareHomeJobTypes: builder.query({
       query: ({ page = 0, limit = 100, status = 'active', keyword = '' } = {}) => {
         const params = {
@@ -77,7 +75,40 @@ export const careHomeJobsApi = createApi({
           : [{ type: 'CareHomeJobType', id: 'LIST' }],
     }),
 
-    /** POST /web/care-home/job */
+    createCareHomeJobType: builder.mutation({
+      query: (body) => ({
+        url: API_ROUTES.CARE_HOME_JOB_TYPES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: [{ type: 'CareHomeJobType', id: 'LIST' }],
+    }),
+
+    updateCareHomeJobType: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: API_ROUTES.CARE_HOME_JOB_TYPES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'CareHomeJobType', id },
+        { type: 'CareHomeJobType', id: 'LIST' },
+      ],
+    }),
+
+    deleteCareHomeJobType: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.CARE_HOME_JOB_TYPES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'CareHomeJobType', id },
+        { type: 'CareHomeJobType', id: 'LIST' },
+      ],
+    }),
+
     createCareHomeJob: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.CARE_HOME_JOBS,
@@ -116,12 +147,10 @@ export const careHomeJobsApi = createApi({
             );
           });
         } catch {
-          // create failed — nothing to patch
         }
       },
     }),
 
-    /** GET /web/care-home/job/:id */
     getCareHomeJobById: builder.query({
       query: (id) => ({
         url: API_ROUTES.CARE_HOME_JOBS_BY_ID(id),
@@ -135,7 +164,6 @@ export const careHomeJobsApi = createApi({
       providesTags: (_result, _error, id) => [{ type: 'CareHomeJob', id }],
     }),
 
-    /** PUT /web/care-home/job/:id */
     updateCareHomeJob: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.CARE_HOME_JOBS_BY_ID(id),
@@ -148,7 +176,6 @@ export const careHomeJobsApi = createApi({
       ],
     }),
 
-    /** DELETE /web/care-home/job/:id */
     deleteCareHomeJob: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.CARE_HOME_JOBS_BY_ID(id),
@@ -160,10 +187,6 @@ export const careHomeJobsApi = createApi({
       ],
     }),
 
-    /**
-     * PUT /web/care-home/job/:id/alert — shift alert settings
-     * Body: { enabled, phoneNumber: { code, number }, hoursBefore, minutesBefore }
-     */
     updateCareHomeJobAlert: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.CARE_HOME_JOB_ALERT(id),
@@ -176,12 +199,10 @@ export const careHomeJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(careHomeJobsApi.util.updateQueryData('getCareHomeJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // save failed — the form shows the error
         }
       },
     }),
 
-    /** DELETE /web/care-home/job/:id/alert — reset the alert to off */
     clearCareHomeJobAlert: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.CARE_HOME_JOB_ALERT(id),
@@ -193,12 +214,10 @@ export const careHomeJobsApi = createApi({
           const { data: alert } = await queryFulfilled;
           dispatch(careHomeJobsApi.util.updateQueryData('getCareHomeJobById', id, (draft) => patchJobAlert(draft, alert)));
         } catch {
-          // clear failed — the form shows the error
         }
       },
     }),
 
-    /** GET /web/care-home/job/bids */
     getCareHomeJobBids: builder.query({
       query: ({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) => ({
         url: API_ROUTES.CARE_HOME_JOB_BIDS,
@@ -223,10 +242,6 @@ export const careHomeJobsApi = createApi({
           : [{ type: 'CareHomeJobBid', id: 'LIST' }],
     }),
 
-    /**
-     * PUT /web/care-home/job/bids/:id — accept / decline / status update
-     * Body: { status: 'accepted' | 'rejected', worker? }
-     */
     updateCareHomeJobBid: builder.mutation({
       query: ({ id, ...body }) => ({
         url: API_ROUTES.CARE_HOME_JOB_BIDS_BY_ID(id),
@@ -240,10 +255,6 @@ export const careHomeJobsApi = createApi({
       ],
     }),
 
-    /**
-     * POST /web/care-home/booking — accept bid + assign worker
-     * Body: { bid, worker }
-     */
     createCareHomeBooking: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.CARE_HOME_BOOKING,
@@ -257,7 +268,6 @@ export const careHomeJobsApi = createApi({
       ],
     }),
 
-    /** PUT /web/care-home/booking/:id { status: 'cancel' } — client cancels a created booking (cancelledByUser). */
     cancelCareHomeBooking: builder.mutation({
       query: (id) => ({
         url: API_ROUTES.CARE_HOME_BOOKING_BY_ID(id),
@@ -271,10 +281,7 @@ export const careHomeJobsApi = createApi({
       ],
     }),
 
-    /**
-     * GET /web/care-home/booking/calender
-     * Query: latitude, longitude, startDate, endDate, branch?
-     */
+
     getCareHomeBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -302,6 +309,9 @@ export const {
   useGetCareHomeJobByIdQuery,
   useLazyGetCareHomeJobByIdQuery,
   useGetCareHomeJobTypesQuery,
+  useCreateCareHomeJobTypeMutation,
+  useUpdateCareHomeJobTypeMutation,
+  useDeleteCareHomeJobTypeMutation,
   useCreateCareHomeJobMutation,
   useUpdateCareHomeJobMutation,
   useDeleteCareHomeJobMutation,

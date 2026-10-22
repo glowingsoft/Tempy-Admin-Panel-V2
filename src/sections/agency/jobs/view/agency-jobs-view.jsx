@@ -6,9 +6,13 @@ import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import Pagination from '@mui/material/Pagination';
 import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import LoadingButton from '@mui/lab/LoadingButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -92,6 +96,7 @@ import {
   buildLocalBidFromCreate,
   findAgencyBidForJobCard,
   resolveAgencyAssignAction,
+  AGENCY_BIDS_LIST_LIMIT,
 } from 'src/sections/agency/bids/agency-bid-api-utils';
 import {
   buildDirectChatUrl,
@@ -254,13 +259,15 @@ function expandJobsByShift(jobs) {
         hasAgreedRate: Boolean(row.hasAgreedRate || job.hasAgreedRate),
         cardKey: `${job.id}__${row.id || index}`,
         shiftRows: [row],
+        allShiftRows: shiftRows,
         schedule: row.label,
-        schedules: undefined,
+        schedules: shiftRows.map((shift) => shift.label).filter(Boolean),
         shiftDate: row.date || job.shiftDate,
         shiftStartTime: row.startTime || job.shiftStartTime,
         shiftEndTime: row.endTime || job.shiftEndTime,
         breakType: row.breakType || job.breakType,
         breakMin: row.breakMin != null ? row.breakMin : job.breakMin,
+        allowedPersons: row.allowedPersons != null ? row.allowedPersons : job.allowedPersons,
         hourlyRate: row.hourlyRate != null ? row.hourlyRate : job.hourlyRate,
         totalPay: row.totalPay != null ? row.totalPay : job.totalPay,
         bookingId,
@@ -381,6 +388,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
   const [jobDetail, setJobDetail] = useState(null);
   const [jobDetailsDialog, setJobDetailsDialog] = useState(null);
+  const [schedulesDialogJob, setSchedulesDialogJob] = useState(null);
   const [assignDialog, setAssignDialog] = useState({ open: false, job: null, bid: null });
   const [careDetailsJob, setCareDetailsJob] = useState(null);
   const [careDetailsTick, setCareDetailsTick] = useState(0);
@@ -517,7 +525,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   const agencyBidsQuery = useGetAgencyBidsQuery(
     {
       page: 0,
-      limit: 100,
+      limit: AGENCY_BIDS_LIST_LIMIT,
       ...(useAgencyApis && scopeUserId
         ? { userId: scopeUserId, requireOwner: isImpersonating }
         : {}),
@@ -532,7 +540,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   const hccBidsQuery = useGetHomeCareCompanyBidsQuery(
     {
       page: 0,
-      limit: 100,
+      limit: AGENCY_BIDS_LIST_LIMIT,
       ...(isHomeCareCompany && scopeUserId
         ? { userId: scopeUserId, requireOwner: isImpersonating }
         : {}),
@@ -547,7 +555,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
   const nurseBidsQuery = useGetNurseBidsQuery(
     {
       page: 0,
-      limit: 100,
+      limit: AGENCY_BIDS_LIST_LIMIT,
       ...(isStaffMember && scopeUserId
         ? { userId: scopeUserId, requireOwner: isImpersonating }
         : {}),
@@ -727,7 +735,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       try {
         const filtered = await fetchAgencyBids({
           page: 0,
-          limit: 100,
+          limit: AGENCY_BIDS_LIST_LIMIT,
           ...(key ? { shift: key } : {}),
           ...(jobKey ? { job: jobKey } : {}),
         }).unwrap();
@@ -738,6 +746,41 @@ export function AgencyJobsView({ mode = 'agency' }) {
     },
     [bidsByShiftId, bidsResponse?.data, fetchAgencyBids, storagePrefix]
   );
+
+  const forgetBidForShift = useCallback((shiftId) => {
+    const key = String(shiftId || '');
+    if (!key) return;
+    try {
+      sessionStorage.removeItem(`${storagePrefix}-bid-id:${key}`);
+    } catch {
+    }
+    setLocalBidsByShift((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, [storagePrefix]);
+
+  const rememberBidForShift = useCallback((shiftId, bid) => {
+    if (!shiftId || !bid) return;
+    const key = String(shiftId);
+    setLocalBidsByShift((prev) => ({
+      ...prev,
+      [key]: {
+        ...bid,
+        shiftId: key,
+        status: bid.status || 'pending',
+      },
+    }));
+    const savedId = bid.id || bid._id;
+    if (isServerBidId(savedId)) {
+      try {
+        sessionStorage.setItem(`${storagePrefix}-bid-id:${key}`, String(savedId));
+      } catch {
+      }
+    }
+  }, [storagePrefix]);
 
   const findBidForShift = useCallback(
     async (shiftId, jobId = '', { includeInactive = false, network = true } = {}) => {
@@ -775,54 +818,22 @@ export function AgencyJobsView({ mode = 'agency' }) {
       try {
         const filtered = await fetchAgencyBids({
           page: 0,
-          limit: 100,
+          limit: AGENCY_BIDS_LIST_LIMIT,
           shift: key,
           ...(jobId ? { job: jobId } : {}),
         }).unwrap();
         const found = pick(filtered?.data || []);
-        if (found) return found;
+        if (found) {
+          rememberBidForShift(key, found);
+          return found;
+        }
       } catch {
       }
 
       return cached && matchesFilter(cached) ? cached : null;
     },
-    [bidsByShiftId, bidsResponse?.data, fetchAgencyBids]
+    [bidsByShiftId, bidsResponse?.data, fetchAgencyBids, rememberBidForShift]
   );
-
-  const forgetBidForShift = useCallback((shiftId) => {
-    const key = String(shiftId || '');
-    if (!key) return;
-    try {
-      sessionStorage.removeItem(`${storagePrefix}-bid-id:${key}`);
-    } catch {
-    }
-    setLocalBidsByShift((prev) => {
-      if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  }, [storagePrefix]);
-
-  const rememberBidForShift = useCallback((shiftId, bid) => {
-    if (!shiftId || !bid) return;
-    const key = String(shiftId);
-    setLocalBidsByShift((prev) => ({
-      ...prev,
-      [key]: {
-        ...bid,
-        shiftId: key,
-        status: bid.status || 'pending',
-      },
-    }));
-    const savedId = bid.id || bid._id;
-    if (isServerBidId(savedId)) {
-      try {
-        sessionStorage.setItem(`${storagePrefix}-bid-id:${key}`, String(savedId));
-      } catch {
-      }
-    }
-  }, [storagePrefix]);
 
   useEffect(() => {
     if (!isStaffMember) return;
@@ -1134,6 +1145,41 @@ export function AgencyJobsView({ mode = 'agency' }) {
     [jobs, page, rowsPerPage]
   );
 
+  /**
+   * Active-tab only: if list cap missed a shift bid, fetch that shift from API
+   * so Assign / Reassign card state stays correct. Skip Find Jobs (new) to avoid spam.
+   */
+  const missingBidHydrateRef = useRef(new Set());
+  useEffect(() => {
+    if (!scopeUserId || tabs.value !== 'active') return undefined;
+
+    const targets = paginatedJobs
+      .map((job) => {
+        const shiftId = String(job?.shiftRows?.[0]?.id || job?.shiftRows?.[0]?._id || '').trim();
+        const jobId = String(job?.id || '').trim();
+        if (!shiftId || bidsByShiftId.has(shiftId)) return null;
+        if (missingBidHydrateRef.current.has(shiftId)) return null;
+        return { shiftId, jobId };
+      })
+      .filter(Boolean)
+      .slice(0, 15);
+
+    if (!targets.length) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      for (const { shiftId, jobId } of targets) {
+        if (cancelled) return;
+        missingBidHydrateRef.current.add(shiftId);
+        await findBidForShift(shiftId, jobId, { network: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bidsByShiftId, findBidForShift, paginatedJobs, scopeUserId, tabs.value]);
+
   useEffect(() => {
     setPage(1);
   }, [tabs.value, dateFilter, roleFilter, listFilters]);
@@ -1218,7 +1264,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       }
 
       if (!isServerBidId(bidId)) {
-        toast.error('Bid id nahi mili — Edit nahi ho sakti. Pehle Bid Now se bid add karo.');
+        toast.error('Missing bid id — cannot edit. Place a bid with Bid Now first.');
         return;
       }
 
@@ -1336,14 +1382,14 @@ export function AgencyJobsView({ mode = 'agency' }) {
           status: 'pending',
         });
 
-        toast.success(`Bid updated to ${fCurrency(nextBid.bidAmount || updates.bidAmount)}`);
+        toast.success(
+          response?.message ||
+          response?.data?.message ||
+          `Bid updated to ${fCurrency(nextBid.bidAmount || updates.bidAmount)}`
+        );
         handleCloseEditBid();
       } catch (error) {
-        const message =
-          error?.data?.message ||
-          error?.error ||
-          (typeof error?.data === 'string' ? error.data : null) ||
-          'Failed to update bid.';
+        const message = handleApiError(error) || 'Failed to update bid.';
         const lower = String(message).toLowerCase();
         if (
           editingBid &&
@@ -1385,7 +1431,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       }
 
       if (!isServerBidId(bidId)) {
-        toast.error('Bid id nahi mili — Delete nahi ho sakti.');
+        toast.error('Missing bid id — cannot delete.');
         return;
       }
 
@@ -1411,9 +1457,11 @@ export function AgencyJobsView({ mode = 'agency' }) {
     }
 
     try {
-      await deleteAgencyBid(String(bidId)).unwrap();
+      const response = await deleteAgencyBid(String(bidId)).unwrap();
       forgetBidForShift(shiftId);
-      toast.success('Bid deleted successfully.');
+      toast.success(
+        response?.message || response?.data?.message || 'Bid deleted successfully.'
+      );
       deleteBidDialog.onFalse();
       setBidToDelete(null);
       try {
@@ -1421,12 +1469,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       } catch {
       }
     } catch (error) {
-      toast.error(
-        error?.data?.message ||
-        error?.error ||
-        (typeof error?.data === 'string' ? error.data : null) ||
-        'Failed to delete bid.'
-      );
+      toast.error(handleApiError(error) || 'Failed to delete bid.');
     }
   }, [bidToDelete, deleteAgencyBid, deleteBidDialog, forgetBidForShift, refetchBids, refetchJobs]);
 
@@ -1500,14 +1543,14 @@ export function AgencyJobsView({ mode = 'agency' }) {
             _id: existing.id || existing._id,
             status: 'pending',
           });
-          toast.success(`Bid updated to ${fCurrency(amount)}`);
+          toast.success(
+            response?.message ||
+            response?.data?.message ||
+            `Bid updated to ${fCurrency(amount)}`
+          );
           handleCloseBid();
         } catch (error) {
-          const message =
-            error?.data?.message ||
-            error?.error ||
-            (typeof error?.data === 'string' ? error.data : null) ||
-            'Failed to update bid.';
+          const message = handleApiError(error) || 'Failed to update bid.';
           setBidSubmitError(String(message));
         }
         return;
@@ -1529,14 +1572,14 @@ export function AgencyJobsView({ mode = 'agency' }) {
           }
         }
 
-        toast.success(`Bid of ${fCurrency(amount)} submitted.`);
+        toast.success(
+          response?.message ||
+          response?.data?.message ||
+          `Bid of ${fCurrency(amount)} submitted.`
+        );
         handleCloseBid();
       } catch (error) {
-        const message =
-          error?.data?.message ||
-          error?.error ||
-          (typeof error?.data === 'string' ? error.data : null) ||
-          'Failed to submit bid. Please try again.';
+        const message = handleApiError(error) || 'Failed to submit bid. Please try again.';
 
         const messageText = String(message);
         setBidSubmitError(messageText);
@@ -1861,7 +1904,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
         const id = await ensureStaffBookingId(job);
         if (!id) {
           const message =
-            'Is job ki booking backend pe create nahi hui. Check-in tab chalega jab booking ban jaye.';
+            'No booking exists for this job yet. Check-in is available after a booking is created.';
           toast.error(message);
           throw new Error(message);
         }
@@ -1881,7 +1924,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
           }),
         }).unwrap();
 
-        toast.success(`Checked in — ${job.title}`);
+        toast.success(
+          response?.message || response?.data?.message || `Checked in — ${job.title}`
+        );
         setCheckInJob(null);
 
         const updated = mapBookingUpdateResponse(response);
@@ -1901,12 +1946,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
         } catch {
         }
       } catch (error) {
-        const raw =
-          error?.data?.message ||
-          error?.data?.error?.message ||
-          (typeof error?.data === 'string' ? error.data : null) ||
-          error?.message ||
-          'Check-in failed. Please try again.';
+        const raw = handleApiError(error) || 'Check-in failed. Please try again.';
         const message = /outside allowed radius/i.test(String(raw))
           ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Detect GPS again.'
           : raw;
@@ -1982,11 +2022,15 @@ export function AgencyJobsView({ mode = 'agency' }) {
         return;
       }
       try {
-        await respondNurseBookingOffer({ id, action }).unwrap();
-        toast.success(action === 'accept' ? `Shift accepted — ${job.title}` : `Offer declined — ${job.title}`);
+        const response = await respondNurseBookingOffer({ id, action }).unwrap();
+        toast.success(
+          response?.message ||
+          response?.data?.message ||
+          (action === 'accept' ? `Shift accepted — ${job.title}` : `Offer declined — ${job.title}`)
+        );
         refetchJobs();
       } catch (error) {
-        toast.error(handleApiError(error));
+        toast.error(handleApiError(error) || 'Could not respond to this offer.');
       }
     },
     [ensureStaffBookingId, refetchJobs, respondNurseBookingOffer]
@@ -2002,16 +2046,20 @@ export function AgencyJobsView({ mode = 'agency' }) {
     }
     setIsCancellingBooking(true);
     try {
-      await (isHomeCareCompany ? cancelHccBooking : cancelAgencyBooking)(id).unwrap();
+      const response = await (isHomeCareCompany ? cancelHccBooking : cancelAgencyBooking)(
+        id
+      ).unwrap();
       toast.success(
-        job.actionType === 'awaitingWorker'
+        response?.message ||
+        response?.data?.message ||
+        (job.actionType === 'awaitingWorker'
           ? `Booking withdrawn — ${job.title}`
-          : `Booking cancelled — ${job.title}`
+          : `Booking cancelled — ${job.title}`)
       );
       setBookingToCancel(null);
       await Promise.all([refetchJobs(), refetchBids()]);
     } catch (error) {
-      toast.error(handleApiError(error));
+      toast.error(handleApiError(error) || 'Could not cancel this booking.');
     } finally {
       setIsCancellingBooking(false);
     }
@@ -2023,7 +2071,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
         const id = await ensureStaffBookingId(job);
         if (!id) {
           const message =
-            'Is job ki booking backend pe create nahi hui. Check-out tab chalega jab booking ban jaye.';
+            'No booking exists for this job yet. Check-out is available after a booking is created.';
           toast.error(message);
           throw new Error(message);
         }
@@ -2043,7 +2091,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
           }),
         }).unwrap();
 
-        toast.success(`Checked out — ${job.title}`);
+        toast.success(
+          response?.message || response?.data?.message || `Checked out — ${job.title}`
+        );
         setCheckOutJob(null);
 
         const updated = mapBookingUpdateResponse(response);
@@ -2064,11 +2114,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
         }
       } catch (error) {
         const message =
-          error?.data?.message ||
-          error?.data?.error?.message ||
-          (typeof error?.data === 'string' ? error.data : null) ||
-          error?.message ||
-          'Check-out failed. Please try again.';
+          handleApiError(error) || 'Check-out failed. Please try again.';
         toast.error(message);
         throw new Error(message);
       }
@@ -2098,7 +2144,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
   );
 
   const handleViewAllSchedules = useCallback((job) => {
-    toast.info(`All schedules for ${job.title}`);
+    if (!job) return;
+    setSchedulesDialogJob(job);
   }, []);
 
   const handleOpenCareDetails = useCallback((job) => {
@@ -2119,6 +2166,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
     return (
       <AgencyAssignStaffView
         job={jobDetail}
+        mode={mode}
         currentTab={tabs.value}
         onBack={handleBackFromDetail}
         onTabChange={handleDetailTabChange}
@@ -2487,7 +2535,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
             py: 8,
             textAlign: 'center',
             borderRadius: 2,
-            bgcolor: (theme) => theme.vars.palette.grey[100],
+            bgcolor: 'background.neutral',
             border: (theme) => `1px dashed ${theme.vars.palette.divider}`,
           }}
         >
@@ -2544,6 +2592,62 @@ export function AgencyJobsView({ mode = 'agency' }) {
         mode={mode}
         onClose={handleCloseAssignDialog}
       />
+
+      <Dialog
+        open={Boolean(schedulesDialogJob)}
+        onClose={() => setSchedulesDialogJob(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          Schedules — {schedulesDialogJob?.title || 'Job'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1}>
+            {(schedulesDialogJob?.allShiftRows?.length
+              ? schedulesDialogJob.allShiftRows
+              : schedulesDialogJob?.shiftRows || []
+            ).map((row, index) => (
+              <Box
+                key={row.id || row.label || index}
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  bgcolor: 'action.hover',
+                  border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {row.label ||
+                    [row.date, row.startTime && row.endTime ? `${row.startTime}–${row.endTime}` : '']
+                      .filter(Boolean)
+                      .join(' · ') ||
+                    `Shift ${index + 1}`}
+                </Typography>
+                {(row.hourlyRate != null || row.totalPay != null || row.breakMin != null) && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.35 }}>
+                    {[
+                      row.hourlyRate != null ? `${fCurrency(row.hourlyRate)}/hr` : null,
+                      row.totalPay != null ? `Pay ${fCurrency(row.totalPay)}` : null,
+                      row.breakMin != null
+                        ? `Break ${row.breakMin} min${row.breakType ? ` · ${row.breakType}` : ''}`
+                        : null,
+                      row.allowedPersons ? `${row.allowedPersons} staff` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button onClick={() => setSchedulesDialogJob(null)} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ConfirmDialog
         open={Boolean(bookingToCancel)}

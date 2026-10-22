@@ -49,7 +49,12 @@ import {
 
 import { DashboardStatCard } from 'src/sections/dashboard/dashboard-stat-card';
 
-import { JobTypesProvider, useJobTypes } from '../context/job-types-provider';
+import { useAuthContext } from 'src/auth/hooks';
+import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
+
+import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
+import { useRoleJobTypeMutations } from 'src/sections/job-roles/use-role-job-type-mutations';
+
 import { JobTypeFormDialog } from '../job-type-form-dialog';
 
 const TABLE_HEAD = [
@@ -85,11 +90,7 @@ export function JobTypesView({ variant = 'care-home' }) {
     return <AdminJobTypesViewContent />;
   }
 
-  return (
-    <JobTypesProvider>
-      <LocalJobTypesViewContent />
-    </JobTypesProvider>
-  );
+  return <LocalJobTypesViewContent />;
 }
 
 function AdminJobTypesViewContent() {
@@ -437,16 +438,50 @@ function AdminJobTypesViewContent() {
 }
 
 function LocalJobTypesViewContent() {
-  // Admin viewing this account: job types can be viewed, not added, edited or deleted.
   const viewOnly = useViewOnly();
+  const { user } = useAuthContext();
+  const role = resolveDashboardRole(user) || 'careHome';
   const hiddenIfViewOnly = viewOnly ? { display: 'none' } : undefined;
   const formDialog = useBoolean();
   const deleteDialog = useBoolean();
+  const table = useTable({ defaultRowsPerPage: 10 });
 
-  const { jobTypes, addJobType, updateJobType, deleteJobType } = useJobTypes();
-
+  const [search, setSearch] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [editingJobType, setEditingJobType] = useState(null);
   const [jobTypeToDelete, setJobTypeToDelete] = useState(null);
+
+  useEffect(() => {
+    const next = search.trim();
+    if (next === keyword) return undefined;
+
+    const timer = setTimeout(() => {
+      setKeyword(next);
+      table.onResetPage();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [keyword, search, table.onResetPage]);
+
+  const {
+    data: jobTypes = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useRoleJobTypes(role, {
+    args: { page: 0, limit: 200, status: 'all', keyword },
+    refetchOnMountOrArgChange: 60,
+    refetchOnFocus: false,
+  });
+
+  const { canMutate, create, update, remove, isSaving } = useRoleJobTypeMutations(role);
+  const allowEdit = canMutate && !viewOnly;
+
+  const pagedJobTypes = useMemo(() => {
+    const start = table.page * table.rowsPerPage;
+    return jobTypes.slice(start, start + table.rowsPerPage);
+  }, [jobTypes, table.page, table.rowsPerPage]);
 
   const handleOpenAdd = useCallback(() => {
     setEditingJobType(null);
@@ -462,17 +497,29 @@ function LocalJobTypesViewContent() {
   );
 
   const handleFormSubmit = useCallback(
-    (formData) => {
-      if (editingJobType) {
-        updateJobType(editingJobType.id, formData);
-        toast.success('Job type updated');
+    async (formData) => {
+      const payload = buildAdminJobRolePayload(formData);
+
+      if (!payload.department || !payload.title) {
+        toast.error('Department and title are required');
         return;
       }
 
-      addJobType(formData);
-      toast.success('Job type added');
+      try {
+        if (editingJobType?.id) {
+          await update({ id: editingJobType.id, ...payload }).unwrap();
+          toast.success('Job type updated');
+        } else {
+          await create(payload).unwrap();
+          toast.success('Job type added');
+        }
+        setEditingJobType(null);
+      } catch (err) {
+        toast.error(handleApiError(err));
+        throw err;
+      }
     },
-    [addJobType, editingJobType, updateJobType]
+    [create, editingJobType, update]
   );
 
   const handleDeleteClick = useCallback(
@@ -483,14 +530,18 @@ function LocalJobTypesViewContent() {
     [deleteDialog]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    if (!jobTypeToDelete) return;
+  const handleConfirmDelete = useCallback(async () => {
+    if (!jobTypeToDelete?.id) return;
 
-    deleteJobType(jobTypeToDelete.id);
-    toast.success('Job type deleted');
-    setJobTypeToDelete(null);
-    deleteDialog.onFalse();
-  }, [deleteJobType, deleteDialog, jobTypeToDelete]);
+    try {
+      await remove(jobTypeToDelete.id).unwrap();
+      toast.success('Job type deleted');
+      setJobTypeToDelete(null);
+      deleteDialog.onFalse();
+    } catch (err) {
+      toast.error(handleApiError(err));
+    }
+  }, [deleteDialog, jobTypeToDelete, remove]);
 
   return (
     <>
@@ -503,65 +554,129 @@ function LocalJobTypesViewContent() {
             { name: 'Job Types' },
           ]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={handleOpenAdd}
-              style={hiddenIfViewOnly}
-            >
-              Add Job Type
-            </Button>
+            allowEdit ? (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={handleOpenAdd}
+                style={hiddenIfViewOnly}
+              >
+                Add Job Type
+              </Button>
+            ) : null
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
         <Card>
-          <Scrollbar>
-            <Table sx={{ minWidth: 720 }}>
-              <TableHeadCustom headLabel={TABLE_HEAD} rowCount={jobTypes.length} />
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ p: 2.5, alignItems: { md: 'center' } }}
+          >
+            <TextField
+              fullWidth
+              size="small"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search department or title"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
 
-              <TableBody>
-                {jobTypes.map((jobType) => (
-                  <TableRow key={jobType.id} hover>
-                    <TableCell>
-                      <Typography variant="subtitle2">{jobType.label}</Typography>
-                    </TableCell>
+          {isError ? (
+            <Alert
+              severity="error"
+              sx={{ mx: 2.5, mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetch()}>
+                  Retry
+                </Button>
+              }
+            >
+              {handleApiError(error) || 'Failed to load job types'}
+            </Alert>
+          ) : null}
 
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{jobType.category}</TableCell>
+          {!canMutate ? (
+            <Alert severity="info" sx={{ mx: 2.5, mb: 2 }}>
+              Job types for this account are managed by Tempy admin. You can view the list used when
+              posting jobs.
+            </Alert>
+          ) : null}
 
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{jobType.name}</TableCell>
+          {isLoading ? (
+            <ModuleLoading />
+          ) : (
+            <Scrollbar>
+              <Table sx={{ minWidth: 720 }}>
+                <TableHeadCustom headLabel={TABLE_HEAD} rowCount={pagedJobTypes.length} />
 
-                    <TableCell align="right">
-                      <Stack
-                        direction="row"
-                        justifyContent="flex-end"
-                        spacing={0.25}
-                        style={hiddenIfViewOnly}
-                      >
-                        <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => handleOpenEdit(jobType)}>
-                            <Iconify icon="solar:pen-bold" width={18} />
-                          </IconButton>
-                        </Tooltip>
+                <TableBody>
+                  {pagedJobTypes.map((jobType) => (
+                    <TableRow key={jobType.id} hover>
+                      <TableCell>
+                        <Typography variant="subtitle2">{jobType.label}</Typography>
+                      </TableCell>
 
-                        <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteClick(jobType)}
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {jobType.category || jobType.department || '—'}
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {jobType.name || jobType.title || '—'}
+                      </TableCell>
+
+                      <TableCell align="right">
+                        {allowEdit ? (
+                          <Stack
+                            direction="row"
+                            justifyContent="flex-end"
+                            spacing={0.25}
+                            style={hiddenIfViewOnly}
                           >
-                            <Iconify icon="solar:trash-bin-trash-bold" width={18} />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            <Tooltip title="Edit">
+                              <IconButton size="small" onClick={() => handleOpenEdit(jobType)}>
+                                <Iconify icon="solar:pen-bold" width={18} />
+                              </IconButton>
+                            </Tooltip>
 
-                <TableNoData notFound={!jobTypes.length} />
-              </TableBody>
-            </Table>
-          </Scrollbar>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteClick(jobType)}
+                              >
+                                <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  <TableNoData notFound={!pagedJobTypes.length} />
+                </TableBody>
+              </Table>
+            </Scrollbar>
+          )}
+
+          {!isLoading ? (
+            <TablePaginationCustom
+              count={jobTypes.length}
+              page={table.page}
+              rowsPerPage={table.rowsPerPage}
+              onPageChange={table.onChangePage}
+              onRowsPerPageChange={table.onChangeRowsPerPage}
+            />
+          ) : null}
         </Card>
       </DashboardContent>
 
@@ -571,6 +686,7 @@ function LocalJobTypesViewContent() {
         onClose={formDialog.onFalse}
         currentJobType={editingJobType}
         onSubmit={handleFormSubmit}
+        submitting={isSaving}
       />
 
       <ConfirmDialog
@@ -585,7 +701,12 @@ function LocalJobTypesViewContent() {
           ) : null
         }
         action={
-          <Button variant="contained" color="error" onClick={handleConfirmDelete}>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={isSaving}
+            onClick={handleConfirmDelete}
+          >
             Delete
           </Button>
         }

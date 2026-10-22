@@ -127,6 +127,14 @@ export function AgencyBidDetailDialog({ open, bid, onClose, onEdit, onWithdraw, 
             </Box>
           </Stack>
 
+          {(bid.notes || bid.note) && (
+            <DetailRow
+              icon="solar:document-text-bold"
+              label="Note"
+              value={bid.notes || bid.note}
+            />
+          )}
+
           <Divider sx={{ borderStyle: 'dashed' }} />
 
           <Stack spacing={0.75}>

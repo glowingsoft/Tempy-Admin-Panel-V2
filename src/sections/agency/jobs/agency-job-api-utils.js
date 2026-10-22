@@ -110,7 +110,6 @@ export function extractLatLng(source, { allowZero = true } = {}) {
     Boolean
   );
 
-  // Pass 1: GeoJSON coordinates — more reliable than named lat/lng (often swapped in older rows).
   for (const node of candidates) {
     const parsed = parseCoordinates(node.coordinates);
     if (!parsed) continue;
@@ -118,7 +117,6 @@ export function extractLatLng(source, { allowZero = true } = {}) {
     return { latitude: parsed.latitude, longitude: parsed.longitude };
   }
 
-  // Pass 2: named latitude / longitude (normalized for common swaps).
   for (const node of candidates) {
     const latDirect = pickNumber(readApiLate(node));
     const lngDirect = pickNumber(readApiLong(node));
@@ -176,7 +174,6 @@ export function getJobDistanceLabel(jobOrApiItem, origin) {
   return formatDistanceAway(getDistanceKm(from, jobPoint));
 }
 
-/** Card distance from the viewer's location and the job pin. API distanceInKM is kept only when either point is missing. */
 export function applyJobDistances(jobs = [], origin) {
   if (!isUsablePoint(origin)) return jobs;
 
@@ -250,7 +247,6 @@ function isTrueFlag(value) {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
 
-/** Jobs API: `hasAgreedRate` or `hasAgreed` on the job or on a shift. */
 export function readHasAgreedRate(source) {
   if (!source || typeof source !== 'object') return false;
   return Object.entries(source).some(([key, value]) => {
@@ -295,7 +291,6 @@ function refId(value) {
   return readPartyId(value);
 }
 
-/** Mongo id on a user, job role, or a plain id string. Walks basicInfo when the account is nested. */
 export function readPartyId(value, depth = 0) {
   if (depth > 4 || value == null || value === '') return '';
   if (typeof value !== 'object') {
@@ -333,7 +328,6 @@ function readKeyedPartyId(source, names) {
   return '';
 }
 
-/** Customer who posted the job. Jobs list sends this as `user` (sometimes under basicInfo). */
 export function readJobCustomerId(job = {}) {
   if (!job || typeof job !== 'object') return '';
   const raw = job.raw && typeof job.raw === 'object' ? job.raw : job;
@@ -346,7 +340,6 @@ export function readJobCustomerId(job = {}) {
   );
 }
 
-/** Job role id. Jobs list sends this as `type._id` / `type.id`. */
 export function readJobRoleId(job = {}) {
   if (!job || typeof job !== 'object') return '';
   const raw = job.raw && typeof job.raw === 'object' ? job.raw : job;
@@ -581,7 +574,23 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
   );
 
   const bookingStatus = pickBookingStatus(item, shifts[0]);
-  const bookingAttendance = pickBookingDoc(item, shifts[0])?.attendance || null;
+  const bookingDoc = pickBookingDoc(item, shifts[0]);
+  const bookingAttendance = bookingDoc?.attendance || null;
+  const assignedWorker =
+    (bookingDoc?.worker && typeof bookingDoc.worker === 'object' ? bookingDoc.worker : null) ||
+    (bookingDoc?.staff && typeof bookingDoc.staff === 'object' ? bookingDoc.staff : null) ||
+    (bookingDoc?.nurse && typeof bookingDoc.nurse === 'object' ? bookingDoc.nurse : null) ||
+    (item.myBooking?.worker && typeof item.myBooking.worker === 'object' ? item.myBooking.worker : null) ||
+    null;
+  const assignedStaff = assignedWorker
+    ? [
+        {
+          id: String(assignedWorker._id || assignedWorker.id || '').trim(),
+          name: String(assignedWorker.name || '').trim() || 'Staff',
+          avatarUrl: assignedWorker.profileIcon || assignedWorker.avatarUrl || '',
+        },
+      ].filter((member) => member.id)
+    : [];
 
   return {
     id,
@@ -604,6 +613,7 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
     totalPay,
     breakType: mapBreakType(primaryShift || shifts[0]),
     breakMin: Number(primaryShift?.breakMin ?? item.breakMin) || 0,
+    allowedPersons: pickNumber(primaryShift?.allowedPersons, item.allowedPersons),
     gender: item.gender || '',
     description,
     careNotes: String(item.careNotes || item.notes || '').trim(),
@@ -655,6 +665,7 @@ export function mapAgencyJobFromApi(item = {}, { origin } = {}) {
     shiftRows,
     schedule: primaryShift?.label || '',
     schedules: shiftRows.map((row) => row.label).filter(Boolean),
+    assignedStaff,
     actionType: tabStatus === 'active' ? resolveSupplierBookingAction(bookingId, bookingStatus) : undefined,
     raw: item,
   };

@@ -1,12 +1,10 @@
 import { _mock } from './_mock';
-import { formatDistanceKm, getDistanceKm } from './_agency-assign-staff';
+import { formatDistanceKm, getDistanceKm } from 'src/sections/agency/jobs/agency-assign-staff-utils';
 
-// ----------------------------------------------------------------------
 
-/** Urban shuttle pacing used for ETA / drive-time estimates. */
 const MINUTES_PER_KM = 3.8;
 const DWELL_MINUTES_PER_STOP = 8;
-const DEPARTURE_MINUTES = 7 * 60; // 07:00 from agency hub
+const DEPARTURE_MINUTES = 7 * 60;
 
 const COMPUTED_STOP_KEYS = [
   'sequence',
@@ -36,7 +34,6 @@ export const TRANSPORT_VEHICLES = [
     capacity: 14,
     plate: 'CP 14 TEM',
     driver: 'James Carter',
-    /** How many locations this vehicle covers on a run */
     maxStops: 12,
     zone: 'central',
   },
@@ -104,7 +101,6 @@ export function formatClock(totalMinutes) {
 
 function estimateDriveMinutes(distanceKm) {
   if (distanceKm == null || Number.isNaN(Number(distanceKm))) return 5;
-  // Always show a real drive time — never 0 on a live stop leg
   return Math.max(4, Math.round(Number(distanceKm) * MINUTES_PER_KM));
 }
 
@@ -142,7 +138,6 @@ const STAFF_FIRST_NAMES = [
   'Owen',
 ];
 
-/** 20 client locations spread around London for a dense zigzag shuttle map. */
 const TRANSPORT_STOP_SEEDS = [
   { id: 'riverside', name: 'Riverside Care Home', client: 'Riverside Care Group', address: '45 Thames Road, Greenwich, SE10 9RF', latitude: 51.4826, longitude: 0.0077, status: 'scheduled' },
   { id: 'oakwood', name: 'Oakwood Nursing Home', client: 'Oakwood Healthcare', address: '18 Forest Hill Road, Lewisham, SE23 3QT', latitude: 51.4395, longitude: -0.0534, status: 'scheduled' },
@@ -185,7 +180,6 @@ export const TRANSPORT_STOPS = TRANSPORT_STOP_SEEDS.map((seed, index) => ({
   staff: buildStopStaff(index * 5 + 1, 5),
 }));
 
-// ----------------------------------------------------------------------
 
 export function getStopStaffCount(stop) {
   return stop?.staff?.length || 0;
@@ -196,10 +190,6 @@ export function getDepartureMinutes(dateValue) {
   return match?.departureMinutes ?? DEPARTURE_MINUTES;
 }
 
-/**
- * Attach sequence + drive minutes / distance / clock ETA for each stop
- * based on Agency → nearest → next → farther flow.
- */
 export function enrichStopsWithRouteTiming(
   hub = TRANSPORT_HUB,
   stops = [],
@@ -282,10 +272,6 @@ export function computeRouteMetrics(
   };
 }
 
-/**
- * Nearest-neighbour from hub: visit closest remaining stop first,
- * then keep going to the next nearest (near → far path).
- */
 export function optimizeStopOrder(
   hub = TRANSPORT_HUB,
   stops = [],
@@ -322,7 +308,6 @@ function pushZigZagSegment(points, from, to, bendIndex) {
   const dx = to.longitude - from.longitude;
   const dy = to.latitude - from.latitude;
   const length = Math.sqrt(dx * dx + dy * dy) || 0.01;
-  // Perpendicular unit vector for zigzag bends
   const px = -dy / length;
   const py = dx / length;
   const side = bendIndex % 2 === 0 ? 1 : -1;
@@ -339,7 +324,6 @@ function pushZigZagSegment(points, from, to, bendIndex) {
   points.push([to.longitude, to.latitude]);
 }
 
-/** Curved / zigzag LineString so the shuttle path looks like a real multi-stop run. */
 export function buildRouteLineCoordinates(hub = TRANSPORT_HUB, stops = []) {
   const points = [[hub.longitude, hub.latitude]];
   let previous = hub;
@@ -349,7 +333,6 @@ export function buildRouteLineCoordinates(hub = TRANSPORT_HUB, stops = []) {
     previous = stop;
   });
 
-  // Return leg also zigzags back to the hub
   pushZigZagSegment(points, previous, hub, stops.length);
 
   return points;
@@ -397,10 +380,6 @@ function applyDateStatuses(stops, dateValue) {
   });
 }
 
-/**
- * Full functional plan builder — date + vehicle change the stop list,
- * timings, statuses, and route length.
- */
 export function buildShuttlePlan({
   date = TRANSPORT_DATES[0].value,
   vehicleId = TRANSPORT_VEHICLES[0].id,
@@ -453,10 +432,6 @@ export function formatTransportStatus(status) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-/**
- * How many of the selected vehicle type to dispatch for this staff load.
- * Agencies can send multiple vans when one vehicle is not enough.
- */
 export function getFleetRequirement(totalStaff = 0, vehicle = TRANSPORT_VEHICLES[0]) {
   const capacity = Math.max(1, vehicle?.capacity || 1);
   const staff = Math.max(0, Number(totalStaff) || 0);

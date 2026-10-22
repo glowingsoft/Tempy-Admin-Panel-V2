@@ -113,13 +113,11 @@ export function getBranchCoordinates(branch) {
 export function resolveAgencyAvailabilityStatus({ kind = 'available', formStatus = '' } = {}) {
   const raw = String(formStatus || kind || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
 
-  // Backend mongoose enum (camelCase where applicable)
   if (raw === 'addleave' || raw === 'leave') return 'leave';
   if (raw === 'dayoff' || raw === 'notscheduled' || raw === 'unscheduled') return 'dayOff';
   if (raw === 'busy' || raw === 'unavailable' || raw === 'block') return 'busy';
   if (raw === 'oncall') return 'onCall';
   if (raw === 'sleepover') return 'sleepover';
-  // Timed work / add-shift — same field backend requires on every create
   if (
     !raw ||
     raw === 'shift' ||
@@ -314,14 +312,59 @@ export function flattenTeamsStaff(teams = []) {
 }
 
 /**
- * @deprecated Do not create a separate "Availability" team — blocks belong on calendar staff rows.
- * Kept for callers that only need staff list enrichment without orphans.
+ * @deprecated 
  */
 export function mergeAvailabilityStaffIntoTeams(teams = [], availabilityList = []) {
   return (teams || []).map((team) => ({
     ...team,
     staff: [...(team.staff || [])],
   }));
+}
+
+export function buildStaffBusyDateSet(availabilityList = [], staffList = []) {
+  const keys = new Set();
+  const roster = Array.isArray(staffList) ? staffList : [];
+
+  const collectIds = (rawId) => {
+    const id = String(rawId || '').trim();
+    if (!id) return [];
+    const match = roster.find((member) => {
+      const candidates = [
+        member.id,
+        member.staffId,
+        member.workerId,
+        member.membershipId,
+        member._id,
+      ];
+      return candidates.some((candidate) => String(candidate || '').trim() === id);
+    });
+    if (!match) return [id];
+    return [
+      match.id,
+      match.staffId,
+      match.workerId,
+      match.membershipId,
+      id,
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+  };
+
+  (availabilityList || []).flatMap((entry) => expandAvailabilityEntry(entry)).forEach((entry) => {
+    if (!entry?.date) return;
+    if (!(entry.busy || entry.dayOff || entry.leave || entry.blocksAutoAccept)) return;
+    collectIds(entry.staffId).forEach((staffId) => {
+      keys.add(`${staffId}-${entry.date}`);
+    });
+  });
+
+  return keys;
+}
+
+export function isStaffBusyOnDateInSet(busyDateKeys, staffId, date) {
+  if (!busyDateKeys?.size) return false;
+  const key = `${String(staffId || '').trim()}-${String(date || '').trim()}`;
+  return Boolean(key.endsWith('-') ? false : busyDateKeys.has(key));
 }
 
 export function availabilityListToShiftMap(
