@@ -18,6 +18,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { mergeStatusCounts } from 'src/utils/status-counts';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import { Iconify } from 'src/components/iconify';
 import { ModuleLoading } from 'src/components/loading-screen';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -130,7 +131,7 @@ export function AgencyStaffListView() {
 
   useEffect(() => {
     if (!isError || errorToastShown) return;
-    toast.error(error?.data?.message || error?.error || 'Could not load staff list.');
+    toast.error(handleApiError(error) || 'Could not load staff list.');
     setErrorToastShown(true);
   }, [error, errorToastShown, isError]);
 
@@ -203,22 +204,22 @@ export function AgencyStaffListView() {
             toast.error('Staff record id missing — cannot update');
             throw new Error('Missing staff id');
           }
-          await updateAgencyStaff({ id: editId, ...payload }).unwrap();
-          toast.success('Staff updated successfully!');
+          const response = await updateAgencyStaff({ id: editId, ...payload }).unwrap();
+          toast.success(pickApiToastMessage(response, 'Staff updated successfully!'));
           // List refreshes once via invalidatesTags — do not call refetch() again.
         } catch (err) {
-          toast.error(err?.data?.message || err?.error || 'Failed to update staff');
+          toast.error(handleApiError(err) || 'Failed to update staff');
           throw err;
         }
         return;
       }
 
       try {
-        await createAgencyStaff(payload).unwrap();
-        toast.success('Staff added successfully!');
+        const response = await createAgencyStaff(payload).unwrap();
+        toast.success(pickApiToastMessage(response, 'Staff added successfully!'));
         // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (err) {
-        toast.error(err?.data?.message || err?.error || 'Failed to add staff');
+        toast.error(handleApiError(err) || 'Failed to add staff');
         throw err;
       }
     },
@@ -229,14 +230,14 @@ export function AgencyStaffListView() {
     if (!staffToDelete) return;
 
     try {
-      await deleteAgencyStaff(staffToDelete.id).unwrap();
-      toast.success('Staff deleted successfully!');
+      const response = await deleteAgencyStaff(staffToDelete.id).unwrap();
+      toast.success(pickApiToastMessage(response, 'Staff deleted successfully!'));
       deleteDialog.onFalse();
       setStaffToDelete(null);
       table.onUpdatePageDeleteRow(dataFiltered.length);
       // List refreshes once via invalidatesTags — do not call refetch() again.
     } catch (err) {
-      toast.error(err?.data?.message || err?.error || 'Failed to delete staff');
+      toast.error(handleApiError(err) || 'Failed to delete staff');
     }
   }, [staffToDelete, deleteAgencyStaff, deleteDialog, table, dataFiltered.length]);
 
@@ -259,11 +260,11 @@ export function AgencyStaffListView() {
       setImporting(true);
       try {
         const response = await importAgencyStaff(file).unwrap();
-        toast.success(response?.message || `Imported ${rows.length} staff`);
+        toast.success(pickApiToastMessage(response, `Imported ${rows.length} staff`));
         importDialog.onFalse();
         // List refreshes once via invalidatesTags — do not call refetch() again.
       } catch (error) {
-        toast.error(error?.data?.message || error?.error || 'Failed to import staff');
+        toast.error(handleApiError(error) || 'Failed to import staff');
       } finally {
         setImporting(false);
       }

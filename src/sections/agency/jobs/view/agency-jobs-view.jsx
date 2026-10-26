@@ -1638,50 +1638,72 @@ export function AgencyJobsView({ mode = 'agency' }) {
     ]
   );
 
+  const resolveAssignBidForJob = useCallback(
+    async (job) => {
+      const shiftId = job?.shiftRows?.[0]?.id || job?.shiftRows?.[0]?._id || '';
+      let bid = findAgencyBidForJobCard(bidsByShiftId, {
+        shiftId,
+        jobId: job?.id || '',
+      });
+      let bidId = bid?.id || bid?._id || '';
+      if (!isServerBidId(bidId) && shiftId) {
+        try {
+          bidId = await resolveBidId(shiftId, job?.id || '', '');
+          if (isServerBidId(bidId)) {
+            bid = { ...(bid || {}), id: bidId, _id: bidId };
+          }
+        } catch {
+        }
+      }
+      return {
+        bid,
+        assignState: resolveAgencyAssignAction({ job, bid }),
+      };
+    },
+    [bidsByShiftId, resolveBidId]
+  );
+
+  const openAssignModal = useCallback(
+    async (job, { allowAssignedDetails = false } = {}) => {
+      const { bid, assignState } = await resolveAssignBidForJob(job);
+
+      if (assignState.actionType === 'assigned' || assignState.actionType === 'awaitingWorker') {
+        if (allowAssignedDetails) {
+          setJobDetailsDialog(job);
+          return;
+        }
+        toast.info('Staff already assigned for this shift');
+        return;
+      }
+
+      if (assignState.actionType !== 'reassign' && !canAssignFromAgencyBid(bid)) {
+        toast.warning(
+          normalizeAgencyBidStatus(bid?.status) === 'pending'
+            ? 'Bid is still pending — wait until the poster accepts it.'
+            : 'No accepted bid for this shift — Active only shows accepted bids ready to assign.'
+        );
+        return;
+      }
+
+      setAssignDialog({ open: true, job, bid });
+    },
+    [resolveAssignBidForJob]
+  );
+
   const handleAssignStaff = useCallback(
     async (job) => {
       if (isStaffMember) return;
 
+      // Agency / HCC: one Assign path only — booking modal (API). Never open the full grid.
       if (canAssignViaModal) {
-        const shiftId = job?.shiftRows?.[0]?.id || job?.shiftRows?.[0]?._id || '';
-        let bid = findAgencyBidForJobCard(bidsByShiftId, {
-          shiftId,
-          jobId: job?.id || '',
-        });
-        let bidId = bid?.id || bid?._id || '';
-        if (!isServerBidId(bidId) && shiftId) {
-          try {
-            bidId = await resolveBidId(shiftId, job?.id || '', '');
-            if (isServerBidId(bidId)) {
-              bid = { ...(bid || {}), id: bidId, _id: bidId };
-            }
-          } catch {
-          }
-        }
-
-        const assignState = resolveAgencyAssignAction({ job, bid });
-        if (assignState.actionType === 'assigned' || assignState.actionType === 'awaitingWorker') {
-          toast.info('Staff already assigned for this shift');
-          return;
-        }
-
-        if (assignState.actionType !== 'reassign' && !canAssignFromAgencyBid(bid)) {
-          toast.warning(
-            normalizeAgencyBidStatus(bid?.status) === 'pending'
-              ? 'Bid is still pending — wait until the poster accepts it.'
-              : 'No accepted bid for this shift — Active only shows accepted bids ready to assign.'
-          );
-          return;
-        }
-
-        setAssignDialog({ open: true, job, bid });
+        await openAssignModal(job);
         return;
       }
 
       tabs.setValue('active');
       setJobDetail(job);
     },
-    [bidsByShiftId, canAssignViaModal, isStaffMember, resolveBidId, tabs]
+    [canAssignViaModal, isStaffMember, openAssignModal, tabs]
   );
 
   const handleCloseAssignDialog = useCallback(
@@ -1698,12 +1720,19 @@ export function AgencyJobsView({ mode = 'agency' }) {
   );
 
   const handleViewStaff = useCallback(
-    (job) => {
+    async (job) => {
       if (isStaffMember) return;
+
+      // Same API surface as Assign: reassign → modal; already assigned → job details (not incomplete grid).
+      if (canAssignViaModal) {
+        await openAssignModal(job, { allowAssignedDetails: true });
+        return;
+      }
+
       tabs.setValue('active');
       setJobDetail(job);
     },
-    [isStaffMember, tabs]
+    [canAssignViaModal, isStaffMember, openAssignModal, tabs]
   );
 
   const handleCheckIn = useCallback((job) => {
@@ -2162,7 +2191,8 @@ export function AgencyJobsView({ mode = 'agency' }) {
     if (saved) setCareDetailsTick((n) => n + 1);
   }, []);
 
-  if (jobDetail && !isStaffMember) {
+  // Full Assign grid only for roles without the booking modal (agency/HCC always use the modal).
+  if (jobDetail && !isStaffMember && !canAssignViaModal) {
     return (
       <AgencyAssignStaffView
         job={jobDetail}

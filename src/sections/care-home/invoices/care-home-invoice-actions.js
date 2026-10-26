@@ -46,7 +46,6 @@ export function loadCareHomeInvoices() {
         row?.paymentStatus === 'scheduled' ||
         row?.paymentStatus === 'paid'
     );
-    // Do not fall back to demo CARE_HOME_INVOICES — empty until real payments exist.
     if (!looksLikeShiftPayments) return [];
 
     return parsed.map(reviveInvoice);

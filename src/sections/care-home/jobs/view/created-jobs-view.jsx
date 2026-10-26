@@ -1304,7 +1304,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
     } catch (err) {
 
       if (isBackendCacheBug(err)) {
-        toast.success('Job deleted (backend cache cleanup error — ask backend to fix invalidateJobCache)');
+        toast.success('Job deleted successfully');
         deleteDialog.onFalse();
         setJobToDelete(null);
         refetch();

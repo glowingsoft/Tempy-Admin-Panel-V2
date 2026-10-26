@@ -55,6 +55,18 @@ import { useTheme } from '@mui/material/styles';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useViewOnly } from 'src/hooks/use-view-only';
+import {
+  rotaBorder,
+  rotaBorderColor,
+  rotaHover,
+  rotaMuted,
+  rotaPaper,
+  rotaRowActive,
+  rotaSelected,
+  rotaSoftSuccess,
+  rotaSoftSuccessBg,
+  rotaWash,
+} from 'src/components/shifts/rota-theme';
 import { useRouter } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
 import { EmptyContent } from 'src/components/empty-content';
@@ -567,8 +579,6 @@ function applyRotaConfig(config) {
   STAFF_TEAM_MAP = maps.staffTeamMap;
 }
 
-const FORTNIGHT_START = new Date(2025, 4, 25);
-
 
 function formatShiftTime(t) {
   if (!t?.includes(':')) return '--:--';
@@ -602,84 +612,6 @@ function getInitials(name) {
     .join('')
     .slice(0, 2)
     .toUpperCase();
-}
-
-function buildInitialShifts() {
-  const shifts = {};
-  const add = (staffId, dayOffset, data) => {
-    if (!ALL_STAFF.some((s) => s.id === staffId)) return;
-    const date = format(addDays(FORTNIGHT_START, dayOffset), 'yyyy-MM-dd');
-    shifts[`${staffId}-${date}`] = { id: `${staffId}-${date}`, staffId, date, ...data };
-  };
-  const staffName = (id) => ALL_STAFF.find((s) => s.id === id)?.name || 'Staff';
-  const roleFor = (id) => STAFF_TEAM_MAP[id]?.badge || 'CA';
-
-  add(8, 6, { kind: 'shift', roleCode: 'DA', startTime: '08:00', endTime: '20:00', displayName: staffName(8), warning: true, staffCount: 2, hasBreak: true, verified: true });
-  add(8, 7, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(8), warning: true, staffCount: 2, hasBreak: true, verified: true });
-  add(8, 8, { kind: 'leave', leaveTitle: 'All Day (11h)', leaveSubtitle: 'SSP', leaveType: 'ssp' });
-  add(8, 9, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(8), faded: true, staffCount: 2, hasBreak: true });
-  add(8, 10, { kind: 'shift', roleCode: 'TP CA', startTime: '08:00', endTime: '20:00', displayName: staffName(8), staffCount: 2, hasBreak: true });
-  add(8, 11, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(8), warning: true, hasBreak: true });
-
-  add(9, 6, { kind: 'leave', leaveTitle: 'All Day (7.5h)', leaveSubtitle: 'Unpaid Sick Leave', leaveType: 'sick' });
-  add(9, 8, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(9), staffCount: 1, hasBreak: true });
-  add(9, 10, { kind: 'shift', roleCode: 'FH CA', startTime: '08:00', endTime: '20:00', displayName: staffName(9), warning: true, hasBreak: true });
-
-
-  add(11, 6, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(11), warning: true, staffCount: 2, verified: true });
-  add(11, 7, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(11), hasBreak: true, staffCount: 2, verified: true });
-  add(11, 8, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(11), staffCount: 2, hasBreak: true });
-  add(11, 10, { kind: 'unavailable' });
-  add(11, 12, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '20:00', displayName: staffName(11), hasBreak: true });
-
-  add(1, 0, { kind: 'shift', roleCode: roleFor(1), startTime: '08:00', endTime: '17:00', displayName: staffName(1), warning: true, hasBreak: true, staffCount: 2, verified: true });
-  add(1, 1, { kind: 'shift', roleCode: roleFor(1), startTime: '08:00', endTime: '17:00', displayName: staffName(1), hasBreak: true, staffCount: 2, verified: true });
-  add(1, 2, { kind: 'shift', roleCode: roleFor(1), startTime: '08:00', endTime: '17:00', displayName: staffName(1), shield: true });
-  add(1, 4, { kind: 'shift', roleCode: roleFor(1), startTime: '08:00', endTime: '17:00', displayName: staffName(1) });
-  add(2, 0, { kind: 'shift', roleCode: roleFor(2), startTime: '08:00', endTime: '17:00', displayName: staffName(2), warning: true, hasBreak: true, staffCount: 1, verified: true });
-  add(2, 3, { kind: 'shift', roleCode: roleFor(2), startTime: '08:00', endTime: '17:00', displayName: staffName(2), hasBreak: true });
-  add(15, 1, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '16:00', displayName: staffName(15), hasBreak: true, staffCount: 2 });
-  add(15, 4, { kind: 'shift', roleCode: 'CA', startTime: '08:00', endTime: '16:00', displayName: staffName(15), verified: true });
-
-  TEAMS.forEach((team) => {
-    team.staff
-      .filter((s) => !s.isVacant && !s.isPast)
-      .forEach((member, mi) => {
-        const hasAny = Object.values(shifts).some((s) => s.staffId === member.id);
-        if (hasAny) return;
-        const dayA = (mi * 2) % 10;
-        const dayB = (dayA + 3) % 12;
-        add(member.id, dayA, {
-          kind: 'shift',
-          roleCode: team.badge,
-          startTime: '08:00',
-          endTime: '16:00',
-          displayName: member.name,
-          hasBreak: true,
-          staffCount: 1,
-          verified: true,
-        });
-        add(member.id, dayB, {
-          kind: 'shift',
-          roleCode: team.badge,
-          startTime: '09:00',
-          endTime: '17:00',
-          displayName: member.name,
-          hasBreak: true,
-          staffCount: 1,
-        });
-        if (mi % 3 === 0) {
-          add(member.id, (dayA + 1) % 12, {
-            kind: 'leave',
-            leaveTitle: 'All Day',
-            leaveSubtitle: 'Holiday Leave',
-            leaveType: 'holiday',
-          });
-        }
-      });
-  });
-
-  return shifts;
 }
 
 function computeStats(shifts) {
@@ -1050,8 +982,9 @@ function ShiftFormCard({
 
   const handleRemove = () => {
     const target = shift || { staffId: Number(staffId), date };
-    if (!target.staffId || !target.date) {
-      toast.error('No shift selected to remove');
+    if (!target?.bookingId && !shiftAllowsCancelBooking(target)) {
+      toast.error('Only booked shifts can be removed — cancel via the API.');
+      setMoreAnchor(null);
       return;
     }
     onDelete?.(target);
@@ -1090,11 +1023,11 @@ function ShiftFormCard({
       <Box
         sx={{
           display: 'flex',
-          border: '1px solid #e0e0e0',
+          border: rotaBorder,
           borderBottom: 'none',
           borderRadius: '6px 6px 0 0',
           overflow: 'hidden',
-          bgcolor: '#fafafa',
+          bgcolor: rotaMuted,
         }}
       >
         <Box
@@ -1113,7 +1046,7 @@ function ShiftFormCard({
           {badge}
         </Box>
 
-        <Box sx={{ flex: 1, minWidth: 0, p: 1, position: 'relative', bgcolor: '#fafafa' }}>
+        <Box sx={{ flex: 1, minWidth: 0, p: 1, position: 'relative', bgcolor: rotaMuted }}>
           <Stack direction="row" spacing={0.75} alignItems="flex-end" sx={{ mb: 0.75 }}>
             <ShiftTimePickerPill
               value={startInput}
@@ -1161,7 +1094,7 @@ function ShiftFormCard({
               sx={{
                 '& .MuiInputBase-root': {
                   fontSize: 12,
-                  bgcolor: '#fff',
+                  bgcolor: rotaPaper,
                 },
               }}
             />
@@ -1183,7 +1116,7 @@ function ShiftFormCard({
         </Box>
       </Box>
 
-      <Box sx={{ display: 'flex', borderRadius: '0 0 6px 6px', overflow: 'hidden', border: '1px solid #e0e0e0', borderTop: 'none' }}>
+      <Box sx={{ display: 'flex', borderRadius: '0 0 6px 6px', overflow: 'hidden', border: rotaBorder, borderTop: 'none' }}>
         <Button
           fullWidth
           size="small"
@@ -1221,7 +1154,9 @@ function ShiftFormCard({
       </Box>
 
       <Menu anchorEl={moreAnchor} open={Boolean(moreAnchor)} onClose={() => setMoreAnchor(null)}>
-        <MenuItem onClick={handleRemove}>Remove shift</MenuItem>
+        {shiftAllowsCancelBooking(shift) ? (
+          <MenuItem onClick={handleRemove}>Cancel booking</MenuItem>
+        ) : null}
         <MenuItem onClick={handleDuplicate}>Duplicate shift</MenuItem>
         <MenuItem onClick={handleOpenNotes}>Add notes</MenuItem>
       </Menu>
@@ -1306,7 +1241,7 @@ function AddShiftPopover({ open, position, onClose, formProps }) {
               height: 0,
               borderLeft: '7px solid transparent',
               borderRight: '7px solid transparent',
-              borderBottom: '7px solid #fafafa',
+              borderBottom: (theme) => `7px solid ${rotaMuted(theme)}`,
               zIndex: 2,
             }}
           />
@@ -1319,18 +1254,18 @@ function AddShiftPopover({ open, position, onClose, formProps }) {
             position: 'absolute',
             top: -10,
             right: -10,
-            bgcolor: '#fff',
-            border: '1px solid #e0e0e0',
+            bgcolor: rotaPaper,
+            border: rotaBorder,
             width: 22,
             height: 22,
             zIndex: 3,
-            '&:hover': { bgcolor: '#f5f5f5' },
+            '&:hover': { bgcolor: rotaHover },
           }}
         >
           <Iconify icon="eva:close-fill" width={14} />
         </IconButton>
 
-        <Box sx={{ width: MODAL_W, bgcolor: '#fff', borderRadius: 1, overflow: 'hidden' }}>
+        <Box sx={{ width: MODAL_W, bgcolor: rotaPaper, borderRadius: 1, overflow: 'hidden' }}>
           <ShiftFormCard {...formProps} />
         </Box>
       </Box>
@@ -1343,7 +1278,7 @@ function TimePill({ label, faded }) {
     <Box
       component="span"
       sx={{
-        bgcolor: '#fff',
+        bgcolor: rotaPaper,
         border: `1px solid ${CARD.pillBorder}`,
         borderRadius: '10px',
         px: 0.65,
@@ -1714,6 +1649,7 @@ function RotaShiftCard({
   const workerRated = canRateWorker && Boolean(findShiftReview(shift, member));
   const onCancelBooking = useContext(ShiftCancelBookingContext);
   const canCancelBooking = Boolean(onCancelBooking) && shiftAllowsCancelBooking(shift);
+  const canRemoveShift = !viewOnly && canCancelBooking;
 
   const cardSx = { width: '100%', height: '100%', borderRadius: '6px', overflow: 'hidden', position: 'relative' };
 
@@ -1734,12 +1670,10 @@ function RotaShiftCard({
 
   const handleCardClick = (event) => {
     event?.stopPropagation?.();
-    // Client: completed shift → rate worker
     if (canRateWorker) {
       onRateWorker?.(shift, member);
       return;
     }
-    // Client: unfilled shift click → view bids
     if (canViewBids) {
       onViewBids?.(shift);
       return;
@@ -1770,11 +1704,27 @@ function RotaShiftCard({
     }
   };
 
+  const handleRemoveShift = () => {
+    setMenuAnchor(null);
+    if (!shift) return;
+
+    if (canCancelBooking) {
+      onCancelBooking(shift, member);
+      return;
+    }
+
+    toast.error(
+      String(shift?.bookingId || '').trim()
+        ? 'This booking can no longer be cancelled.'
+        : 'This shift has no booking id — it cannot be removed via the API.'
+    );
+  };
+
   const menuItems = SHIFT_CARD_MENU.filter((item) => {
     if (item.id === 'bids') return canViewBids;
     if (item.id === 'rate') return canIncreaseRate;
     if (item.id === 'rateWorker') return canRateWorker;
-    if (item.id === 'cancelBooking') return canCancelBooking;
+    if (item.id === 'cancelBooking') return false;
     return true;
   }).map((item) => (item.id === 'rateWorker' && workerRated ? { ...item, label: 'Update rating' } : item));
 
@@ -1978,6 +1928,11 @@ function RotaShiftCard({
               {item.label}
             </MenuItem>
           ))}
+          {canRemoveShift ? (
+            <MenuItem onClick={handleRemoveShift} sx={{ color: 'error.main' }}>
+              Cancel booking
+            </MenuItem>
+          ) : null}
         </Menu>
 
         {detailsDialog}
@@ -2151,17 +2106,11 @@ function RotaShiftCard({
             {item.label}
           </MenuItem>
         ))}
-        {!viewOnly && shift && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              toast.info('Remove shift');
-            }}
-            sx={{ color: 'error.main' }}
-          >
-            Remove shift
+        {canRemoveShift ? (
+          <MenuItem onClick={handleRemoveShift} sx={{ color: 'error.main' }}>
+            Cancel booking
           </MenuItem>
-        )}
+        ) : null}
       </Menu>
 
       {detailsDialog}
@@ -2173,22 +2122,23 @@ function getGridContentWidth(dayCount, staffColWidth, dayColWidth) {
   return staffColWidth + dayCount * dayColWidth;
 }
 
-const GRID_LINE = '#e0e0e0';
-
-/** Extends row grid lines to the right edge when the viewport is wider than the data columns */
-function GridRowTail({ bgcolor = '#fff', dayColWidth = DAY_COL_W, showGridLines = true }) {
+function GridRowTail({ bgcolor = rotaPaper, dayColWidth = DAY_COL_W, showGridLines = true }) {
   return (
     <Box
-      sx={{
-        flex: 1,
-        minWidth: 0,
-        alignSelf: 'stretch',
-        borderBottom: showGridLines ? `1px solid ${GRID_LINE}` : 'none',
-        bgcolor,
-        ...(showGridLines && {
-          backgroundImage: `repeating-linear-gradient(to right, transparent 0, transparent ${dayColWidth - 1}px, ${GRID_LINE} ${dayColWidth - 1}px, ${GRID_LINE} ${dayColWidth}px)`,
-          backgroundSize: `${dayColWidth}px 100%`,
-        }),
+      sx={(theme) => {
+        const line = rotaBorderColor(theme);
+        const bg = typeof bgcolor === 'function' ? bgcolor(theme) : bgcolor;
+        return {
+          flex: 1,
+          minWidth: 0,
+          alignSelf: 'stretch',
+          borderBottom: showGridLines ? `1px solid ${line}` : 'none',
+          bgcolor: bg,
+          ...(showGridLines && {
+            backgroundImage: `repeating-linear-gradient(to right, transparent 0, transparent ${dayColWidth - 1}px, ${line} ${dayColWidth - 1}px, ${line} ${dayColWidth}px)`,
+            backgroundSize: `${dayColWidth}px 100%`,
+          }),
+        };
       }}
     />
   );
@@ -2235,7 +2185,7 @@ function ShiftCell({
     p: '1px',
     flexShrink: 0,
     overflow: 'hidden',
-    bgcolor: isActive ? '#e3f2fd' : isRowActive ? '#f9fdf7' : 'transparent',
+    bgcolor: (theme) => (isActive ? rotaSelected(theme) : isRowActive ? rotaRowActive(theme) : 'transparent'),
     boxShadow: isActive ? 'inset 0 0 0 2px #42a5f5' : 'none',
     '&:hover .empty-plus': {
       color: 'text.secondary',
@@ -2342,8 +2292,8 @@ function StaffRow({
         display: 'flex',
         alignItems: 'stretch',
         minHeight: rowMinHeight,
-        borderBottom: `1px solid ${GRID_LINE}`,
-        bgcolor: isSelected ? '#f9fdf7' : '#fff',
+        borderBottom: (theme) => `1px solid ${rotaBorderColor(theme)}`,
+        bgcolor: (theme) => (isSelected ? rotaRowActive(theme) : rotaPaper(theme)),
         cursor: member.isVacant ? 'default' : 'pointer',
       }}
     >
@@ -2358,17 +2308,17 @@ function StaffRow({
           display: 'flex',
           alignItems: 'center',
           alignSelf: 'stretch',
-          borderRight: `1px solid ${GRID_LINE}`,
+          borderRight: (theme) => `1px solid ${rotaBorderColor(theme)}`,
           borderLeft: (theme) =>
             isSelected ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
-          bgcolor: isSelected ? 'primary.lighter' : '#fff',
+          bgcolor: (theme) => (isSelected ? 'primary.lighter' : rotaPaper(theme)),
           cursor: member.isVacant ? 'default' : 'pointer',
           position: 'sticky',
           left: 0,
           zIndex: 5,
           boxShadow: '2px 0 0 0 rgba(0,0,0,0.04)',
           '&:hover': {
-            bgcolor: member.isVacant ? '#fff' : isSelected ? 'primary.lighter' : '#fafafa',
+            bgcolor: (theme) => (member.isVacant ? rotaPaper(theme) : isSelected ? 'primary.lighter' : rotaMuted(theme)),
           },
         }}
       >
@@ -2442,7 +2392,7 @@ function StaffRow({
           />
         );
       })}
-      <GridRowTail bgcolor={isSelected ? '#f9fdf7' : '#fff'} dayColWidth={dayColWidth} />
+      <GridRowTail bgcolor={(theme) => (isSelected ? rotaRowActive(theme) : rotaPaper(theme))} dayColWidth={dayColWidth} />
     </Box>
   );
 }
@@ -2504,8 +2454,8 @@ function TeamGroup({
         sx={{
           display: 'flex',
           alignItems: 'stretch',
-          bgcolor: '#fafafa',
-          borderBottom: collapsed ? 'none' : `1px solid ${GRID_LINE}`,
+          bgcolor: rotaMuted,
+          borderBottom: (theme) => (collapsed ? 'none' : `1px solid ${rotaBorderColor(theme)}`),
           minHeight: TEAM_HEADER_H,
           ...(collapsed && { mb: 0.25 }),
         }}
@@ -2522,7 +2472,7 @@ function TeamGroup({
             justifyContent: 'center',
             gap: 0.2,
             borderRight: 'none',
-            bgcolor: '#fafafa',
+            bgcolor: rotaMuted,
             position: 'sticky',
             left: 0,
             zIndex: 5,
@@ -2578,7 +2528,7 @@ function TeamGroup({
             </Typography>
           </Stack>
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0, alignSelf: 'stretch', bgcolor: '#fafafa' }} />
+        <Box sx={{ flex: 1, minWidth: 0, alignSelf: 'stretch', bgcolor: rotaMuted }} />
       </Box>
 
       {!collapsed &&
@@ -2656,9 +2606,9 @@ function LeftSidebar({
       sx={{
         width: isMobile ? '100%' : SIDEBAR_W,
         minWidth: isMobile ? '100%' : SIDEBAR_W,
-        borderRight: isMobile ? 'none' : '1px solid #e0e0e0',
-        borderBottom: isMobile ? '1px solid #e0e0e0' : 'none',
-        bgcolor: '#fff',
+        borderRight: (theme) => (isMobile ? 'none' : rotaBorder(theme)),
+        borderBottom: (theme) => (isMobile ? rotaBorder(theme) : 'none'),
+        bgcolor: rotaPaper,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -2666,7 +2616,7 @@ function LeftSidebar({
         ...hideScrollY,
       }}
     >
-      <Box sx={{ p: 1.5, borderBottom: '1px solid #e0e0e0', flexShrink: 0 }}>
+      <Box sx={{ p: 1.5, borderBottom: rotaBorder, flexShrink: 0 }}>
         {hideLocationPicker ? (
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0, py: 0.5 }}>
             <Iconify
@@ -2797,7 +2747,7 @@ function LeftSidebar({
       <Stack
         spacing={0}
         sx={{
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: rotaBorder,
           flexShrink: 0,
           ...(isMobile && { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }),
         }}
@@ -2835,7 +2785,7 @@ function LeftSidebar({
               fontWeight: 600,
               fontSize: 13,
               borderRadius: 0,
-              borderBottom: '1px solid #e0e0e0',
+              borderBottom: rotaBorder,
               flexShrink: 0,
               textTransform: 'none',
             }}
@@ -2843,7 +2793,7 @@ function LeftSidebar({
             Back
           </Button>
 
-          <Box sx={{ p: 1.5, borderBottom: '1px solid #e0e0e0', flexShrink: 0 }}>
+          <Box sx={{ p: 1.5, borderBottom: rotaBorder, flexShrink: 0 }}>
             <Stack direction="row" spacing={1.25} alignItems="flex-start">
               <Avatar sx={{ width: 36, height: 36, bgcolor: '#78909c', fontSize: 13 }}>
                 {getInitials(selectedStaff.name)}
@@ -2941,7 +2891,6 @@ function LeftSidebar({
           size="small"
           startIcon={<Iconify icon="eva:plus-fill" width={14} />}
           onClick={onAddJob}
-          // No `onAddJob` → read-only roster (admin viewing the account).
           style={onAddJob ? undefined : { display: 'none' }}
           sx={{
             justifyContent: 'flex-start',
@@ -2950,14 +2899,14 @@ function LeftSidebar({
             color: 'primary.main',
             border: '1px solid',
             borderColor: '#81c784',
-            bgcolor: '#f1f8e9',
+            bgcolor: rotaSoftSuccessBg,
             borderRadius: 1,
             py: 0.65,
             textTransform: 'none',
             flexShrink: 0,
             boxShadow: 'inset 0 0 0 1px rgba(129, 199, 132, 0.35)',
             '&:hover': {
-              bgcolor: '#e8f5e9',
+              bgcolor: rotaSoftSuccess,
             },
           }}
         >
@@ -3085,7 +3034,6 @@ function ShiftsViewContent({
 
   if (useCalendarApi) {
     const apiTeams = calendarSynced && Array.isArray(calendarTeams) ? calendarTeams : [];
-    // Prefer booking-calendar role groups; if empty after sync, fall back to staff API (not localStorage).
     TEAMS = calendarSynced ? (apiTeams.length > 0 ? apiTeams : staffApiTeams) : [];
     const maps = deriveStaffMaps(TEAMS);
     ALL_STAFF = maps.allStaff;
@@ -3115,10 +3063,10 @@ function ShiftsViewContent({
   );
   const postedJobs = useCalendarApi ? apiPostedJobs : localPostedJobs;
   const [weekStart, setWeekStart] = useState(() =>
-    useCalendarApi ? startOfWeek(new Date(), { weekStartsOn: 1 }) : FORTNIGHT_START
+    startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [viewRange, setViewRange] = useState('Fortnight');
-  const [shifts, setShifts] = useState(() => (useCalendarApi ? {} : buildInitialShifts()));
+  const [shifts, setShifts] = useState({});
   const [collapsed, setCollapsed] = useState({});
   const [location, setLocation] = useState(defaultLocationId || ALL_LOCATIONS_ID);
   const teamOrderStorageKey = `tempy-shifts-team-order-${apiRole || 'careHome'}`;
@@ -4071,6 +4019,12 @@ function ShiftsViewContent({
     });
   }, [shiftForm.open, shiftForm.staff?.id, shiftForm.date, getCellPosition]);
 
+  const refuseLocalRotaWrite = useCallback((actionLabel) => {
+    toast.info(
+      `${actionLabel} is not saved on this rota. Use Book shift to post a job, or Cancel booking to remove a booked shift.`
+    );
+  }, []);
+
   const handleCellClick = useCallback(
     (anchor, shift, staff, date, team) => {
       if (isLocked) {
@@ -4084,7 +4038,6 @@ function ShiftsViewContent({
       setFocusedShiftDate(date);
       setShowStaffDetail(true);
 
-      // Empty cells: book shift or mark person off from the cell
       if (!shift) {
         setCellActionMenu({
           anchorEl: anchor,
@@ -4099,6 +4052,13 @@ function ShiftsViewContent({
         return;
       }
 
+      if (useCalendarApi) {
+        toast.info(
+          'Use the shift menu to cancel a booking, or Book shift on an empty cell to post a job.'
+        );
+        return;
+      }
+
       setActiveSidebarAction('add-job');
       openShiftForm({
         shift,
@@ -4108,7 +4068,7 @@ function ShiftsViewContent({
         position: getAnchorPosition(anchor),
       });
     },
-    [isLocked, openShiftForm]
+    [isLocked, openShiftForm, useCalendarApi]
   );
 
   const closeCellActionMenu = useCallback(() => {
@@ -4192,54 +4152,33 @@ function ShiftsViewContent({
   );
 
   const handleCellDayOff = useCallback(() => {
-    if (!cellActionMenu?.staff || !cellActionMenu?.date) return;
-    const { staff, team, date } = cellActionMenu;
     closeCellActionMenu();
-    setPersonOffState({ open: true, staff, team, date });
-  }, [cellActionMenu, closeCellActionMenu]);
+    toast.info(
+      'Day off / leave is not available here yet — there is no availability API for this role. Use Book shift or Cancel booking.'
+    );
+  }, [closeCellActionMenu]);
 
   const handleClosePersonOff = useCallback(() => {
     setPersonOffState({ open: false, staff: null, team: null, date: '' });
   }, []);
 
   const handleConfirmPersonOff = useCallback(
-    async ({ staff, date, type, notes }) => {
-      if (!staff?.id || !date) return;
-
-      const key = `${staff.id}-${date}`;
-      const isLeave = type === 'leave';
-
-      setShifts((prev) => ({
-        ...prev,
-        [key]: {
-          id: key,
-          staffId: staff.id,
-          date,
-          dayOff: !isLeave,
-          leave: isLeave,
-          notes: notes || '',
-          startTime: '00:00',
-          endTime: '23:59',
-        },
-      }));
-
-      setSelectedStaff(staff);
-      setFocusedShiftDate(date);
-      setShowStaffDetail(true);
-      setActiveSidebarAction(isLeave ? 'add-leave' : 'day-off');
-
-      toast.success(
-        isLeave
-          ? `${staff.name || 'Staff'} marked as leave / person off`
-          : `${staff.name || 'Staff'} marked as day off`
+    async () => {
+      handleClosePersonOff();
+      toast.info(
+        'Day off / leave is not available here yet — there is no availability API for this role.'
       );
     },
-    []
+    [handleClosePersonOff]
   );
 
   const openAddShiftPopover = useCallback(() => {
     if (isLocked) {
       notifyLocked();
+      return;
+    }
+    if (useCalendarApi) {
+      refuseLocalRotaWrite('Add shift');
       return;
     }
     const staff = selectedStaff || teams[0]?.staff?.[0];
@@ -4257,58 +4196,44 @@ function ShiftsViewContent({
       date,
       position: getCellPosition(staff.id, date),
     });
-  }, [days, getCellPosition, isLocked, openShiftForm, selectedStaff, shifts, staffTeamMap, teams]);
+  }, [
+    days,
+    getCellPosition,
+    isLocked,
+    openShiftForm,
+    refuseLocalRotaWrite,
+    selectedStaff,
+    shifts,
+    staffTeamMap,
+    teams,
+    useCalendarApi,
+  ]);
 
   const handleSaveShift = useCallback(
     (form) => {
-      const key = `${form.staffId}-${form.date}`;
-      const member = allStaff.find((s) => s.id === form.staffId);
-
-      setShifts((prev) => {
-        const isUpdate = Boolean(prev[key]);
-        const next = {
-          ...prev,
-          [key]: {
-            ...(prev[key] || {}),
-            id: key,
-            staffId: form.staffId,
-            date: form.date,
-            startTime: form.startTime,
-            endTime: form.endTime,
-            location: form.location || '',
-            notes: form.notes ?? prev[key]?.notes ?? '',
-          },
-        };
-        const hours = computeStaffHours(next, form.staffId, days);
-        toast.success(
-          isUpdate
-            ? `Shift updated — ${member?.name} now at ${Math.round(hours)}h`
-            : `Shift added — ${member?.name} now at ${Math.round(hours)}h`
-        );
-        return next;
-      });
-
-      if (member) setSelectedStaff(member);
+      refuseLocalRotaWrite(form?.id || form?.bookingId ? 'Edit shift' : 'Add shift');
       setFormPreview(null);
     },
-    [allStaff, days]
+    [refuseLocalRotaWrite]
   );
 
   const handleDeleteShift = useCallback(
     (shift) => {
-      const key = `${shift.staffId}-${shift.date}`;
-      const member = allStaff.find((s) => s.id === shift.staffId);
+      const member = allStaff.find((s) => String(s.id) === String(shift?.staffId));
 
-      setShifts((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        const hours = computeStaffHours(next, shift.staffId, days);
-        toast.success(`Shift removed — ${member?.name} now at ${Math.round(hours)}h`);
-        return next;
-      });
+      if (!String(shift?.bookingId || '').trim()) {
+        toast.error('This shift has no booking id — it cannot be removed via the API.');
+        return;
+      }
+      if (!shiftAllowsCancelBooking(shift)) {
+        toast.error('This booking can no longer be cancelled.');
+        return;
+      }
+
+      setCancelBookingTarget({ shift, member });
       setFormPreview(null);
     },
-    [allStaff, days]
+    [allStaff]
   );
 
   const handleDuplicateShift = useCallback(
@@ -4317,68 +4242,9 @@ function ShiftsViewContent({
         notifyLocked();
         return;
       }
-
-      const staffId = Number(form.staffId);
-      const member = allStaff.find((s) => s.id === staffId);
-      const currentIndex = days.findIndex((day) => format(day, 'yyyy-MM-dd') === form.date);
-
-      let targetDate = null;
-      for (let offset = 1; offset <= days.length; offset += 1) {
-        const day = days[(Math.max(currentIndex, 0) + offset) % days.length];
-        const dateKey = format(day, 'yyyy-MM-dd');
-        if (dateKey === form.date) continue;
-        if (!shifts[`${staffId}-${dateKey}`]) {
-          targetDate = dateKey;
-          break;
-        }
-      }
-
-      if (!targetDate) {
-        toast.warning('No empty day available in this period to duplicate into');
-        return;
-      }
-
-      const key = `${staffId}-${targetDate}`;
-      setShifts((prev) => {
-        const next = {
-          ...prev,
-          [key]: {
-            id: key,
-            staffId,
-            date: targetDate,
-            startTime: form.startTime,
-            endTime: form.endTime,
-            location: form.location || '',
-            notes: form.notes || '',
-          },
-        };
-        toast.success(
-          `Shift duplicated to ${format(parse(targetDate, 'yyyy-MM-dd', new Date()), 'EEE d MMM')} — ${member?.name}`
-        );
-        return next;
-      });
-
-      setFocusedShiftDate(targetDate);
-      if (member) setSelectedStaff(member);
-
-      const team = staffTeamMap[staffId] || teams[0];
-      openShiftForm({
-        shift: {
-          id: key,
-          staffId,
-          date: targetDate,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          location: form.location || '',
-          notes: form.notes || '',
-        },
-        staff: member || shiftForm.staff,
-        team,
-        date: targetDate,
-        position: getCellPosition(staffId, targetDate),
-      });
+      refuseLocalRotaWrite('Duplicate shift');
     },
-    [allStaff, days, getCellPosition, isLocked, openShiftForm, shiftForm.staff, shifts, staffTeamMap, teams]
+    [isLocked, refuseLocalRotaWrite]
   );
 
   const handleNotesSave = useCallback(
@@ -4387,52 +4253,9 @@ function ShiftsViewContent({
         notifyLocked();
         return;
       }
-
-      const key = `${form.staffId}-${form.date}`;
-      const member = allStaff.find((s) => s.id === form.staffId);
-
-      setShifts((prev) => {
-        const existing = prev[key];
-        const next = {
-          ...prev,
-          [key]: {
-            ...(existing || {}),
-            id: key,
-            staffId: form.staffId,
-            date: form.date,
-            startTime: form.startTime || existing?.startTime || '09:00',
-            endTime: form.endTime || existing?.endTime || '17:00',
-            location: form.location || existing?.location || '',
-            notes: form.notes || '',
-          },
-        };
-        toast.success(
-          form.notes?.trim()
-            ? `Notes saved — ${member?.name}`
-            : `Notes cleared — ${member?.name}`
-        );
-        return next;
-      });
-
-      setShiftForm((prev) =>
-        prev.open && prev.date === form.date && prev.staff?.id === form.staffId
-          ? {
-            ...prev,
-            shift: {
-              ...(prev.shift || {}),
-              id: key,
-              staffId: form.staffId,
-              date: form.date,
-              startTime: form.startTime,
-              endTime: form.endTime,
-              location: form.location || '',
-              notes: form.notes || '',
-            },
-          }
-          : prev
-      );
+      refuseLocalRotaWrite('Shift notes');
     },
-    [isLocked]
+    [isLocked, refuseLocalRotaWrite]
   );
 
   const shiftFormCardProps = useMemo(() => {
@@ -4481,52 +4304,17 @@ function ShiftsViewContent({
         notifyLocked();
         return;
       }
-      const staff = selectedStaff || teams[0]?.staff?.[0];
-      if (!staff) return;
-      const date = format(days[0], 'yyyy-MM-dd');
-      const key = `${staff.id}-${date}`;
-
-      if (type === 'not-scheduled') {
-        setShifts((prev) => {
-          const next = { ...prev };
-          days.forEach((day) => {
-            delete next[`${staff.id}-${format(day, 'yyyy-MM-dd')}`];
-          });
-          toast.success('Marked as not scheduled');
-          return next;
-        });
-        setActiveSidebarAction(type);
-        setFormPreview(null);
-        return;
-      }
-
-      const meta = {
-        'on-call': { onCall: true, startTime: '00:00', endTime: '23:59' },
-        sleepover: { sleepover: true, startTime: '22:00', endTime: '07:00' },
-        'day-off': { dayOff: true, startTime: '00:00', endTime: '23:59' },
-        'add-leave': { leave: true, startTime: '00:00', endTime: '23:59' },
-      }[type];
-
-      if (!meta) return;
-
-      const shortLabels = {
-        'on-call': 'On call scheduled',
-        sleepover: 'Sleepover scheduled',
-        'day-off': 'Day off scheduled',
-        'add-leave': 'Leave added',
+      const labels = {
+        'not-scheduled': 'Not scheduled',
+        'on-call': 'On call',
+        sleepover: 'Sleepover',
+        'day-off': 'Day off',
+        'add-leave': 'Leave',
       };
-
-      setShifts((prev) => ({
-        ...prev,
-        [key]: { id: key, staffId: staff.id, date, ...meta },
-      }));
-
-      toast.success(shortLabels[type] || 'Saved');
-
-      setActiveSidebarAction(type);
+      refuseLocalRotaWrite(labels[type] || 'Rota change');
       setFormPreview(null);
     },
-    [days, isLocked, selectedStaff, teams]
+    [isLocked, refuseLocalRotaWrite]
   );
 
   const handleStaffSelect = useCallback((member) => {
@@ -4840,8 +4628,8 @@ function ShiftsViewContent({
                 sx={{
                   px: 2,
                   py: isMobile ? 1.25 : 0.75,
-                  borderBottom: '1px solid #e0e0e0',
-                  bgcolor: '#fff',
+                  borderBottom: rotaBorder,
+                  bgcolor: rotaPaper,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1.25,
@@ -4897,9 +4685,9 @@ function ShiftsViewContent({
                       sx={{
                         fontSize: 11.5,
                         color: 'text.primary',
-                        bgcolor: rosterScope === ROSTER_SCOPE.CURRENT ? '#e8f5e9' : '#f5f5f5',
+                        bgcolor: (theme) => (rosterScope === ROSTER_SCOPE.CURRENT ? rotaSoftSuccess(theme) : rotaHover(theme)),
                         border: '1px solid',
-                        borderColor: rosterScope === ROSTER_SCOPE.CURRENT ? '#81c784' : '#e0e0e0',
+                        borderColor: (theme) => (rosterScope === ROSTER_SCOPE.CURRENT ? '#81c784' : rotaBorderColor(theme)),
                         textTransform: 'none',
                         px: 1.5,
                         minWidth: 'auto',
@@ -4914,9 +4702,9 @@ function ShiftsViewContent({
                       sx={{
                         fontSize: 11.5,
                         color: 'text.primary',
-                        bgcolor: rosterScope === ROSTER_SCOPE.ALL ? '#e3f2fd' : '#f5f5f5',
+                        bgcolor: (theme) => (rosterScope === ROSTER_SCOPE.ALL ? rotaSelected(theme) : rotaHover(theme)),
                         border: '1px solid',
-                        borderColor: rosterScope === ROSTER_SCOPE.ALL ? '#90caf9' : '#e0e0e0',
+                        borderColor: (theme) => (rosterScope === ROSTER_SCOPE.ALL ? '#90caf9' : rotaBorderColor(theme)),
                         textTransform: 'none',
                         px: 1.5,
                         minWidth: 'auto',
@@ -4982,7 +4770,6 @@ function ShiftsViewContent({
               <ShiftRotaGridScroll
                 gridRef={gridRef}
                 gridContentWidth={gridContentWidth}
-                gridLine={GRID_LINE}
                 isPanning={isPanning}
                 onGridMouseDown={handleGridMouseDown}
                 stickyLeftWidth={staffColWidth}
@@ -4994,16 +4781,16 @@ function ShiftsViewContent({
                     position: 'sticky',
                     top: 0,
                     zIndex: 5,
-                    bgcolor: '#fff',
-                    borderBottom: `1px solid ${GRID_LINE}`,
+                    bgcolor: rotaPaper,
+                    borderBottom: (theme) => `1px solid ${rotaBorderColor(theme)}`,
                   }}
                 >
                   <Box
                     sx={{
                       width: staffColWidth,
                       minWidth: staffColWidth,
-                      borderRight: `1px solid ${GRID_LINE}`,
-                      bgcolor: '#fff',
+                      borderRight: (theme) => `1px solid ${rotaBorderColor(theme)}`,
+                      bgcolor: rotaPaper,
                       position: 'sticky',
                       left: 0,
                       zIndex: 6,
@@ -5020,7 +4807,6 @@ function ShiftsViewContent({
                         day={day}
                         hours={dayHours[i]}
                         dayColWidth={dayColWidth}
-                        gridLine={GRID_LINE}
                         weatherType={apiWeather?.type || null}
                         dayWeather={apiWeather}
                         onClick={handleDateHeaderClick}
@@ -5041,7 +4827,7 @@ function ShiftsViewContent({
                       boxSizing: 'border-box',
                       px: 3,
                       py: 6,
-                      bgcolor: '#fff',
+                      bgcolor: rotaPaper,
                       zIndex: 2,
                     }}
                   >
@@ -5097,7 +4883,7 @@ function ShiftsViewContent({
                   </DndContext>
                 )}
 
-                <Box sx={{ flex: 1, minHeight: 32, bgcolor: '#fff' }} />
+                <Box sx={{ flex: 1, minHeight: 32, bgcolor: rotaPaper }} />
               </ShiftRotaGridScroll>
             </Box>
           </Box>
@@ -5113,20 +4899,22 @@ function ShiftsViewContent({
               <Iconify icon="solar:calendar-add-bold" width={18} sx={{ mr: 1 }} />
               Book shift
             </MenuItem>
-            <MenuItem onClick={handleCellDayOff}>
-              <Iconify icon="solar:user-block-rounded-bold" width={18} sx={{ mr: 1 }} />
-              Person off / day off
-            </MenuItem>
+            {!useCalendarApi ? (
+              <MenuItem onClick={handleCellDayOff}>
+                <Iconify icon="solar:user-block-rounded-bold" width={18} sx={{ mr: 1 }} />
+                Person off / day off
+              </MenuItem>
+            ) : null}
           </Menu>
 
-          {!VIEW_ONLY && (
+          {!VIEW_ONLY && !useCalendarApi ? (
             <AddShiftPopover
               open={shiftForm.open}
               position={shiftForm.position}
               onClose={closeShiftForm}
               formProps={shiftFormCardProps}
             />
-          )}
+          ) : null}
 
           <PostJobDialog
             open={postJobDialog.value}

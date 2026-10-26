@@ -24,11 +24,11 @@ import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 import { EmptyContent } from 'src/components/empty-content';
 import { ModuleLoading } from 'src/components/loading-screen';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 
 import { groupJobRolesByDepartment } from './supplier-job-roles-utils';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
 function toIdSet(list = []) {
   return new Set(list.map((item) => item.id).filter(Boolean));
@@ -39,14 +39,7 @@ function sameIds(a, b) {
   return [...a].every((id) => b.has(id));
 }
 
-function getErrorMessage(error, fallback) {
-  return error?.data?.message || error?.data?.error?.message || error?.error || fallback;
-}
 
-/**
- * "My job types" — suppliers pick which admin job types they provide.
- * The saved list decides the rows on their shifts calendar.
- */
 export function SupplierJobRolesForm({ role }) {
   const viewOnly = useViewOnly();
   const choicesQuery = useGetSupplierJobRoleChoicesQuery({ role }, { refetchOnMountOrArgChange: 60, refetchOnFocus: false });
@@ -59,12 +52,10 @@ export function SupplierJobRolesForm({ role }) {
   const [selected, setSelected] = useState(() => new Set());
   const [search, setSearch] = useState('');
 
-  // Pre-tick the saved job types whenever the saved list (re)loads.
   useEffect(() => {
     setSelected(new Set(savedIds));
   }, [savedIds]);
 
-  // After the choices reload (e.g. a job type was deactivated), drop ticks that no longer exist.
   useEffect(() => {
     if (!choicesQuery.data) return;
     const valid = toIdSet(choicesQuery.data);
@@ -103,13 +94,13 @@ export function SupplierJobRolesForm({ role }) {
 
   const handleSave = useCallback(async () => {
     try {
-      // Always the full list — this call replaces what is saved ([] clears everything).
-      await saveJobRoles({ role, jobRoles: [...selected] }).unwrap();
-      toast.success(selected.size ? 'Job types saved' : 'Job types cleared');
+      const response = await saveJobRoles({ role, jobRoles: [...selected] }).unwrap();
+      toast.success(
+        pickApiToastMessage(response, selected.size ? 'Job types saved' : 'Job types cleared')
+      );
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Could not save job types'));
+      toast.error(handleApiError(error) || 'Could not save job types');
       if (error?.status === 400) {
-        // invalid_job_roles — a job type is no longer active; reload the choices.
         choicesQuery.refetch();
         mineQuery.refetch();
       }
@@ -130,7 +121,7 @@ export function SupplierJobRolesForm({ role }) {
           </Button>
         }
       >
-        {getErrorMessage(choicesQuery.error, 'Could not load job types')}
+        {handleApiError(choicesQuery.error) || 'Could not load job types'}
       </Alert>
     );
   }
@@ -161,7 +152,7 @@ export function SupplierJobRolesForm({ role }) {
 
       {mineQuery.isError ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {getErrorMessage(mineQuery.error, 'Could not load your saved job types')}
+          {handleApiError(mineQuery.error) || 'Could not load your saved job types'}
         </Alert>
       ) : null}
 
@@ -250,7 +241,6 @@ export function SupplierJobRolesForm({ role }) {
         </>
       )}
 
-      {/* Admin viewing the account cannot change its job types. */}
       <Stack
         direction="row"
         spacing={1.5}

@@ -250,7 +250,14 @@ export function ShiftRotaGridScroll({
             minHeight: '100%',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: `1px solid ${gridLine}`,
+            borderRight: (theme) =>
+              `1px solid ${
+                typeof gridLine === 'string' && gridLine
+                  ? gridLine
+                  : theme.palette.mode === 'dark'
+                    ? theme.vars.palette.divider
+                    : '#e0e0e0'
+              }`,
           }}
         >
           {children}

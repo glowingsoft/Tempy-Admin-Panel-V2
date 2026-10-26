@@ -72,13 +72,22 @@ function messageFromData(data) {
   );
 }
 
-/**
- * Prefer the backend/API error text so QA sees live server messages, not FE copy.
- */
+
+export function pickApiToastMessage(payload, fallback = '') {
+  const message = firstNonEmptyString(
+    typeof payload === 'string' ? payload : '',
+    payload?.message,
+    payload?.msg,
+    payload?.data?.message,
+    typeof payload?.data === 'string' ? payload.data : '',
+    payload?.data?.msg
+  );
+  return message || fallback || '';
+}
+
 export function handleApiError(error) {
   if (!error) return 'Unknown error occurred.';
 
-  // Enriched client Errors (e.g. social auth) may wrap the RTK error as `cause`
   const apiError = error?.cause && typeof error.cause === 'object' ? error.cause : error;
   const data = apiError?.data ?? error?.data;
 

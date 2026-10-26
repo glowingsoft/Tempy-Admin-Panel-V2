@@ -23,6 +23,7 @@ import { Iconify } from 'src/components/iconify';
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 
 import {
   TEMPY_PLATFORM_FEE_RATE,
@@ -78,13 +79,16 @@ export function AgencyProviderPayoutsDialog({ open, bills = [], onClose, onConfi
 
     setSubmitting(true);
     try {
-      await onConfirmPayout?.(selectedBills.map((bill) => bill.id));
+      const response = await onConfirmPayout?.(selectedBills.map((bill) => bill.id));
       toast.success(
-        `Marked ${selectedBills.length} payout${selectedBills.length === 1 ? '' : 's'} as sent to provider`
+        pickApiToastMessage(
+          response,
+          `Marked ${selectedBills.length} payout${selectedBills.length === 1 ? '' : 's'} as sent to provider`
+        )
       );
       onClose?.(true);
     } catch (err) {
-      toast.error(err?.message || 'Could not complete provider payout');
+      toast.error(handleApiError(err) || err?.message || 'Could not complete provider payout');
     } finally {
       setSubmitting(false);
     }

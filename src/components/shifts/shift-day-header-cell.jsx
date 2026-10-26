@@ -29,7 +29,7 @@ export function ShiftDayHeaderCell({
   day,
   hours,
   dayColWidth,
-  gridLine = '#e0e0e0',
+  gridLine,
   weatherType = null,
   dayWeather = null,
   onClick,
@@ -93,7 +93,14 @@ export function ShiftDayHeaderCell({
   const cellSx = {
     width: dayColWidth,
     minWidth: dayColWidth,
-    borderRight: `1px solid ${gridLine}`,
+    borderRight: (theme) =>
+      `1px solid ${
+        typeof gridLine === 'string' && gridLine
+          ? gridLine
+          : theme.palette.mode === 'dark'
+            ? theme.vars.palette.divider
+            : '#e0e0e0'
+      }`,
     py: 0.5,
     px: 0.25,
     flexShrink: 0,
