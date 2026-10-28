@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
+import { rotaBorderColor, rotaPaper, rotaWash } from 'src/components/shifts/rota-theme';
 
 const SCROLL_AREA_SX = {
   flex: 1,
@@ -12,22 +13,25 @@ const SCROLL_AREA_SX = {
   overflowX: 'scroll',
   overflowY: 'auto',
   scrollbarWidth: 'thin',
-  scrollbarColor: '#9e9e9e #f0f0f0',
   scrollbarGutter: 'stable',
+  scrollbarColor: (theme) =>
+    `${theme.palette.mode === 'dark' ? theme.vars.palette.grey[600] : '#9e9e9e'} ${rotaWash(theme)}`,
   '&::-webkit-scrollbar': {
     height: 12,
     width: 10,
   },
   '&::-webkit-scrollbar-thumb': {
     borderRadius: 999,
-    backgroundColor: '#9e9e9e',
-    border: '2px solid #f0f0f0',
+    backgroundColor: (theme) =>
+      theme.palette.mode === 'dark' ? theme.vars.palette.grey[600] : '#9e9e9e',
+    border: (theme) => `2px solid ${rotaWash(theme)}`,
     '&:hover': {
-      backgroundColor: '#757575',
+      backgroundColor: (theme) =>
+        theme.palette.mode === 'dark' ? theme.vars.palette.grey[500] : '#757575',
     },
   },
   '&::-webkit-scrollbar-track': {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: rotaWash,
   },
 };
 
@@ -219,7 +223,7 @@ export function ShiftRotaGridScroll({
         onScroll={updateScrollHints}
         sx={{
           ...SCROLL_AREA_SX,
-          bgcolor: '#fff',
+          bgcolor: rotaPaper,
           cursor: isPanning ? 'grabbing' : 'grab',
           userSelect: isPanning ? 'none' : 'auto',
         }}
@@ -254,9 +258,7 @@ export function ShiftRotaGridScroll({
               `1px solid ${
                 typeof gridLine === 'string' && gridLine
                   ? gridLine
-                  : theme.palette.mode === 'dark'
-                    ? theme.vars.palette.divider
-                    : '#e0e0e0'
+                  : rotaBorderColor(theme)
               }`,
           }}
         >

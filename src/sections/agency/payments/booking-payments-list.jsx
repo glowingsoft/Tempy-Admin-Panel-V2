@@ -30,6 +30,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom, TablePaginationCustom } from 'src/components/table';
 
 import { ModuleLoading } from 'src/components/loading-screen';
+import { DashboardEmptyState } from 'src/sections/dashboard/dashboard-empty-state';
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: '', label: 'All payment statuses' },
@@ -146,7 +147,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
   const clientPaged = payments.length > rowsPerPage;
   const visiblePayments = clientPaged ? payments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) : payments;
   const totalRecords = data?.meta?.hasTotal ? data.meta.totalRecords : null;
-  const count = clientPaged
+  const count = clientPagedose
     ? payments.length
     : totalRecords != null
       ? totalRecords

@@ -79,11 +79,12 @@ import { useJobsWithReviews } from 'src/sections/reviews/use-jobs-with-reviews';
 import { usePrepareJobReview } from 'src/sections/reviews/use-prepare-job-review';
 import { useActiveBranch } from 'src/sections/branches/active-branch-context';
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
-import { jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
+import { ALL_SITES_ID, jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
 
 import {
   buildCareHomeJobPayload,
   isJobCreateSoftError,
+  pickJobSuccessToast,
 } from '../care-home-job-api-utils';
 import { PostJobDialog } from '../post-job-dialog';
 import { ClosedJobReview } from '../closed-job-review';
@@ -95,14 +96,11 @@ import {
   ACTIVE_JOB_HORIZON_OPTIONS,
   CREATED_JOB_API_STATUS_OPTIONS,
   CREATED_JOB_FILL_OPTIONS,
-  countJobsByApiStatus,
   formatJobStartsInLabel,
   formatScheduleLabel,
   getGenderLabel,
   getJobStatusConfig,
   isEmployerJobCompleted,
-  isJobPendingFill,
-  isJobScheduledWithWorkers,
   jobMayHaveAttendance,
   jobHasWorkerRating,
   getWorkerRatingOption,
@@ -629,7 +627,7 @@ function CreatedJobCard({ job, viewMode = 'grid', onDelete, onLeaveReview, onOpe
 
 export function CreatedJobsView({ openPostOnMount = false, mode = 'careHome' }) {
   return (
-    <JobTypesProvider>
+    <JobTypesProvider role={mode}>
       <CreatedJobsViewContent openPostOnMount={openPostOnMount} mode={mode} />
     </JobTypesProvider>
   );
@@ -714,15 +712,30 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
     [branchesData?.data]
   );
 
+  const [page, setPage] = useState(1);
+  const { viewMode, handleViewModeChange: onViewModeChange } = usePersistedViewMode(
+    isLocalAuthority
+      ? 'local-authority-created-jobs'
+      : isUser
+        ? 'user-created-jobs'
+        : isHospital
+          ? 'hospital-created-jobs'
+          : 'care-home-created-jobs',
+    'grid'
+  );
+  const rowsPerPage = viewMode === 'grid' ? ROWS_PER_PAGE_GRID : ROWS_PER_PAGE_LIST;
+  const scopedBranchId =
+    activeBranchId && activeBranchId !== ALL_SITES_ID ? String(activeBranchId) : '';
+
   const jobsQueryArgs = useMemo(
     () => ({
-      page: 0,
-      limit: 100,
+      page: Math.max(0, page - 1),
+      limit: rowsPerPage,
       status:
         dashboardFilter === 'scheduled' || dashboardFilter === 'pending'
           ? 'active'
           : dashboardFilter === 'completed'
-            ? ''
+            ? 'completed'
             : statusFilter === 'all'
               ? ''
               : statusFilter,
@@ -732,8 +745,9 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
           : activeHorizon,
       ...listFilters,
       bids: FILL_TAB_BIDS[dashboardFilter] || '',
+      ...(scopedBranchId ? { branch: scopedBranchId } : {}),
     }),
-    [activeHorizon, dashboardFilter, listFilters, statusFilter]
+    [activeHorizon, dashboardFilter, listFilters, page, rowsPerPage, scopedBranchId, statusFilter]
   );
 
   const { data: jobTypesList } = useRoleJobTypes(mode);
@@ -843,20 +857,11 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
   const [jobToDelete, setJobToDelete] = useState(null);
   const [reviewJob, setReviewJob] = useState(null);
   const [attendanceJob, setAttendanceJob] = useState(null);
-  const [page, setPage] = useState(1);
-  const { viewMode, handleViewModeChange: onViewModeChange } = usePersistedViewMode(
-    isLocalAuthority
-      ? 'local-authority-created-jobs'
-      : isUser
-        ? 'user-created-jobs'
-        : isHospital
-          ? 'hospital-created-jobs'
-          : 'care-home-created-jobs',
-    'grid'
-  );
 
-  // Initial load vs socket/background refresh (keep cards visible while refetching).
   const listLoading = isLoading;
+  const serverTotalRaw = jobsData?.meta?.totalRecords ?? jobsData?.total_length;
+  const apiHasTotal = serverTotalRaw !== undefined && serverTotalRaw !== null && serverTotalRaw !== '';
+  const serverTotal = apiHasTotal ? Number(serverTotalRaw) || 0 : null;
 
   useEffect(() => {
     if (openPostOnMount && !viewOnly) {
@@ -873,11 +878,12 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
   const filteredJobs = useMemo(() => {
     const byStatus =
-      statusFilter === 'all'
+      statusFilter === 'all' && dashboardFilter !== 'completed'
         ? jobs.filter((job) => resolveJobApiStatus(job.apiStatus || job.status) !== 'deleted')
         : jobs.filter((job) => {
           const mapped = resolveJobApiStatus(job.apiStatus || job.status);
           if (!mapped) return true;
+          if (dashboardFilter === 'completed') return mapped === 'completed';
           return mapped === statusFilter;
         });
 
@@ -886,41 +892,45 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       .filter((job) => jobMatchesActiveBranch(job, activeBranchId));
   }, [activeBranchId, dashboardFilter, jobs, statusFilter]);
 
-  useEffect(() => {
-    if (statusFilter !== 'all') return;
-    allStatusCountsRef.current = countJobsByApiStatus(jobs);
-  }, [jobs, statusFilter]);
-
   const statusCounts = useMemo(() => {
     const fromMeta = Object.entries(jobsCount || {}).reduce((acc, [key, value]) => {
       acc[String(key).toLowerCase()] = Number(value) || 0;
       return acc;
     }, {});
-    const fromList = statusFilter === 'all' ? countJobsByApiStatus(jobs) : allStatusCountsRef.current;
 
     return CREATED_JOB_API_STATUS_OPTIONS.reduce((acc, option) => {
       if (option.value === 'all') {
-        acc.all = Number(fromMeta.all ?? fromMeta.total ?? jobsData?.total_length ?? jobs.length) || 0;
+        acc.all =
+          Number(fromMeta.all ?? fromMeta.total ?? (apiHasTotal ? serverTotal : null) ?? jobs.length) || 0;
       } else if (fromMeta[option.value] != null) {
         acc[option.value] = Number(fromMeta[option.value]) || 0;
-      } else if (statusFilter === option.value) {
-        acc[option.value] = jobs.length;
+      } else if (
+        (dashboardFilter === 'completed' && option.value === 'completed') ||
+        statusFilter === option.value
+      ) {
+        acc[option.value] = apiHasTotal ? serverTotal : jobs.length;
       } else {
-        acc[option.value] = Number(fromList[option.value]) || 0;
+        acc[option.value] = Number(allStatusCountsRef.current[option.value]) || 0;
       }
       return acc;
     }, {});
-  }, [jobs, jobsCount, jobsData?.total_length, statusFilter]);
+  }, [apiHasTotal, dashboardFilter, jobs.length, jobsCount, serverTotal, statusFilter]);
 
   const displayedJobs = useMemo(
     () => (listFilters.sort ? filteredJobs : sortJobsByCreatedAtDesc(filteredJobs)),
     [filteredJobs, listFilters.sort]
   );
 
-  const rowsPerPage = viewMode === 'grid' ? ROWS_PER_PAGE_GRID : ROWS_PER_PAGE_LIST;
-  const pageCount = Math.max(1, Math.ceil(displayedJobs.length / rowsPerPage));
+  const pageCount = Math.max(
+    1,
+    apiHasTotal
+      ? Math.ceil(serverTotal / rowsPerPage) || 1
+      : displayedJobs.length < rowsPerPage
+        ? page
+        : page + 1
+  );
   const safePage = Math.min(page, pageCount);
-  const paginatedJobs = displayedJobs.slice((safePage - 1) * rowsPerPage, safePage * rowsPerPage);
+  const paginatedJobs = displayedJobs;
 
   const handleChangePage = useCallback((_event, newPage) => {
     setPage(newPage);
@@ -936,7 +946,12 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
   useEffect(() => {
     setPage(1);
-  }, [activeBranchId, dashboardFilter, statusFilter]);
+  }, [activeBranchId, activeHorizon, dashboardFilter, listFilters, statusFilter, viewMode]);
+
+  useEffect(() => {
+    if (!apiHasTotal) return;
+    if (page > pageCount) setPage(pageCount);
+  }, [apiHasTotal, page, pageCount]);
 
   useEffect(() => {
     const next =
@@ -954,38 +969,38 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
   const listShowsEveryJob =
     !dashboardFilter && statusFilter === 'all' && activeHorizon === 'all' && !hasJobListFilters(listFilters);
 
-  const fillCountsFromJobs = useMemo(() => {
-    const inActiveBranch = (job) =>
-      jobMatchesActiveBranch(job, activeBranchId) &&
-      resolveJobApiStatus(job.apiStatus || job.status) !== 'deleted';
-    const visibleJobs = jobs.filter(inActiveBranch);
-
-    return {
-      all: visibleJobs.length,
-      pending: visibleJobs.filter((job) => isJobPendingFill(job)).length,
-      scheduled: visibleJobs.filter((job) => isJobScheduledWithWorkers(job) && !isEmployerJobCompleted(job)).length,
-      completed: visibleJobs.filter((job) => isEmployerJobCompleted(job)).length,
-    };
-  }, [activeBranchId, jobs]);
-
-  const savedFillCountsRef = useRef(fillCountsFromJobs);
-  if (listShowsEveryJob) savedFillCountsRef.current = fillCountsFromJobs;
+  const savedFillCountsRef = useRef({ all: 0, pending: 0, scheduled: 0, completed: 0 });
 
   const fillCounts = useMemo(() => {
-    if (listShowsEveryJob) return fillCountsFromJobs;
     const saved = savedFillCountsRef.current;
+    const totalForPage = apiHasTotal ? serverTotal : displayedJobs.length;
+
+    if (listShowsEveryJob) {
+      const next = {
+        ...saved,
+        all: totalForPage,
+      };
+      savedFillCountsRef.current = next;
+      return next;
+    }
+
     if (isFetching || isLoading) return saved;
 
-    const inActiveBranch = (job) =>
-      jobMatchesActiveBranch(job, activeBranchId) &&
-      resolveJobApiStatus(job.apiStatus || job.status) !== 'deleted';
-    const visibleJobs = jobs.filter(inActiveBranch);
-
-    if (dashboardFilter === 'pending') return { ...saved, pending: visibleJobs.length };
-    if (dashboardFilter === 'scheduled') return { ...saved, scheduled: visibleJobs.length };
-    if (dashboardFilter === 'completed') return { ...saved, completed: visibleJobs.length };
-    return saved;
-  }, [activeBranchId, dashboardFilter, fillCountsFromJobs, isFetching, isLoading, jobs, listShowsEveryJob]);
+    const next = { ...saved, all: saved.all || totalForPage };
+    if (dashboardFilter === 'pending') next.pending = totalForPage;
+    if (dashboardFilter === 'scheduled') next.scheduled = totalForPage;
+    if (dashboardFilter === 'completed') next.completed = totalForPage;
+    savedFillCountsRef.current = next;
+    return next;
+  }, [
+    apiHasTotal,
+    dashboardFilter,
+    displayedJobs.length,
+    isFetching,
+    isLoading,
+    listShowsEveryJob,
+    serverTotal,
+  ]);
 
   const syncCreatedJobsQuery = useCallback(
     (nextFilter) => {
@@ -1066,6 +1081,18 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
     setEditingJob(null);
   }, [postDialog]);
 
+  const { prepareReviewJob } = usePrepareJobReview(mode);
+
+  const handleLeaveReview = useCallback(
+    async (job) => {
+      const nextJob = await prepareReviewJob(job);
+      if (!nextJob) return;
+      setReviewJob(nextJob);
+      reviewDialog.onTrue();
+    },
+    [prepareReviewJob, reviewDialog]
+  );
+
   const handleOpenJob = useCallback(
     async (job) => {
       const status = normalizeJobStatus(job?.apiStatus || job?.status);
@@ -1081,8 +1108,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
       if (isEmployerJobCompleted(job)) {
         if (!jobHasWorkerRating(job)) {
-          setReviewJob(job);
-          reviewDialog.onTrue();
+          await handleLeaveReview(job);
           return;
         }
         router.push(getCreatedJobDetailsHref(pathname, job.id));
@@ -1102,7 +1128,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
       router.push(getCreatedJobDetailsHref(pathname, job.id));
     },
-    [fetchJobById, pathname, postDialog, reviewDialog, router, viewOnly]
+    [fetchJobById, handleLeaveReview, pathname, postDialog, router, viewOnly]
   );
 
   const handleSubmitJob = useCallback(
@@ -1169,22 +1195,26 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       }
 
       if (editingJob?.id) {
+        let response;
         try {
-          await updateJob({ id: editingJob.id, ...body }).unwrap();
+          response = await updateJob({ id: editingJob.id, ...body }).unwrap();
         } catch (err) {
           if (!isJobCreateSoftError(err)) throw err;
+          response = err?.data;
         }
-        toast.success('Job updated successfully');
+        toast.success(pickJobSuccessToast(response, 'Job updated successfully'));
         return;
       }
 
+      let response;
       try {
-        await createJob(body).unwrap();
+        response = await createJob(body).unwrap();
       } catch (err) {
         if (!isJobCreateSoftError(err)) throw err;
+        response = err?.data;
       }
 
-      toast.success('Job created successfully');
+      toast.success(pickJobSuccessToast(response, 'Job created successfully'));
     },
     [branches, createJob, editingJob, isHomeCareCompany, isUser, updateJob]
   );
@@ -1195,18 +1225,6 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       deleteDialog.onTrue();
     },
     [deleteDialog]
-  );
-
-  const { prepareReviewJob } = usePrepareJobReview(mode);
-
-  const handleLeaveReview = useCallback(
-    async (job) => {
-      const nextJob = await prepareReviewJob(job);
-      if (!nextJob) return;
-      setReviewJob(nextJob);
-      reviewDialog.onTrue();
-    },
-    [prepareReviewJob, reviewDialog]
   );
 
   const handleCloseReviewDialog = useCallback(() => {
@@ -1631,7 +1649,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
           </Stack>
         )}
 
-        {displayedJobs.length > rowsPerPage && (
+        {(apiHasTotal ? serverTotal > rowsPerPage : pageCount > 1 || displayedJobs.length >= rowsPerPage) && (
           <Pagination
             page={safePage}
             count={pageCount}

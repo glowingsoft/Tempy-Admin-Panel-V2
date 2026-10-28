@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useGetCareHomeJobsQuery } from 'src/store/Reducer/care-home-jobs-api';
 import { useGetHospitalJobsQuery } from 'src/store/Reducer/hospital-jobs-api';
@@ -10,14 +10,19 @@ import { useGetHomeCareCompanyJobsQuery } from 'src/store/Reducer/home-care-comp
 import { normalizePostedJobForSidebar } from './posted-jobs-schedule-utils';
 
 const EMPTY = [];
+const DEFAULT_PAGE_SIZE = 50;
 
-/**
- * Posted / available jobs for employer schedule left panel.
- * careHome | hospital | localAuthority | user → company-posted jobs
- * agency | homeCareCompany → jobs list for that dashboard
- */
-export function useEmployerPostedJobs(apiRole = 'careHome', { skip = false, limit = 50 } = {}) {
-  const args = { page: 0, limit, status: 'all' };
+export function useEmployerPostedJobs(
+  apiRole = 'careHome',
+  { skip = false, pageSize = DEFAULT_PAGE_SIZE } = {}
+) {
+  const [limit, setLimit] = useState(pageSize);
+
+  useEffect(() => {
+    setLimit(pageSize);
+  }, [apiRole, pageSize, skip]);
+
+  const args = useMemo(() => ({ page: 0, limit, status: 'all' }), [limit]);
 
   const careHome = useGetCareHomeJobsQuery(args, {
     skip: skip || apiRole !== 'careHome',
@@ -56,9 +61,23 @@ export function useEmployerPostedJobs(apiRole = 'careHome', { skip = false, limi
     return list.map(normalizePostedJobForSidebar).filter(Boolean);
   }, [active.data?.data]);
 
+  const totalRaw = active.data?.meta?.totalRecords ?? active.data?.total_length;
+  const apiHasTotal = totalRaw !== undefined && totalRaw !== null && totalRaw !== '';
+  const total = apiHasTotal ? Number(totalRaw) || 0 : null;
+  const hasMore = apiHasTotal ? jobs.length < total : jobs.length >= limit;
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || active.isFetching) return;
+    setLimit((prev) => prev + pageSize);
+  }, [active.isFetching, hasMore, pageSize]);
+
   return {
     jobs,
-    loading: Boolean(active.isLoading || active.isFetching),
+    loading: Boolean(active.isLoading),
+    loadingMore: Boolean(active.isFetching && jobs.length),
+    hasMore,
+    loadMore,
+    total,
     refetch: active.refetch,
   };
 }

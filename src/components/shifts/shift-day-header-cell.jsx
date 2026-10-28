@@ -8,7 +8,6 @@ import { format } from 'date-fns';
 import { ShiftWeatherIcon } from 'src/components/weather/shift-weather-icon';
 import { getDayWeather } from 'src/components/weather/shift-weather-utils';
 
-// ----------------------------------------------------------------------
 
 export { getDayWeather, isRainyWeatherDay } from 'src/components/weather/shift-weather-utils';
 
@@ -94,12 +93,7 @@ export function ShiftDayHeaderCell({
     width: dayColWidth,
     minWidth: dayColWidth,
     borderRight: (theme) =>
-      `1px solid ${
-        typeof gridLine === 'string' && gridLine
-          ? gridLine
-          : theme.palette.mode === 'dark'
-            ? theme.vars.palette.divider
-            : '#e0e0e0'
+      `1px solid ${typeof gridLine === 'string' && gridLine ? gridLine : theme.vars.palette.divider
       }`,
     py: 0.5,
     px: 0.25,

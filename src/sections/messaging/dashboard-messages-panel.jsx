@@ -60,9 +60,7 @@ import {
 import { mapUserProfileFromApi } from 'src/sections/account/account-profile-utils';
 import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
-// ----------------------------------------------------------------------
 
-// ----------------------------------------------------------------------
 
 function isContactOnline(contact) {
   return Boolean(contact?.isOnline ?? contact?.online);
@@ -70,8 +68,6 @@ function isContactOnline(contact) {
 
 function VoiceMessagePlayer({ url, mimeType, duration }) {
   const playbackType = voicePlaybackType(url, mimeType);
-  // Phone m4a is not requested on refresh. Chrome cannot play Apple Lossless, and a direct
-  // fetch of the bucket fails with an empty response because S3 sends no CORS header.
   const decodeOnPlay = playbackType === 'audio/mp4' && !String(url).startsWith('blob:');
   const [src, setSrc] = useState(decodeOnPlay ? '' : url);
   const [preparing, setPreparing] = useState(false);
@@ -234,11 +230,11 @@ function MessageText({ text, isMe }) {
           wordBreak: 'break-word',
           ...(!expanded &&
             isLong && {
-              display: '-webkit-box',
-              WebkitLineClamp: 8,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }),
+            display: '-webkit-box',
+            WebkitLineClamp: 8,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }),
         }}
       >
         {value}
@@ -631,7 +627,6 @@ function ChatListItem({ item, selected, onClick, onDelete }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 export function DashboardMessagesPanel({
   conversations,
@@ -650,6 +645,12 @@ export function DashboardMessagesPanel({
   sending = false,
   apiErrorMessage = '',
   apiMode = false,
+  hasMoreConversations = false,
+  loadingMoreConversations = false,
+  onLoadMoreConversations,
+  hasMoreMessages = false,
+  loadingMoreMessages = false,
+  onLoadMoreMessages,
 }) {
   const viewOnly = useViewOnly();
   const isApiMode = apiMode || Boolean(onSendText);
@@ -676,8 +677,7 @@ export function DashboardMessagesPanel({
   const [attachmentsOpen, setAttachmentsOpen] = useState(true);
   const [mobileView, setMobileView] = useState('inbox');
   const wasLgUpRef = useRef(lgUp);
-  // Shrinking the window used to hide the open conversation, because the narrow
-  // layout starts on the inbox. Keep the thread that was already on screen.
+
   useEffect(() => {
     if (wasLgUpRef.current && !lgUp && selectedId) {
       setMobileView('thread');
@@ -782,7 +782,6 @@ export function DashboardMessagesPanel({
       ? conversations.find((item) => String(item.id) === String(preferredId))
       : null;
 
-    // Deep-link / draft: match by participant/object id when conversation id differs.
     if (!conversation && preferredId) {
       const draftPeerId = String(preferredId).startsWith('draft-')
         ? String(preferredId).replace(/^draft-/, '')
@@ -946,7 +945,6 @@ export function DashboardMessagesPanel({
       if (!selectedId || !message || sending) return;
 
       if (onSendText && selected) {
-        // WhatsApp-style: clear input + scroll immediately; bubble appears via optimistic pending.
         setDraft('');
         isNearBottomRef.current = true;
         requestAnimationFrame(() => scrollThreadToBottom());
@@ -955,7 +953,6 @@ export function DashboardMessagesPanel({
           isNearBottomRef.current = true;
           requestAnimationFrame(() => scrollThreadToBottom());
         } catch {
-          // toast handled in hook — restore draft if send failed
           setDraft(message);
         }
         return;
@@ -986,7 +983,6 @@ export function DashboardMessagesPanel({
         try {
           await onSendAttachmentMessage(selected, messageData);
         } catch {
-          // toast handled in hook
         }
         return;
       }
@@ -1128,7 +1124,6 @@ export function DashboardMessagesPanel({
         toast.success('Location shared');
         setLocationDialogOpen(false);
       } catch {
-        // toast handled upstream
       } finally {
         setSharingLocation(false);
       }
@@ -1175,7 +1170,6 @@ export function DashboardMessagesPanel({
             return;
           }
 
-          // webm does not play on the phone. m4a (Safari) and wav (Chrome) do.
           const file = await toMobilePlayableVoiceFile(blob, rawType);
           if (isApiMode) {
             handleSendAttachment({
@@ -1256,7 +1250,6 @@ export function DashboardMessagesPanel({
       confirmDeleteMessage.onFalse();
       setPendingDeleteMessage(null);
     } catch {
-      // toast handled upstream
     } finally {
       setDeletingMessage(false);
     }
@@ -1295,7 +1288,6 @@ export function DashboardMessagesPanel({
         if (!lgUp) setMobileView('inbox');
       }
     } catch {
-      // toast handled upstream
     } finally {
       setDeletingConversation(false);
     }
@@ -1311,7 +1303,6 @@ export function DashboardMessagesPanel({
   const contactEmail = selected?.email || (isApiMode ? '—' : '');
 
   const isGroupChat = selected?.isGroup;
-  // Admin viewing the account reads its chats but cannot send, delete or start conversations.
   const canSendMessage = selected?.canMessage !== false && !viewOnly;
   const canDeleteMessages = typeof onDeleteMessage === 'function' && !viewOnly;
   const canDeleteConversation = typeof onDeleteConversation === 'function' && !viewOnly;
@@ -1487,7 +1478,24 @@ export function DashboardMessagesPanel({
           flexDirection: 'column',
         }}
       >
-        <Scrollbar sx={{ flex: 1, minHeight: 0, height: 1 }}>{renderChatList()}</Scrollbar>
+        <Scrollbar sx={{ flex: 1, minHeight: 0, height: 1 }}>
+          {renderChatList()}
+          {hasMoreConversations && typeof onLoadMoreConversations === 'function' ? (
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Button
+                fullWidth
+                size="small"
+                color="inherit"
+                variant="outlined"
+                disabled={loadingMoreConversations}
+                onClick={onLoadMoreConversations}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                {loadingMoreConversations ? 'Loading…' : 'Load more conversations'}
+              </Button>
+            </Box>
+          ) : null}
+        </Scrollbar>
       </Box>
     </Stack>
   );
@@ -1581,6 +1589,20 @@ export function DashboardMessagesPanel({
             <ModuleLoading sx={{ flex: 1, minHeight: 240 }} />
           ) : (
             <>
+              {hasMoreMessages && typeof onLoadMoreMessages === 'function' ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    variant="outlined"
+                    disabled={loadingMoreMessages}
+                    onClick={onLoadMoreMessages}
+                    sx={{ textTransform: 'none', fontWeight: 700 }}
+                  >
+                    {loadingMoreMessages ? 'Loading…' : 'Load earlier messages'}
+                  </Button>
+                </Box>
+              ) : null}
               {visibleMessages.map((message) => (
                 <MessageBubble
                   key={message.id}

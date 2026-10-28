@@ -10,7 +10,6 @@ import { DashboardMessagesPanel } from './dashboard-messages-panel';
 import { useConversationsMessaging } from './use-conversations-messaging';
 import { ModuleLoading } from 'src/components/loading-screen';
 
-// ----------------------------------------------------------------------
 
 export function ApiMessagesView({ groupByCategory = true } = {}) {
   const searchParams = useSearchParams();
@@ -52,28 +51,33 @@ export function ApiMessagesView({ groupByCategory = true } = {}) {
         </Typography>
       ) : null}
 
-      {/* One loader for the whole panel — its list/thread loaders would otherwise stack with it. */}
       {messaging.initialLoading ? (
         <ModuleLoading />
       ) : (
-      <DashboardMessagesPanel
-        conversations={messaging.conversations}
-        selectedConversationId={messaging.selectedConversationId}
-        threadMessages={messaging.selectedMessages}
-        onConversationsChange={messaging.onConversationsChange}
-        onSendText={messaging.onSendText}
-        onSendAttachmentMessage={messaging.onSendAttachment}
-        onSelectConversation={messaging.onSelectConversation}
-        onDeleteMessage={messaging.onDeleteMessage}
-        onDeleteConversation={messaging.onDeleteConversation}
-        disableAutoReply
-        apiMode
-        loading={messaging.initialLoading}
-        messagesLoading={messaging.isMessagesFetching}
-        sending={messaging.isSending}
-        apiErrorMessage={messaging.apiErrorMessage}
-        groupByCategory={groupByCategory}
-      />
+        <DashboardMessagesPanel
+          conversations={messaging.conversations}
+          selectedConversationId={messaging.selectedConversationId}
+          threadMessages={messaging.selectedMessages}
+          onConversationsChange={messaging.onConversationsChange}
+          onSendText={messaging.onSendText}
+          onSendAttachmentMessage={messaging.onSendAttachment}
+          onSelectConversation={messaging.onSelectConversation}
+          onDeleteMessage={messaging.onDeleteMessage}
+          onDeleteConversation={messaging.onDeleteConversation}
+          disableAutoReply
+          apiMode
+          loading={messaging.initialLoading}
+          messagesLoading={messaging.isMessagesFetching}
+          sending={messaging.isSending}
+          apiErrorMessage={messaging.apiErrorMessage}
+          groupByCategory={groupByCategory}
+          hasMoreConversations={messaging.hasMoreConversations}
+          loadingMoreConversations={messaging.loadingMoreConversations}
+          onLoadMoreConversations={messaging.loadMoreConversations}
+          hasMoreMessages={messaging.hasMoreMessages}
+          loadingMoreMessages={messaging.loadingMoreMessages}
+          onLoadMoreMessages={messaging.loadMoreMessages}
+        />
       )}
     </DashboardContent>
   );

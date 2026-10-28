@@ -1,10 +1,11 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/components/iconify';
+import { rotaBorder, rotaBorderColor, rotaMuted, rotaPaper } from 'src/components/shifts/rota-theme';
 
-// ----------------------------------------------------------------------
 
 function statusColor(status) {
   const raw = String(status || '').toLowerCase();
@@ -15,13 +16,13 @@ function statusColor(status) {
   return 'text.secondary';
 }
 
-/**
- * Left panel: company posted jobs only (display). Calendar assignee names stay on shift cards.
- * `loading` only suppresses the empty state — the shifts page overlay is the loader.
- */
+
 export function PostedJobsSidebarPanel({
   jobs = [],
   loading = false,
+  loadingMore = false,
+  hasMore = false,
+  onLoadMore,
   title = 'Posted jobs',
 }) {
   return (
@@ -31,15 +32,21 @@ export function PostedJobsSidebarPanel({
         minHeight: 160,
         display: 'flex',
         flexDirection: 'column',
-        borderTop: '1px solid #e0e0e0',
-        bgcolor: '#fafbfc',
+        borderTop: rotaBorder,
+        bgcolor: rotaMuted,
       }}
     >
       <Stack
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        sx={{ px: 1.5, py: 1, borderBottom: '1px solid #eceff1', flexShrink: 0, bgcolor: '#fff' }}
+        sx={{
+          px: 1.5,
+          py: 1,
+          borderBottom: rotaBorder,
+          flexShrink: 0,
+          bgcolor: rotaPaper,
+        }}
       >
         <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.2 }}>
           {title}
@@ -63,8 +70,8 @@ export function PostedJobsSidebarPanel({
               px: 1.25,
               py: 2,
               borderRadius: 1.25,
-              border: '1px dashed #d5d9de',
-              bgcolor: '#fff',
+              border: (theme) => `1px dashed ${rotaBorderColor(theme)}`,
+              bgcolor: rotaPaper,
               textAlign: 'center',
             }}
           >
@@ -80,8 +87,8 @@ export function PostedJobsSidebarPanel({
             sx={{
               px: 1.25,
               py: 1.1,
-              border: '1px solid #e6e8eb',
-              bgcolor: '#fff',
+              border: rotaBorder,
+              bgcolor: rotaPaper,
               borderRadius: 1.25,
               flexShrink: 0,
             }}
@@ -157,6 +164,27 @@ export function PostedJobsSidebarPanel({
             </Stack>
           </Box>
         ))}
+
+        {hasMore && typeof onLoadMore === 'function' ? (
+          <Button
+            size="small"
+            color="inherit"
+            variant="outlined"
+            disabled={loadingMore}
+            onClick={onLoadMore}
+            sx={{
+              mt: 0.5,
+              flexShrink: 0,
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: 'none',
+              borderColor: (theme) => rotaBorderColor(theme),
+              bgcolor: rotaPaper,
+            }}
+          >
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </Button>
+        ) : null}
       </Stack>
     </Box>
   );

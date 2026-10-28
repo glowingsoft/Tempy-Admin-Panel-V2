@@ -2085,6 +2085,9 @@ function LeftSidebar({
   actions = SIDEBAR_ACTIONS,
   postedJobs = [],
   postedJobsLoading = false,
+  postedJobsLoadingMore = false,
+  postedJobsHasMore = false,
+  onLoadMorePostedJobs,
   postedJobsTitle = 'Jobs',
 }) {
   return (
@@ -2385,6 +2388,9 @@ function LeftSidebar({
         <PostedJobsSidebarPanel
           jobs={postedJobs}
           loading={postedJobsLoading}
+          loadingMore={postedJobsLoadingMore}
+          hasMore={postedJobsHasMore}
+          onLoadMore={onLoadMorePostedJobs}
           title={postedJobsTitle}
         />
       </Box>
@@ -2482,7 +2488,6 @@ export function AgencyShiftsView({
     return withAllLocationsOption([]);
   }, [agencyBranches, isNurseApi, isStaffMember, locationOrigin, useCalendarApi]);
 
-  // GET {agency|home-care-company}/job-roles?status=active — nurses don't pick a job type here.
   const { data: jobTypesList } = useRoleJobTypes(isHomeCareCompanyApi ? 'homeCareCompany' : 'agency', {
     skip: !useCalendarApi || isNurseApi,
   });
@@ -2589,7 +2594,13 @@ export function AgencyShiftsView({
     : isAgencyApi
       ? 'agency'
       : '';
-  const { jobs: postedJobs, loading: postedJobsLoading } = useEmployerPostedJobs(postedJobsRole || 'agency', {
+  const {
+    jobs: postedJobs,
+    loading: postedJobsLoading,
+    loadingMore: postedJobsLoadingMore,
+    hasMore: postedJobsHasMore,
+    loadMore: loadMorePostedJobs,
+  } = useEmployerPostedJobs(postedJobsRole || 'agency', {
     skip: !useCalendarApi || !postedJobsRole || isStaffMember || isNurseApi,
   });
   const [collapsed, setCollapsed] = useState({});
@@ -2929,7 +2940,6 @@ export function AgencyShiftsView({
 
   const visibleStaffCount = useMemo(() => countRosterMembers(visibleTeams), [visibleTeams]);
 
-  // Supplier calendar with no keys in `data`: no saved job types and no shifts in range.
   const showChooseJobTypes =
     useCalendarApi && calendarSynced && !isStaffMember && !isCalendarFetching && TEAMS.length === 0;
 
@@ -3500,7 +3510,6 @@ export function AgencyShiftsView({
           `Booking cancelled — ${member?.name || 'Staff'}`
         );
 
-        // Optimistic UI remove; calendar invalidate/refetch is source of truth.
         setShifts((prev) => {
           const remaining = getDayShifts(prev, shift.staffId, shift.date).filter(
             (entry) => entry.id !== shift.id
@@ -3513,7 +3522,6 @@ export function AgencyShiftsView({
         try {
           await refetchCalendar();
         } catch {
-          // Tags already invalidate the calendar query.
         }
       } catch (error) {
         toast.error(
@@ -3998,6 +4006,9 @@ export function AgencyShiftsView({
           actions={sidebarActions}
           postedJobs={postedJobs}
           postedJobsLoading={postedJobsLoading}
+          postedJobsLoadingMore={postedJobsLoadingMore}
+          postedJobsHasMore={postedJobsHasMore}
+          onLoadMorePostedJobs={loadMorePostedJobs}
           postedJobsTitle={isHomeCareCompanyApi ? 'Jobs' : 'Jobs'}
         />
 

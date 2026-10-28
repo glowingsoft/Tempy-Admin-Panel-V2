@@ -104,10 +104,9 @@ const CROSS_USER_LOCAL_KEYS = [
   'tempy-staff-shift-cancellations',
   'tempy-staff-shift-alerts',
   'tempy-supplier-job-care-details',
-  'tempy-employer-shift-payments-v2',
 ];
 
-const CROSS_USER_LOCAL_PREFIXES = ['tempy-dashboard-invoices:', 'tempy-company-roster:'];
+const CROSS_USER_LOCAL_PREFIXES = ['tempy-company-roster:'];
 
 const CROSS_USER_SESSION_PREFIXES = ['nurse:', 'agency:', 'hcc:', 'nurse-', 'agency-', 'hcc-'];
 

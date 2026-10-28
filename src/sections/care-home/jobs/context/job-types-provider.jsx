@@ -1,121 +1,62 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
 
-import {
-  createJobType,
-  loadJobTypes,
-  parseJobTypeLabel,
-  saveJobTypes,
-} from '../care-home-job-types-utils';
+import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
+
 
 const JobTypesContext = createContext(null);
 
-function buildSeedJobTypes(seedLabels = []) {
-  return seedLabels.map((label, index) => {
-    const trimmed = String(label).trim();
-    if (trimmed.includes(' · ')) {
-      const { category, name } = parseJobTypeLabel(trimmed);
-      return createJobType({
-        id: `job-type-seed-${index}`,
-        category,
-        name,
-      });
-    }
-    return {
-      id: `job-type-seed-${index}`,
-      category: 'Individual',
-      name: trimmed,
-      label: trimmed,
-    };
-  });
+const EMPTY = [];
+
+function mapApiJobType(item) {
+  if (!item || typeof item !== 'object') return null;
+  const id = String(item.id || item._id || '').trim();
+  if (!id) return null;
+
+  const name = String(item.title || item.name || item.label || '').trim();
+  const category = String(item.department || item.category || '').trim();
+  const label = String(item.label || name || '').trim();
+
+  return {
+    id,
+    category,
+    name,
+    label,
+    status: item.status,
+  };
 }
 
-export function JobTypesProvider({ children, seedLabels = null, storageKey = null }) {
-  const [jobTypes, setJobTypes] = useState(() => {
-    if (seedLabels?.length) {
-      if (storageKey) {
-        try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length) {
-              return parsed.map((item) =>
-                createJobType({
-                  id: item.id,
-                  category: item.category,
-                  name: item.name,
-                })
-              );
-            }
-          }
-        } catch {
-          // fall through to seed
-        }
-      }
-      return buildSeedJobTypes(seedLabels);
-    }
-    return loadJobTypes();
-  });
+export function JobTypesProvider({ children, role = 'careHome' }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useRoleJobTypes(role);
 
-  const persist = useCallback(
-    (nextJobTypes) => {
-      setJobTypes(nextJobTypes);
-      if (storageKey) {
-        localStorage.setItem(storageKey, JSON.stringify(nextJobTypes));
-        return;
-      }
-      if (!seedLabels?.length) {
-        saveJobTypes(nextJobTypes);
-      }
-    },
-    [seedLabels, storageKey]
-  );
+  const jobTypes = useMemo(() => {
+    const list = Array.isArray(data) ? data : EMPTY;
+    return list.map(mapApiJobType).filter(Boolean);
+  }, [data]);
 
-  const addJobType = useCallback(
-    ({ category, name }) => {
-      const nextType = createJobType({ category, name });
-      persist([nextType, ...jobTypes]);
-      return nextType;
-    },
-    [jobTypes, persist]
-  );
-
-  const updateJobType = useCallback(
-    (id, { category, name }) => {
-      persist(
-        jobTypes.map((item) =>
-          item.id === id
-            ? createJobType({ id, category, name })
-            : item
-        )
-      );
-    },
-    [jobTypes, persist]
-  );
-
-  const deleteJobType = useCallback(
-    (id) => {
-      persist(jobTypes.filter((item) => item.id !== id));
-    },
-    [jobTypes, persist]
-  );
+  const jobTypeLabels = useMemo(() => jobTypes.map((item) => item.label).filter(Boolean), [jobTypes]);
 
   const getJobTypeById = useCallback(
-    (id) => jobTypes.find((item) => item.id === id) || null,
+    (id) => jobTypes.find((item) => String(item.id) === String(id)) || null,
     [jobTypes]
   );
-
-  const jobTypeLabels = useMemo(() => jobTypes.map((item) => item.label), [jobTypes]);
 
   const value = useMemo(
     () => ({
       jobTypes,
       jobTypeLabels,
-      addJobType,
-      updateJobType,
-      deleteJobType,
       getJobTypeById,
+      isLoading,
+      isFetching,
+      isError,
+      refetch,
     }),
-    [jobTypes, jobTypeLabels, addJobType, updateJobType, deleteJobType, getJobTypeById]
+    [jobTypes, jobTypeLabels, getJobTypeById, isLoading, isFetching, isError, refetch]
   );
 
   return <JobTypesContext.Provider value={value}>{children}</JobTypesContext.Provider>;

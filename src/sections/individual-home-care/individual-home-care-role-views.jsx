@@ -13,9 +13,6 @@ import { StaffProvider } from 'src/sections/staff/context/staff-provider';
 import { AgencyPaymentsView } from 'src/sections/agency/payments/view/agency-payments-view';
 import { AgencyEarningsView } from 'src/sections/agency/earnings/view/agency-earnings-view';
 
-import { INDIVIDUAL_HOME_CARE_ROTA_CONFIG } from './shifts/individual-home-care-shifts-data';
-
-// ----------------------------------------------------------------------
 
 export function IndividualHomeCareShiftsView() {
   return (
@@ -24,10 +21,6 @@ export function IndividualHomeCareShiftsView() {
       apiRole="user"
       rotaConfig={{
         key: 'individual-home-care',
-        // No `teams` here — calendar comes from GET /web/user/booking/calender
-        jobTypeLabels: INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobTypeLabels,
-        jobTypesStorageKey: INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobTypesStorageKey,
-        jobsStorageKey: INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobsStorageKey,
       }}
     />
   );
@@ -59,13 +52,7 @@ export function IndividualHomeCareComplianceView() {
 
 export function IndividualHomeCarePostJobView() {
   return (
-    <AddJobView
-      mode="user"
-      redirectPath={paths.dashboard.individualHomeCare.jobs.created}
-      jobTypeLabels={INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobTypeLabels}
-      jobTypesStorageKey={INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobTypesStorageKey}
-      jobsStorageKey={INDIVIDUAL_HOME_CARE_ROTA_CONFIG.jobsStorageKey}
-    />
+    <AddJobView mode="user" redirectPath={paths.dashboard.individualHomeCare.jobs.created} />
   );
 }
 
