@@ -8,7 +8,6 @@ import { format } from 'date-fns';
 import { ShiftWeatherIcon } from 'src/components/weather/shift-weather-icon';
 import { getDayWeather } from 'src/components/weather/shift-weather-utils';
 
-// ----------------------------------------------------------------------
 
 export { getDayWeather, isRainyWeatherDay } from 'src/components/weather/shift-weather-utils';
 
@@ -29,7 +28,7 @@ export function ShiftDayHeaderCell({
   day,
   hours,
   dayColWidth,
-  gridLine = '#e0e0e0',
+  gridLine,
   weatherType = null,
   dayWeather = null,
   onClick,
@@ -93,7 +92,9 @@ export function ShiftDayHeaderCell({
   const cellSx = {
     width: dayColWidth,
     minWidth: dayColWidth,
-    borderRight: `1px solid ${gridLine}`,
+    borderRight: (theme) =>
+      `1px solid ${typeof gridLine === 'string' && gridLine ? gridLine : theme.vars.palette.divider
+      }`,
     py: 0.5,
     px: 0.25,
     flexShrink: 0,

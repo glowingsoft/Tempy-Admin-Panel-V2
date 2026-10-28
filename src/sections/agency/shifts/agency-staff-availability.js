@@ -1,5 +1,3 @@
-import { format, isValid, parse } from 'date-fns';
-
 // ----------------------------------------------------------------------
 
 const STORAGE_KEY = 'agency-staff-availability-blocks';
@@ -51,37 +49,4 @@ export function isStaffBusyOnDate(staffId, date) {
   const block = getAvailabilityBlock(staffId, date);
   if (!block) return false;
   return ['busy', 'dayOff', 'leave'].includes(block.type);
-}
-
-export function availabilityBlocksToShiftEntries(blocks = loadAvailabilityBlocks()) {
-  const shifts = {};
-
-  Object.values(blocks).forEach((block) => {
-    if (!block?.staffId || !block?.date) return;
-
-    const parsed = parse(block.date, 'yyyy-MM-dd', new Date());
-    if (!isValid(parsed)) return;
-
-    const key = `${block.staffId}-${block.date}`;
-    shifts[key] = {
-      id: key,
-      staffId: block.staffId,
-      date: block.date,
-      startTime: '00:00',
-      endTime: '23:59',
-      busy: block.type === 'busy',
-      dayOff: block.type === 'dayOff',
-      leave: block.type === 'leave',
-      blocksAutoAccept: true,
-      note: block.note || '',
-    };
-  });
-
-  return shifts;
-}
-
-export function formatBusyDayLabel(date) {
-  const parsed = parse(date, 'yyyy-MM-dd', new Date());
-  if (!isValid(parsed)) return date;
-  return format(parsed, 'EEEE d MMM');
 }

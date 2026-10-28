@@ -25,7 +25,6 @@ import { toast } from 'src/components/snackbar';
 import { usePersistedViewMode } from 'src/hooks/use-persisted-view-mode';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
-import { matchesJobDateFilter } from 'src/components/jobs/job-date-filters';
 import { EmptyContent } from 'src/components/empty-content';
 
 import {
@@ -53,7 +52,12 @@ import { useGetLocalAuthorityBranchesQuery } from 'src/store/Reducer/local-autho
 import { useUserAddressesQuery } from 'src/store/Reducer/user-branches-api';
 
 import { buildJobsFromCareHomeBids, toCareHomeBidApiStatus } from '../care-home-job-bid-api-utils';
-import { buildCareHomeJobPayload, getJobApiErrorMessage, isJobCreateSoftError } from '../care-home-job-api-utils';
+import {
+  buildCareHomeJobPayload,
+  getJobApiErrorMessage,
+  isJobCreateSoftError,
+  pickJobSuccessToast,
+} from '../care-home-job-api-utils';
 import { jobToDraft } from '../care-home-job-utils';
 import { IncreaseJobRateDialog } from '../increase-job-rate-dialog';
 import { BidCard } from '../bids/job-bid-card';
@@ -67,18 +71,15 @@ import {
   sortBids,
   getBidsPath,
   getBidUiStatus,
-  bidMatchesSearch,
   getBidReceivedTime,
 } from '../bids/job-bid-utils';
 import { useActiveBranch } from 'src/sections/branches/active-branch-context';
-import { bidMatchesActiveBranch, jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
+import { ALL_SITES_ID, bidMatchesActiveBranch, jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
 import { getAgreedRatesPath } from 'src/sections/care-home/agreed-rates/agreed-rates-nav-utils';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
-/** meta.BidCount key for each date filter. */
 const DATE_FILTER_COUNT_KEYS = {
   all: 'total',
   next24Hours: 'next24hCount',
@@ -99,7 +100,6 @@ function jobHasBids(job) {
 }
 
 export function JobBidsView({ mode = 'careHome' }) {
-  // Admin viewing this account: bids can be viewed, not accepted, declined or re-rated.
   const viewOnly = useViewOnly();
   const router = useRouter();
   const pathname = usePathname();
@@ -117,20 +117,57 @@ export function JobBidsView({ mode = 'careHome' }) {
   const [jobFilter, setJobFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [allBidsSnapshot, setAllBidsSnapshot] = useState([]);
-  const bidsQueryArgs = useMemo(() => {
+  const [page, setPage] = useState(1);
+  const { viewMode, setViewMode } = usePersistedViewMode('care-home-job-bids', 'list');
+  const [groupMode, setGroupMode] = useState('all');
+  const rowsPerPage = viewMode === 'grid' ? ROWS_PER_PAGE_GRID : ROWS_PER_PAGE_LIST;
+  const scopedBranchId =
+    activeBranchId && activeBranchId !== ALL_SITES_ID ? String(activeBranchId) : '';
+
+  useEffect(() => {
+    const next = searchQuery.trim();
+    if (next === searchKeyword) return undefined;
+    const timer = setTimeout(() => {
+      setSearchKeyword(next);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword, searchQuery]);
+
+  const listFilterArgs = useMemo(() => {
     const args = {
-      page: 0,
-      limit: 100,
       status: statusFilter === 'all' ? '' : statusFilter,
       job: jobFilter === 'all' ? '' : jobFilter,
+      keyword: searchKeyword,
+      ...(scopedBranchId ? { branch: scopedBranchId } : {}),
     };
     if (dateFilter !== 'all') {
       args.dateFilter = dateFilter;
     }
     return args;
-  }, [dateFilter, jobFilter, statusFilter]);
+  }, [dateFilter, jobFilter, scopedBranchId, searchKeyword, statusFilter]);
+
+  const bidsQueryArgs = useMemo(
+    () => ({
+      ...listFilterArgs,
+      page: Math.max(0, page - 1),
+      limit: rowsPerPage,
+    }),
+    [listFilterArgs, page, rowsPerPage]
+  );
+
+  const countsQueryArgs = useMemo(
+    () => ({ ...listFilterArgs, status: '', page: 0, limit: 1 }),
+    [listFilterArgs]
+  );
+  const dateCountsQueryArgs = useMemo(() => {
+    const args = { ...listFilterArgs, page: 0, limit: 1 };
+    delete args.dateFilter;
+    return args;
+  }, [listFilterArgs]);
 
   const careHomeJobsQuery = useGetCareHomeJobsQuery({ page: 0, limit: 100 }, { skip: skipCareHome });
   const hospitalJobsQuery = useGetHospitalJobsQuery({ page: 0, limit: 100 }, { skip: !isHospital });
@@ -181,9 +218,6 @@ export function JobBidsView({ mode = 'careHome' }) {
   const activeBidsQuery = isLocalAuthority ? localAuthorityBidsQuery : isUser ? userBidsQuery : isHospital ? hospitalBidsQuery : careHomeBidsQuery;
   const { data: bidsData, isLoading: bidsLoading, isFetching: bidsFetching, isError: bidsError, error: bidsErrorDetail, refetch: refetchBids } = activeBidsQuery;
 
-  // Same request without the status filter — feeds the summary counts so every tile stays
-  // accurate while one status is selected. Shares the cache entry when status is "all".
-  const countsQueryArgs = useMemo(() => ({ ...bidsQueryArgs, status: '' }), [bidsQueryArgs]);
   const countsQueryOptions = { refetchOnMountOrArgChange: 60, refetchOnFocus: false };
   const careHomeCountsQuery = useGetCareHomeJobBidsQuery(countsQueryArgs, { skip: skipCareHome, ...countsQueryOptions });
   const hospitalCountsQuery = useGetHospitalJobBidsQuery(countsQueryArgs, { skip: !isHospital, ...countsQueryOptions });
@@ -197,13 +231,6 @@ export function JobBidsView({ mode = 'careHome' }) {
         ? hospitalCountsQuery
         : careHomeCountsQuery;
 
-  // Same request without the date filter — its meta.BidCount gives the per-date counts
-  // (next24hCount / thisWeekCount / nextWeekCount) for the selected status.
-  const dateCountsQueryArgs = useMemo(() => {
-    const args = { ...bidsQueryArgs };
-    delete args.dateFilter;
-    return args;
-  }, [bidsQueryArgs]);
   const careHomeDateCountsQuery = useGetCareHomeJobBidsQuery(dateCountsQueryArgs, { skip: skipCareHome, ...countsQueryOptions });
   const hospitalDateCountsQuery = useGetHospitalJobBidsQuery(dateCountsQueryArgs, { skip: !isHospital, ...countsQueryOptions });
   const userDateCountsQuery = useGetUserJobBidsQuery(dateCountsQueryArgs, { skip: !isUser, ...countsQueryOptions });
@@ -224,7 +251,6 @@ export function JobBidsView({ mode = 'careHome' }) {
   const [updateHospitalJob] = useUpdateHospitalJobMutation();
   const [updateUserJob] = useUpdateUserJobMutation();
   const [updateLocalAuthorityJob] = useUpdateLocalAuthorityJobMutation();
-  // PUT /web/{tenant}/job/bids/:id — user | care-home | hospital | local-authority
   const updateJobBid = isLocalAuthority ? updateLocalAuthorityJobBid : isUser ? updateUserJobBid : isHospital ? updateHospitalJobBid : updateCareHomeJobBid;
   const updateJob = isLocalAuthority ? updateLocalAuthorityJob : isUser ? updateUserJob : isHospital ? updateHospitalJob : updateCareHomeJob;
   const [updatingBidId, setUpdatingBidId] = useState(null);
@@ -292,11 +318,11 @@ export function JobBidsView({ mode = 'careHome' }) {
   }, [bids, selectedJobForRate]);
 
   const canIncreaseSelectedJobRate = Boolean(selectedJobForRate && !jobHasBids(selectedJobForRate) && selectedJobBidCount === 0);
-  const [page, setPage] = useState(1);
-  const { viewMode, setViewMode } = usePersistedViewMode('care-home-job-bids', 'list');
-  const [groupMode, setGroupMode] = useState('all'); // 'all' | 'per-job'
 
   const bidsPending = bidsLoading && !bids.length;
+  const serverTotalRaw = bidsData?.meta?.totalRecords ?? bidsData?.total_length;
+  const apiHasTotal = serverTotalRaw !== undefined && serverTotalRaw !== null && serverTotalRaw !== '';
+  const serverTotal = apiHasTotal ? Number(serverTotalRaw) || 0 : null;
 
   useEffect(() => {
     setPage(1);
@@ -320,12 +346,9 @@ export function JobBidsView({ mode = 'careHome' }) {
   const filteredBids = useMemo(() => {
     const siteJobIds = new Set(careHomeJobs.map((job) => String(job.id)));
     const byStatus = bids.filter((bid) => statusFilter === 'all' || getBidUiStatus(bid) === statusFilter);
-    const byDate = dateFilter === 'all' ? byStatus : byStatus.filter((bid) => matchesJobDateFilter(bid, dateFilter));
-    const bySite = byDate.filter((bid) => bidMatchesActiveBranch(bid, activeBranchId, siteJobIds));
-    const bySearch = bySite.filter((bid) => bidMatchesSearch(bid, searchQuery));
-
-    return sortBids(bySearch, sortBy);
-  }, [activeBranchId, bids, careHomeJobs, dateFilter, searchQuery, sortBy, statusFilter]);
+    const bySite = byStatus.filter((bid) => bidMatchesActiveBranch(bid, activeBranchId, siteJobIds));
+    return sortBids(bySite, sortBy);
+  }, [activeBranchId, bids, careHomeJobs, sortBy, statusFilter]);
 
   useEffect(() => {
     if (bidsLoading || bidsFetching) return;
@@ -334,9 +357,8 @@ export function JobBidsView({ mode = 'careHome' }) {
   }, [bids, bidsFetching, bidsLoading, dateFilter]);
 
   const dateFilterCounts = useMemo(() => {
-    // Backend counts cover every page; a search box query is client-side only, so count locally then.
     const meta = dateCountsData?.bidCount;
-    if (hasBidCountMeta(meta) && !searchQuery.trim()) {
+    if (hasBidCountMeta(meta)) {
       return DATE_FILTERS.reduce((acc, filter) => {
         acc[filter.value] = readBidCount(meta, DATE_FILTER_COUNT_KEYS[filter.value]);
         return acc;
@@ -344,19 +366,24 @@ export function JobBidsView({ mode = 'careHome' }) {
     }
 
     const source = (dateFilter === 'all' ? bids : allBidsSnapshot).filter(
-      (bid) => (statusFilter === 'all' || getBidUiStatus(bid) === statusFilter) && bidMatchesSearch(bid, searchQuery)
+      (bid) => statusFilter === 'all' || getBidUiStatus(bid) === statusFilter
     );
 
     return DATE_FILTERS.reduce((acc, filter) => {
-      acc[filter.value] = filter.value === 'all' ? source.length : source.filter((bid) => matchesJobDateFilter(bid, filter.value)).length;
+      if (filter.value === 'all') {
+        acc[filter.value] = apiHasTotal && dateFilter === 'all' ? serverTotal : source.length;
+      } else if (dateFilter === filter.value && apiHasTotal) {
+        acc[filter.value] = serverTotal;
+      } else {
+        acc[filter.value] = 0;
+      }
       return acc;
     }, {});
-  }, [allBidsSnapshot, bids, dateCountsData?.bidCount, dateFilter, searchQuery, statusFilter]);
+  }, [allBidsSnapshot, apiHasTotal, bids, dateCountsData?.bidCount, dateFilter, serverTotal, statusFilter]);
 
   const statusCounts = useMemo(() => {
     const fromMeta = countsData?.bidCount || {};
 
-    // meta.BidCount is the source of truth (it counts every page, not just the loaded list).
     if (hasBidCountMeta(fromMeta)) {
       return BID_STATUS_FILTERS.reduce((acc, filter) => {
         acc[filter.value] = readBidCount(fromMeta, filter.value === 'all' ? 'total' : filter.value);
@@ -364,24 +391,17 @@ export function JobBidsView({ mode = 'careHome' }) {
       }, {});
     }
 
-    // Older API without BidCount: count the loaded bids.
-    // Apply local accept/reject overrides so counts update before the refetch lands
-    const allStatusBids = (countsData?.data || []).map((bid) => {
-      const override = bidOverrides[String(bid.id || bid._id || '')];
-      return override?.status ? { ...bid, status: override.status, apiStatus: override.status } : bid;
-    });
-
     return BID_STATUS_FILTERS.reduce((acc, filter) => {
       if (filter.value === 'all') {
-        acc.all = Math.max(Number(fromMeta.all ?? fromMeta.total ?? countsData?.total_length) || 0, allStatusBids.length);
+        acc.all = Number(fromMeta.all ?? fromMeta.total ?? (apiHasTotal ? serverTotal : null) ?? bids.length) || 0;
+      } else if (statusFilter === filter.value) {
+        acc[filter.value] = apiHasTotal ? serverTotal : bids.length;
       } else {
-        const local = allStatusBids.filter((bid) => getBidUiStatus(bid) === filter.value).length;
-        // Server breakdown can be missing or zeroed — only trust it when it reports more (list is capped at 100)
-        acc[filter.value] = Math.max(Number(fromMeta[filter.value]) || 0, local);
+        acc[filter.value] = Number(fromMeta[filter.value]) || 0;
       }
       return acc;
     }, {});
-  }, [bidOverrides, countsData]);
+  }, [apiHasTotal, bids.length, countsData, serverTotal, statusFilter]);
 
   const isPerJobView = groupMode === 'per-job';
 
@@ -418,12 +438,23 @@ export function JobBidsView({ mode = 'careHome' }) {
     });
   }, [filteredBids, careHomeJobs]);
 
-  const rowsPerPage = viewMode === 'grid' ? ROWS_PER_PAGE_GRID : ROWS_PER_PAGE_LIST;
-  const listTotal = isPerJobView ? bidsGroupedByJob.length : filteredBids.length;
-  const pageCount = Math.max(1, Math.ceil(listTotal / rowsPerPage));
+  const listTotal = apiHasTotal ? serverTotal : filteredBids.length;
+  const pageCount = Math.max(
+    1,
+    apiHasTotal
+      ? Math.ceil(serverTotal / rowsPerPage) || 1
+      : filteredBids.length < rowsPerPage
+        ? page
+        : page + 1
+  );
   const safePage = Math.min(page, pageCount);
-  const paginatedBids = filteredBids.slice((safePage - 1) * rowsPerPage, safePage * rowsPerPage);
-  const paginatedJobGroups = bidsGroupedByJob.slice((safePage - 1) * rowsPerPage, safePage * rowsPerPage);
+  const paginatedBids = filteredBids;
+  const paginatedJobGroups = isPerJobView ? bidsGroupedByJob : [];
+
+  useEffect(() => {
+    if (!apiHasTotal) return;
+    if (page > pageCount) setPage(pageCount);
+  }, [apiHasTotal, page, pageCount]);
 
   const handleChangePage = useCallback((event, newPage) => {
     setPage(newPage);
@@ -547,13 +578,15 @@ export function JobBidsView({ mode = 'careHome' }) {
 
       if (!body.shift?.length) throw new Error('This job has no shifts to update');
 
+      let response;
       try {
-        await updateJob({ id: job.id, ...body }).unwrap();
+        response = await updateJob({ id: job.id, ...body }).unwrap();
       } catch (err) {
         if (!isJobCreateSoftError(err)) throw err;
+        response = err?.data;
       }
 
-      toast.success(`Rate updated to ${fCurrency(nextRate)}/h`);
+      toast.success(pickJobSuccessToast(response, `Rate updated to ${fCurrency(nextRate)}/h`));
       refetchJobs?.();
       refetchBids?.();
     },
@@ -599,12 +632,6 @@ export function JobBidsView({ mode = 'careHome' }) {
     [employerMessagesPath, router]
   );
 
-  /**
-   * PUT /web/{tenant}/job/bids/:id { status: 'accepted' } only. The backend then rejects the
-   * other bids on the shift and books it: a nurse bid gets an active booking straight away,
-   * an agency / home care company bid waits for the supplier to assign staff (POST /booking
-   * on their side). The customer never creates bookings.
-   */
   const handleAccepted = useCallback(
     async (bidId) => {
       const id = String(bidId || '').trim();
@@ -632,12 +659,9 @@ export function JobBidsView({ mode = 'careHome' }) {
         throw err;
       } finally {
         setUpdatingBidId(null);
-        // Other bids on the shift change too (rejected on success; a busy nurse's bid is
-        // rejected on failure), so always reload from the server.
         try {
           await refetchBids();
         } catch {
-          // best-effort; the mutation already invalidated the list
         }
       }
     },
@@ -890,12 +914,12 @@ export function JobBidsView({ mode = 'careHome' }) {
         dateFilterCounts={dateFilterCounts}
         hasActiveFilters={hasActiveFilters}
         onClearFilters={handleClearFilters}
-        resultCount={filteredBids.length}
+        resultCount={listTotal}
       />
 
       {renderContent()}
 
-      {listTotal > rowsPerPage && (
+      {(apiHasTotal ? serverTotal > rowsPerPage : pageCount > 1 || filteredBids.length >= rowsPerPage) && (
         <Pagination page={safePage} count={pageCount} shape="circular" onChange={handleChangePage} sx={{ mt: 4, display: 'flex', justifyContent: 'center' }} />
       )}
 
@@ -904,7 +928,6 @@ export function JobBidsView({ mode = 'careHome' }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function BidsLoadingSkeleton({ viewMode }) {
   const isGrid = viewMode === 'grid';

@@ -41,6 +41,7 @@ import {
   buildCareHomeJobPayload,
   getJobApiErrorMessage,
   isJobCreateSoftError,
+  pickJobSuccessToast,
 } from '../care-home-job-api-utils';
 import {
   EMPTY_JOB_DRAFT,
@@ -55,9 +56,6 @@ import { useLastJobContactDetails } from '../use-last-job-contact';
 export function AddJobView({
   redirectPath = paths.dashboard.jobs.created,
   mode = 'careHome',
-  jobTypeLabels = null,
-  jobTypesStorageKey = null,
-  jobsStorageKey = null,
 }) {
   const viewOnly = useViewOnly();
 
@@ -78,15 +76,7 @@ export function AddJobView({
     );
   }
 
-  return (
-    <AddJobViewContent
-      mode={mode}
-      redirectPath={redirectPath}
-      jobsStorageKey={jobsStorageKey}
-      jobTypeLabels={jobTypeLabels}
-      jobTypesStorageKey={jobTypesStorageKey}
-    />
-  );
+  return <AddJobViewContent mode={mode} redirectPath={redirectPath} />;
 }
 
 function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
@@ -242,12 +232,12 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
         branch,
         { isUser }
       );
-      await createJob(body).unwrap();
-      toast.success('Job created successfully');
+      const response = await createJob(body).unwrap();
+      toast.success(pickJobSuccessToast(response, 'Job created successfully'));
       router.push(redirectPath);
     } catch (err) {
       if (isJobCreateSoftError(err)) {
-        toast.success('Job created successfully');
+        toast.success(pickJobSuccessToast(err?.data, 'Job created successfully'));
         router.push(redirectPath);
         return;
       }

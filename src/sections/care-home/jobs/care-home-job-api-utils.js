@@ -5,6 +5,7 @@ import { fToNow } from 'src/utils/format-time';
 import { getAgencyBranchMongoId, isMongoObjectId } from 'src/sections/branches/agency-branch-utils';
 import { INVALID_BRANCH_COORDINATES_MESSAGE, isValidLngLat, parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
 import { isApiReviewed, pickApiReview } from 'src/sections/reviews/reviews-api-utils';
+import { pickApiToastMessage } from 'src/store/handleApiError';
 import { pickStoredMediaValue } from 'src/store/Reducer/upload-api';
 import { resolveJobApiStatus } from './care-home-job-utils';
 
@@ -36,7 +37,16 @@ export function applyJobListFilters(params, { startDate = '', endDate = '', jobR
   return params;
 }
 
-export function buildJobListParams({ page = 0, limit = 50, status = '', keyword = '', horizon = '', dateFilter = '', ...filters } = {}) {
+export function buildJobListParams({
+  page = 0,
+  limit = 50,
+  status = '',
+  keyword = '',
+  horizon = '',
+  dateFilter = '',
+  branch = '',
+  ...filters
+} = {}) {
   const params = {
     page: page + 1,
     limit,
@@ -45,10 +55,21 @@ export function buildJobListParams({ page = 0, limit = 50, status = '', keyword 
   if (status && status !== 'all') params.status = status;
   const nextDateFilter = dateFilter || horizon;
   if (nextDateFilter && nextDateFilter !== 'all') params.dateFilter = nextDateFilter;
+  const branchId = String(branch || '').trim();
+  if (branchId && branchId !== 'all') params.branch = branchId;
   return applyJobListFilters(params, filters);
 }
 
-export function buildJobBidListParams({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) {
+export function buildJobBidListParams({
+  page = 0,
+  limit = 100,
+  status = '',
+  keyword = '',
+  job = '',
+  date = '',
+  dateFilter = '',
+  branch = '',
+} = {}) {
   const params = {
     page: page + 1,
     limit,
@@ -60,6 +81,8 @@ export function buildJobBidListParams({ page = 0, limit = 100, status = '', keyw
   if (nextDateFilter && nextDateFilter !== 'all' && nextDateFilter !== 'uncovered') {
     params.dateFilter = nextDateFilter;
   }
+  const branchId = String(branch || '').trim();
+  if (branchId && branchId !== 'all') params.branch = branchId;
   return params;
 }
 
@@ -74,21 +97,35 @@ export function getCreatedJobIdFromApiPayload(payload) {
   return '';
 }
 
+/**
+ * Backend sometimes returns an error status after the job was actually saved
+ * (e.g. post-create cache invalidation). Only treat that as success when the
+ * payload still includes a real job id — never on cache/message text alone.
+ */
 export function isJobCreateSoftError(err) {
   if (!err) return false;
+  return Boolean(
+    getCreatedJobIdFromApiPayload(err?.data) || getCreatedJobIdFromApiPayload(err?.data?.data)
+  );
+}
 
-  const createdId = getCreatedJobIdFromApiPayload(err?.data) || getCreatedJobIdFromApiPayload(err?.data?.data);
-  if (createdId) return true;
+/** Prefer API success text; never surface soft/cache error wording as success. */
+export function pickJobSuccessToast(payload, fallback = '') {
+  const message = pickApiToastMessage(payload, '');
+  if (!message) return fallback;
 
-  const message = String(
-    err?.data?.message || err?.data?.error?.message || (typeof err?.data?.error === 'string' ? err.data.error : '') || err?.error || err?.message || ''
-  ).toLowerCase();
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('cache') ||
+    lower.includes('invalidate') ||
+    lower.includes('correct data') ||
+    lower.includes('fail') ||
+    lower.includes('error')
+  ) {
+    return fallback;
+  }
 
-  if (!message) return false;
-  if (message.includes('correct data')) return true;
-  if (message.includes('invalidatejobcache') || message.includes('jobcache')) return true;
-
-  return false;
+  return message;
 }
 
 const JOB_API_ERROR_MESSAGES = {
@@ -282,7 +319,6 @@ export function mapCareHomeJobFromApi(item = {}) {
   const address = location.fullAddress || [location.city, location.state, location.country].filter(Boolean).join(', ') || '';
 
   const receivingBids = schedules.some((entry) => entry.receivingBids !== false);
-  // Individual users post against a saved address instead of a branch.
   const branchId = String(
     item.branch?._id || item.branch?.id || item.branch || item.branchId || item.address?._id || item.address?.id || (typeof item.address === 'string' ? item.address : '') || ''
   );

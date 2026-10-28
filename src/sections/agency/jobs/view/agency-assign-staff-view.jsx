@@ -16,6 +16,7 @@ import { toast } from 'src/components/snackbar';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { hideScrollY } from 'src/theme/styles/mixins';
 import { fCurrency } from 'src/utils/format-number';
+import { rotaMuted, rotaSelected, rotaWash } from 'src/components/shifts/rota-theme';
 
 import { handleApiError } from 'src/store/handleApiError';
 import { getJobApiErrorMessage } from 'src/sections/care-home/jobs/care-home-job-api-utils';
@@ -42,11 +43,13 @@ import { useGetAgencyStaffQuery } from 'src/store/Reducer/agency-staff-api';
 import { useGetHomeCareCompanyStaffQuery } from 'src/store/Reducer/home-care-company-staff-api';
 import {
   agencyAvailabilityApi,
+  useCancelAgencyBookingMutation,
   useCreateAgencyBookingMutation,
   useGetAgencyAvailabilityQuery,
 } from 'src/store/Reducer/agency-availability-api';
 import {
   homeCareCompanyAvailabilityApi,
+  useCancelHomeCareCompanyBookingMutation,
   useCreateHomeCareCompanyBookingMutation,
   useGetHomeCareCompanyAvailabilityQuery,
 } from 'src/store/Reducer/home-care-company-availability-api';
@@ -109,6 +112,28 @@ function resolveWorkerId(staff) {
     const id = String(candidate || '').trim();
     if (isMongoObjectId(id)) return id;
   }
+  return '';
+}
+
+function resolveCellBookingId({
+  job,
+  visibleCategories,
+  gridCells,
+  categoryId,
+  jobId,
+  shiftId,
+  date,
+}) {
+  const fromGrid = gridCells?.[categoryId]?.[jobId]?.[shiftId]?.[date]?.bookingId;
+  if (isMongoObjectId(fromGrid)) return String(fromGrid).trim();
+
+  const category = visibleCategories.find((item) => String(item.id) === String(categoryId));
+  const jobItem = category?.jobs?.find((item) => String(item.id) === String(jobId));
+  const row = (jobItem?.shiftRows || []).find((item) => String(item.id) === String(shiftId));
+  const fromRow =
+    row?.cells?.[date]?.bookingId || row?.bookingId || jobItem?.bookingId || job?.bookingId;
+  if (isMongoObjectId(fromRow)) return String(fromRow).trim();
+
   return '';
 }
 
@@ -316,7 +341,11 @@ export function AgencyAssignStaffView({
 
   const [createAgencyBooking, agencyAssignState] = useCreateAgencyBookingMutation();
   const [createHccBooking, hccAssignState] = useCreateHomeCareCompanyBookingMutation();
-  const assigning = isHomeCareCompany ? hccAssignState.isLoading : agencyAssignState.isLoading;
+  const [cancelAgencyBooking, agencyCancelState] = useCancelAgencyBookingMutation();
+  const [cancelHccBooking, hccCancelState] = useCancelHomeCareCompanyBookingMutation();
+  const assigning = isHomeCareCompany
+    ? hccAssignState.isLoading || hccCancelState.isLoading
+    : agencyAssignState.isLoading || agencyCancelState.isLoading;
 
   const assignStaffList = useMemo(
     () => mapApiStaffToAssignRoster(staffResponse?.data),
@@ -478,71 +507,135 @@ export function AgencyAssignStaffView({
     setJobShiftSelection((prev) => ({ ...prev, [`${categoryId}-${jobId}`]: shiftId }));
   }, []);
 
-  const applyLocalAssignment = useCallback((categoryId, jobId, shiftId, date, staffId) => {
-    const key = `${categoryId}-${jobId}-${shiftId}`;
-    setAssignments((prev) => {
-      const shiftMap = { ...(prev[key] || {}) };
-      shiftMap[date] = staffId == null ? null : staffId;
-      return { ...prev, [key]: shiftMap };
-    });
+  const applyLocalAssignment = useCallback(
+    (categoryId, jobId, shiftId, date, staffId, bookingId = '') => {
+      const key = `${categoryId}-${jobId}-${shiftId}`;
+      setAssignments((prev) => {
+        const shiftMap = { ...(prev[key] || {}) };
+        shiftMap[date] = staffId == null ? null : staffId;
+        return { ...prev, [key]: shiftMap };
+      });
 
-    setGridCells((prev) => ({
-      ...prev,
-      [categoryId]: {
-        ...prev[categoryId],
-        [jobId]: {
-          ...prev[categoryId]?.[jobId],
-          [shiftId]: {
-            ...prev[categoryId]?.[jobId]?.[shiftId],
-            [date]: staffId
-              ? { status: 'upcoming', staffId }
-              : { status: 'empty', staffId: null },
+      setGridCells((prev) => ({
+        ...prev,
+        [categoryId]: {
+          ...prev[categoryId],
+          [jobId]: {
+            ...prev[categoryId]?.[jobId],
+            [shiftId]: {
+              ...prev[categoryId]?.[jobId]?.[shiftId],
+              [date]: staffId
+                ? {
+                    status: 'upcoming',
+                    staffId,
+                    bookingId: isMongoObjectId(bookingId) ? String(bookingId) : '',
+                  }
+                : { status: 'empty', staffId: null, bookingId: '' },
+            },
           },
         },
-      },
-    }));
-  }, []);
+      }));
+    },
+    []
+  );
+
+  const invalidateAfterBookingChange = useCallback(() => {
+    if (isHomeCareCompany) {
+      dispatch(
+        homeCareCompanyAvailabilityApi.util.invalidateTags([
+          { type: 'HomeCareCompanyBookingCalendar', id: 'LIST' },
+        ])
+      );
+      dispatch(homeCareCompanyJobsApi.util.invalidateTags([{ type: 'HomeCareCompanyJob', id: 'LIST' }]));
+      dispatch(homeCareCompanyBidsApi.util.invalidateTags([{ type: 'HomeCareCompanyBid', id: 'LIST' }]));
+      return;
+    }
+    dispatch(agencyAvailabilityApi.util.invalidateTags([{ type: 'AgencyBookingCalendar', id: 'LIST' }]));
+    dispatch(agencyJobsApi.util.invalidateTags([{ type: 'AgencyJob', id: 'LIST' }]));
+    dispatch(agencyBidsApi.util.invalidateTags([{ type: 'AgencyBid', id: 'LIST' }]));
+  }, [dispatch, isHomeCareCompany]);
 
   const persistAssignment = useCallback(
     async (staffMember) => {
       const workerId = resolveWorkerId(staffMember);
       if (!isMongoObjectId(acceptedBidId)) {
         toast.error('Missing accepted bid for this shift — assign from Active jobs after the bid is accepted.');
-        return false;
+        return { ok: false, bookingId: '' };
       }
       if (!isMongoObjectId(workerId)) {
         toast.error('Select a valid staff member to assign');
-        return false;
+        return { ok: false, bookingId: '' };
       }
 
       try {
         const body = { bid: acceptedBidId, worker: workerId };
-        let result;
-        if (isHomeCareCompany) {
-          result = await createHccBooking(body).unwrap();
-          dispatch(
-            homeCareCompanyAvailabilityApi.util.invalidateTags([
-              { type: 'HomeCareCompanyBookingCalendar', id: 'LIST' },
-            ])
-          );
-          dispatch(homeCareCompanyJobsApi.util.invalidateTags([{ type: 'HomeCareCompanyJob', id: 'LIST' }]));
-          dispatch(homeCareCompanyBidsApi.util.invalidateTags([{ type: 'HomeCareCompanyBid', id: 'LIST' }]));
-        } else {
-          result = await createAgencyBooking(body).unwrap();
-          dispatch(
-            agencyAvailabilityApi.util.invalidateTags([{ type: 'AgencyBookingCalendar', id: 'LIST' }])
-          );
-          dispatch(agencyJobsApi.util.invalidateTags([{ type: 'AgencyJob', id: 'LIST' }]));
-          dispatch(agencyBidsApi.util.invalidateTags([{ type: 'AgencyBid', id: 'LIST' }]));
-        }
+        const result = isHomeCareCompany
+          ? await createHccBooking(body).unwrap()
+          : await createAgencyBooking(body).unwrap();
+        invalidateAfterBookingChange();
         toast.success(pickApiToastMessage(result, 'Staff assigned — check Shifts calendar'));
-        return true;
+        const bookingId = String(
+          result?.data?._id ||
+            result?.data?.id ||
+            result?.data?.bookingId ||
+            result?._id ||
+            result?.id ||
+            result?.bookingId ||
+            ''
+        ).trim();
+        return { ok: true, bookingId: isMongoObjectId(bookingId) ? bookingId : '' };
       } catch (err) {
         toast.error(pickApiErrorToast(err, 'Failed to assign staff'));
+        return { ok: false, bookingId: '' };
+      }
+    },
+    [
+      acceptedBidId,
+      createAgencyBooking,
+      createHccBooking,
+      invalidateAfterBookingChange,
+      isHomeCareCompany,
+    ]
+  );
+
+  const persistUnassignment = useCallback(
+    async ({ categoryId, jobId, shiftId, date }) => {
+      const bookingId = resolveCellBookingId({
+        job,
+        visibleCategories,
+        gridCells,
+        categoryId,
+        jobId,
+        shiftId,
+        date,
+      });
+
+      if (!isMongoObjectId(bookingId)) {
+        toast.error('Booking not found for this cell — cannot unassign via the API.');
+        return false;
+      }
+
+      try {
+        const result = isHomeCareCompany
+          ? await cancelHccBooking(bookingId).unwrap()
+          : await cancelAgencyBooking(bookingId).unwrap();
+        invalidateAfterBookingChange();
+        toast.success(pickApiToastMessage(result, 'Staff unassigned — booking cancelled'));
+        return true;
+      } catch (err) {
+        toast.error(pickApiErrorToast(err, 'Failed to unassign staff'));
         return false;
       }
     },
-    [acceptedBidId, createAgencyBooking, createHccBooking, dispatch, isHomeCareCompany]
+    [
+      cancelAgencyBooking,
+      cancelHccBooking,
+      gridCells,
+      invalidateAfterBookingChange,
+      isHomeCareCompany,
+      job,
+      visibleCategories,
+    ]
   );
 
   const handleAssign = useCallback(
@@ -550,7 +643,19 @@ export function AgencyAssignStaffView({
       if (isViewOnly || assigning) return;
 
       if (staffId == null) {
-        toast.info('Unassign from the booking actions on Active jobs — grid clear is not saved to the server.');
+        const ok = await persistUnassignment({ categoryId, jobId, shiftId, date });
+        if (!ok) return;
+
+        applyLocalAssignment(categoryId, jobId, shiftId, date, null);
+        setSelectedShift((prev) => ({
+          ...prev,
+          categoryId,
+          jobId,
+          shiftId,
+          date,
+          assignedStaffId: null,
+          status: 'Empty',
+        }));
         return;
       }
 
@@ -560,10 +665,10 @@ export function AgencyAssignStaffView({
         return;
       }
 
-      const ok = await persistAssignment(staffMember);
-      if (!ok) return;
+      const result = await persistAssignment(staffMember);
+      if (!result?.ok) return;
 
-      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId);
+      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId, result.bookingId);
       setSelectedShift((prev) => ({
         ...prev,
         categoryId,
@@ -574,7 +679,14 @@ export function AgencyAssignStaffView({
         status: 'Upcoming Shift',
       }));
     },
-    [applyLocalAssignment, assignStaffList, assigning, isViewOnly, persistAssignment]
+    [
+      applyLocalAssignment,
+      assignStaffList,
+      assigning,
+      isViewOnly,
+      persistAssignment,
+      persistUnassignment,
+    ]
   );
 
   const handleCellSelect = useCallback(
@@ -651,11 +763,11 @@ export function AgencyAssignStaffView({
         return;
       }
 
-      const ok = await persistAssignment(staffMember);
-      if (!ok) return;
+      const result = await persistAssignment(staffMember);
+      if (!result?.ok) return;
 
       const { categoryId, jobId, shiftId, date } = popoverCellKey;
-      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId);
+      applyLocalAssignment(categoryId, jobId, shiftId, date, staffId, result.bookingId);
       setSelectedShift((prev) => ({
         ...prev,
         assignedStaffId: staffId,
@@ -729,13 +841,13 @@ export function AgencyAssignStaffView({
                     fontSize: '0.8rem',
                     fontWeight: isActive ? 700 : 500,
                     color: 'text.primary',
-                    bgcolor: isActive ? '#e3f2fd' : 'background.paper',
+                    bgcolor: (theme) => (isActive ? rotaSelected(theme) : theme.vars.palette.background.paper),
                     borderRight: (theme) =>
                       index < AGENCY_JOB_TABS.length - 1
                         ? `1px solid ${theme.vars.palette.divider}`
                         : 'none',
                     '&:hover': {
-                      bgcolor: isActive ? '#e3f2fd' : 'action.hover',
+                      bgcolor: (theme) => (isActive ? rotaSelected(theme) : theme.vars.palette.action.hover),
                     },
                   }}
                 >
@@ -762,7 +874,7 @@ export function AgencyAssignStaffView({
             ))}
           </Stack>
 
-          <Box sx={{ mx: 2, mb: 1.5, bgcolor: '#eeeeee', borderRadius: 1.5, p: 2 }}>
+          <Box sx={{ mx: 2, mb: 1.5, bgcolor: rotaWash, borderRadius: 1.5, p: 2 }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
               {selectedShift?.label || '—'}
             </Typography>
@@ -847,7 +959,7 @@ export function AgencyAssignStaffView({
             </Stack>
           </Box>
 
-          <Box sx={{ mx: 2, mb: 2, bgcolor: '#eeeeee', borderRadius: 1.5, p: 2 }}>
+          <Box sx={{ mx: 2, mb: 2, bgcolor: rotaWash, borderRadius: 1.5, p: 2 }}>
             <Stack spacing={1.5}>
               <JobMediaThumb
                 image={jobMeta.image}
@@ -988,7 +1100,7 @@ export function AgencyAssignStaffView({
           </Box>
         </Box>
 
-        <Box sx={{ flex: 1, ...hideScrollY, overflowY: 'auto', bgcolor: '#fafafa' }}>
+        <Box sx={{ flex: 1, ...hideScrollY, overflowY: 'auto', bgcolor: rotaMuted }}>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             alignItems={{ xs: 'flex-start', sm: 'center' }}
@@ -1015,7 +1127,8 @@ export function AgencyAssignStaffView({
                   fontSize: '0.75rem',
                   fontWeight: viewMode === 'calendar' ? 700 : 500,
                   color: 'text.primary',
-                  bgcolor: viewMode === 'calendar' ? '#e3f2fd' : 'background.paper',
+                  bgcolor: (theme) =>
+                    viewMode === 'calendar' ? rotaSelected(theme) : theme.vars.palette.background.paper,
                   borderRight: (theme) => `1px solid ${theme.vars.palette.divider}`,
                 }}
               >
@@ -1031,7 +1144,8 @@ export function AgencyAssignStaffView({
                   fontSize: '0.75rem',
                   fontWeight: viewMode === 'agency' ? 700 : 500,
                   color: 'text.primary',
-                  bgcolor: viewMode === 'agency' ? '#e3f2fd' : 'background.paper',
+                  bgcolor: (theme) =>
+                    viewMode === 'agency' ? rotaSelected(theme) : theme.vars.palette.background.paper,
                 }}
               >
                 Agency Grid

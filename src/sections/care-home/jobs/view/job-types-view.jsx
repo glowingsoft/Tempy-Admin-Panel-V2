@@ -34,7 +34,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { TableHeadCustom, TableNoData, TablePaginationCustom, useTable } from 'src/components/table';
 import { ModuleLoading } from 'src/components/loading-screen';
 
-import { handleApiError } from 'src/store/handleApiError';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import {
   useCreateAdminJobRoleMutation,
   useDeleteAdminJobRoleMutation,
@@ -182,11 +182,11 @@ function AdminJobTypesViewContent() {
       setSaving(true);
       try {
         if (editingJobType?.id) {
-          await updateJobRole({ id: editingJobType.id, ...payload }).unwrap();
-          toast.success('Job type updated');
+          const response = await updateJobRole({ id: editingJobType.id, ...payload }).unwrap();
+          toast.success(pickApiToastMessage(response, 'Job type updated'));
         } else {
-          await createJobRole(payload).unwrap();
-          toast.success('Job type added');
+          const response = await createJobRole(payload).unwrap();
+          toast.success(pickApiToastMessage(response, 'Job type added'));
         }
         setEditingJobType(null);
       } catch (err) {
@@ -212,8 +212,8 @@ function AdminJobTypesViewContent() {
 
     setSaving(true);
     try {
-      await deleteJobRole(jobTypeToDelete.id).unwrap();
-      toast.success('Job type deleted');
+      const response = await deleteJobRole(jobTypeToDelete.id).unwrap();
+      toast.success(pickApiToastMessage(response, 'Job type deleted'));
       setJobTypeToDelete(null);
       deleteDialog.onFalse();
     } catch (err) {
@@ -507,11 +507,11 @@ function LocalJobTypesViewContent() {
 
       try {
         if (editingJobType?.id) {
-          await update({ id: editingJobType.id, ...payload }).unwrap();
-          toast.success('Job type updated');
+          const response = await update({ id: editingJobType.id, ...payload }).unwrap();
+          toast.success(pickApiToastMessage(response, 'Job type updated'));
         } else {
-          await create(payload).unwrap();
-          toast.success('Job type added');
+          const response = await create(payload).unwrap();
+          toast.success(pickApiToastMessage(response, 'Job type added'));
         }
         setEditingJobType(null);
       } catch (err) {
@@ -534,8 +534,8 @@ function LocalJobTypesViewContent() {
     if (!jobTypeToDelete?.id) return;
 
     try {
-      await remove(jobTypeToDelete.id).unwrap();
-      toast.success('Job type deleted');
+      const response = await remove(jobTypeToDelete.id).unwrap();
+      toast.success(pickApiToastMessage(response, 'Job type deleted'));
       setJobTypeToDelete(null);
       deleteDialog.onFalse();
     } catch (err) {

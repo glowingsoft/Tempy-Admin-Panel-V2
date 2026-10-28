@@ -219,10 +219,10 @@ export const careHomeJobsApi = createApi({
     }),
 
     getCareHomeJobBids: builder.query({
-      query: ({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '' } = {}) => ({
+      query: ({ page = 0, limit = 100, status = '', keyword = '', job = '', date = '', dateFilter = '', branch = '' } = {}) => ({
         url: API_ROUTES.CARE_HOME_JOB_BIDS,
         method: 'GET',
-        params: buildJobBidListParams({ page, limit, status, keyword, job, date, dateFilter }),
+        params: buildJobBidListParams({ page, limit, status, keyword, job, date, dateFilter, branch }),
       }),
       transformResponse: (response, _meta, arg) => {
         const list = Array.isArray(response?.data) ? response.data : [];

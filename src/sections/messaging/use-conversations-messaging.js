@@ -94,10 +94,16 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [pendingByObjectId, setPendingByObjectId] = useState({});
   const [sendBusy, setSendBusy] = useState(false);
+  const [conversationsLimit, setConversationsLimit] = useState(50);
+  const [messagesLimit, setMessagesLimit] = useState(100);
   const skipSocketRefreshRef = useRef(false);
   const socketRefreshTimerRef = useRef(null);
 
   const filterVisibleMessages = useCallback((messages = []) => messages || [], []);
+
+  useEffect(() => {
+    setMessagesLimit(100);
+  }, [selectedObjectId]);
 
   const {
     data: conversationsData,
@@ -107,7 +113,7 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     error,
     refetch,
   } = useGetConversationsQuery(
-    { page: 0, limit: 50, currentUserId },
+    { page: 0, limit: conversationsLimit, currentUserId },
     { skip: !currentUserId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
@@ -116,9 +122,39 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     isFetching: isMessagesFetching,
     refetch: refetchMessages,
   } = useGetConversationMessagesQuery(
-    { objectId: selectedObjectId, page: 0, limit: 100, currentUserId },
+    { objectId: selectedObjectId, page: 0, limit: messagesLimit, currentUserId },
     { skip: !selectedObjectId || !currentUserId }
   );
+
+  const conversationsTotalRaw =
+    conversationsData?.meta?.totalRecords ?? conversationsData?.total_length;
+  const conversationsHasTotal =
+    conversationsTotalRaw !== undefined &&
+    conversationsTotalRaw !== null &&
+    conversationsTotalRaw !== '';
+  const conversationsTotal = conversationsHasTotal ? Number(conversationsTotalRaw) || 0 : null;
+  const conversationsPageCount = conversationsData?.data?.length || 0;
+  const hasMoreConversations = conversationsHasTotal
+    ? conversationsPageCount < conversationsTotal
+    : conversationsPageCount >= conversationsLimit;
+
+  const messagesTotalRaw = messagesData?.meta?.totalRecords ?? messagesData?.total_length;
+  const messagesHasTotal =
+    messagesTotalRaw !== undefined && messagesTotalRaw !== null && messagesTotalRaw !== '';
+  const messagesTotal = messagesHasTotal ? Number(messagesTotalRaw) || 0 : null;
+  const messagesPageCount = messagesData?.data?.length || 0;
+  const hasMoreMessages = Boolean(selectedObjectId) &&
+    (messagesHasTotal ? messagesPageCount < messagesTotal : messagesPageCount >= messagesLimit);
+
+  const loadMoreConversations = useCallback(() => {
+    if (!hasMoreConversations || isFetching) return;
+    setConversationsLimit((prev) => prev + 50);
+  }, [hasMoreConversations, isFetching]);
+
+  const loadMoreMessages = useCallback(() => {
+    if (!hasMoreMessages || isMessagesFetching) return;
+    setMessagesLimit((prev) => prev + 100);
+  }, [hasMoreMessages, isMessagesFetching]);
 
   const [sendMessage, { isLoading: isSending }] = useSendConversationMessageMutation();
   const [uploadAwsFile] = useUploadAwsFileMutation();
@@ -863,6 +899,12 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
       initialLoading,
       isSending: sendBusy || isSending,
       isMessagesFetching,
+      loadingMoreConversations: Boolean(isFetching && conversationsPageCount),
+      loadingMoreMessages: Boolean(isMessagesFetching && messagesPageCount),
+      hasMoreConversations,
+      hasMoreMessages,
+      loadMoreConversations,
+      loadMoreMessages,
       apiErrorMessage,
       currentUserId,
       onConversationsChange: handleConversationsChange,
@@ -878,6 +920,7 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
     }),
     [
       apiErrorMessage,
+      conversationsPageCount,
       currentUserId,
       handleConversationsChange,
       handleConversationAction,
@@ -887,12 +930,18 @@ export function useConversationsMessaging({ preferredParticipantId = '' } = {}) 
       handleSelectConversation,
       handleSendAttachment,
       handleSendText,
+      hasMoreConversations,
+      hasMoreMessages,
       initialLoading,
+      isFetching,
       isMessagesFetching,
       isSending,
+      loadMoreConversations,
+      loadMoreMessages,
       sendBusy,
       loading,
       localConversations,
+      messagesPageCount,
       refetch,
       selectedConversationId,
       selectedMessages,

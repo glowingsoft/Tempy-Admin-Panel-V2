@@ -22,6 +22,7 @@ import {
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import { ModuleLoading } from 'src/components/loading-screen';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 
@@ -43,12 +44,10 @@ function pickPreferred(detailValue, listValue) {
 }
 
 export function AgencyStaffDetailsDialog({ open, onClose, staff, onDeleted }) {
-  // Admin viewing the account cannot delete staff.
   const viewOnly = useViewOnly();
   const confirm = useBoolean();
   const [deleteAgencyStaff, { isLoading: deleting }] = useDeleteAgencyStaffMutation();
 
-  // Detail GET expects linked nurse/staff user id (not always the membership _id).
   const detailLookupId = useMemo(() => {
     if (!open || !staff) return '';
     return String(staff.staffId || staff.membershipId || staff.id || '').trim();
@@ -66,7 +65,6 @@ export function AgencyStaffDetailsDialog({ open, onClose, staff, onDeleted }) {
     skip: !detailLookupId,
   });
 
-  // If nurse id failed / same as membership, don't double-call; otherwise retry membership id.
   const membershipFallbackId =
     membershipId && membershipId !== detailLookupId && errorByStaffId ? membershipId : '';
 
@@ -96,7 +94,6 @@ export function AgencyStaffDetailsDialog({ open, onClose, staff, onDeleted }) {
     return {
       ...staff,
       ...detailStaff,
-      // Keep list membership id for DELETE
       id: staff.id || detailStaff.id,
       membershipId: staff.membershipId || staff.id || detailStaff.membershipId,
       staffId: staff.staffId || detailStaff.staffId || '',
@@ -118,13 +115,13 @@ export function AgencyStaffDetailsDialog({ open, onClose, staff, onDeleted }) {
     if (!currentStaff?.id || busy) return;
 
     try {
-      await deleteAgencyStaff(currentStaff.id).unwrap();
-      toast.success('Staff deleted successfully!');
+      const response = await deleteAgencyStaff(currentStaff.id).unwrap();
+      toast.success(pickApiToastMessage(response, 'Staff deleted successfully!'));
       confirm.onFalse();
       onDeleted?.(currentStaff.id);
       onClose?.();
     } catch (error) {
-      toast.error(error?.data?.message || error?.error || 'Failed to delete staff');
+      toast.error(handleApiError(error) || 'Failed to delete staff');
     }
   }, [busy, confirm, currentStaff, deleteAgencyStaff, onClose, onDeleted]);
 

@@ -15,7 +15,7 @@ import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { AppButton } from 'src/components/app-button';
 
-import { handleApiError } from 'src/store/handleApiError';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 import { BookingPaymentsList } from 'src/sections/agency/payments/booking-payments-list';
@@ -118,7 +118,7 @@ function CustomerMandateCard({ userId }) {
         return;
       }
       if (isUsableCustomerMandate(result)) {
-        toast.success('Direct debit is already set up');
+        toast.success(pickApiToastMessage(result, 'Direct debit is already set up'));
         return;
       }
       toast.error('Could not open the direct debit page. The bank setup link was missing.');
@@ -185,7 +185,7 @@ function SupplierBankCard({ userId }) {
       return;
     }
     try {
-      await updateUser({
+      const response = await updateUser({
         id: userId,
         bankDetails: {
           accountHolderName: form.accountHolderName.trim(),
@@ -193,7 +193,7 @@ function SupplierBankCard({ userId }) {
           accountNumber: form.accountNumber,
         },
       }).unwrap();
-      toast.success('Bank details saved');
+      toast.success(pickApiToastMessage(response, 'Bank details saved'));
     } catch (err) {
       toast.error(handleApiError(err) || 'Could not save bank details');
     }
