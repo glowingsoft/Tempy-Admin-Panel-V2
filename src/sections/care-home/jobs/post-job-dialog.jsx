@@ -38,13 +38,13 @@ function buildOpenDraft({ editingJob, initialDraft }) {
     return {
       ...EMPTY_JOB_DRAFT,
       ...initialDraft,
-      type: '',
-      typeId: '',
-      typeTitle: '',
-      branchId: '',
-      address: '',
-      location: null,
-      gender: '',
+      type: String(initialDraft.type || '').trim(),
+      typeId: String(initialDraft.typeId || '').trim(),
+      typeTitle: String(initialDraft.typeTitle || '').trim(),
+      branchId: String(initialDraft.branchId || '').trim(),
+      address: String(initialDraft.address || '').trim(),
+      location: initialDraft.location || null,
+      gender: String(initialDraft.gender || '').trim(),
       schedules: initialDraft.schedules?.length
         ? initialDraft.schedules.map((entry) => ({ ...entry }))
         : [{ ...createDefaultSchedule() }],

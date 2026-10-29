@@ -1180,8 +1180,11 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
         { includeStatus: Boolean(editingJob), isUser }
       );
 
-      if (!body.name) throw new Error('Please enter a job name');
       if (!body.type) throw new Error('Please select a job type');
+      if (!body.name) {
+        body.name = String(draft.typeTitle || draft.type || '').trim();
+      }
+      if (!body.name) throw new Error('Please select a job type');
       if (!(body.branch || body.address))
         throw new Error(
           'Please select a location'
@@ -1189,9 +1192,6 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       if (!body.shift?.length) throw new Error('Please add at least one shift');
       if (!editingJob?.id && !String(draft.image || '').trim()) {
         throw new Error('Please add a job image');
-      }
-      if (!editingJob?.id && !(Number(draft.hourlyRate) > 0)) {
-        throw new Error('Please enter a rate per hour');
       }
 
       if (editingJob?.id) {

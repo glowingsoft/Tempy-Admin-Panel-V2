@@ -2,14 +2,14 @@ import { paths } from 'src/routes/paths';
 
 import { NAV_ICONS } from './nav-icons';
 
+
 export const navDataCareHome = [
   {
     items: [
+      { title: 'Book a shift', countKey: 'shifts', path: paths.dashboard.shifts, icon: NAV_ICONS.calendar },
       { title: 'Dashboard', path: paths.dashboard.root, icon: NAV_ICONS.dashboard },
       { title: 'Locations', path: paths.dashboard.branches, icon: NAV_ICONS.branches, deep: true },
-      { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.staff.root, icon: NAV_ICONS.user },
-      { title: 'Chat', countKey: 'chat', path: paths.dashboard.messages, icon: NAV_ICONS.chat },
       {
         title: 'Jobs',
         path: paths.dashboard.jobs.root,
@@ -21,6 +21,7 @@ export const navDataCareHome = [
           { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.jobs.agreedRates },
         ],
       },
+      { title: 'Chat', countKey: 'chat', path: paths.dashboard.messages, icon: NAV_ICONS.chat },
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.contracts, icon: NAV_ICONS.contract },
       { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.permanentHires, icon: NAV_ICONS.user },
       { title: 'Compliance', path: paths.dashboard.compliance, icon: NAV_ICONS.lock },

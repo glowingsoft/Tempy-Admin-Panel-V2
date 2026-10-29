@@ -210,7 +210,6 @@ function applyBranchFilter({ inputData, filters }) {
       (branch) => String(branch.status || 'active').toLowerCase() === 'active'
     );
   }
-  // "All" = exact API list (including soft-deleted).
 
   if (name?.trim()) {
     const query = name.trim().toLowerCase();
@@ -237,13 +236,12 @@ function applyBranchFilter({ inputData, filters }) {
 }
 
 export function BranchesView() {
-  // Admin viewing this account: branches can be viewed, not added, edited or deleted.
   const viewOnly = useViewOnly();
   const table = useTable({ defaultRowsPerPage: 10 });
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useSelector((state) => state.user);
-  const { enabled: siteSwitcherEnabled, setActiveBranchId } = useActiveBranch();
+  const { setActiveBranchId } = useActiveBranch();
   const accountType = user?.accountState?.accountType;
   const permission = user?.permission;
   const dashboardHref = getDashboardRootPath(permission, accountType);
@@ -286,7 +284,6 @@ export function BranchesView() {
     () => ({
       page: 0,
       limit: 100,
-      // Always fetch full API list; tabs filter client-side (active / pending / inactive / deleted).
       status: '',
     }),
     []
@@ -405,7 +402,6 @@ export function BranchesView() {
             ? refetchHomeCareCompanyBranches
             : refetchCareHomeBranches;
 
-  // API only — no localStorage / demo branch list.
   const countSourceList = useMemo(() => apiBranches, [apiBranches]);
 
   const branchTabCounts = useMemo(() => {
@@ -738,7 +734,12 @@ export function BranchesView() {
               <TableBody>
                 {!listLoading &&
                   visibleBranches.map((branch) => (
-                    <TableRow key={branch.id || branch._id} hover>
+                    <TableRow
+                      key={branch.id || branch._id}
+                      hover
+                      onClick={() => handleOpenSite(branch)}
+                      sx={{ cursor: 'pointer' }}
+                    >
                       {apiMode ? (
                         <>
                           <TableCell sx={{ width: 72 }}>
@@ -747,16 +748,11 @@ export function BranchesView() {
                           <TableCell sx={{ maxWidth: 220 }}>
                             <Typography
                               variant="subtitle2"
-                              onClick={
-                                siteSwitcherEnabled ? () => handleOpenSite(branch) : undefined
-                              }
                               sx={{
                                 fontSize: 13,
                                 lineHeight: 1.4,
                                 wordBreak: 'break-word',
-                                ...(siteSwitcherEnabled
-                                  ? { cursor: 'pointer', '&:hover': { color: 'primary.main' } }
-                                  : null),
+                                '&:hover': { color: 'primary.main' },
                               }}
                             >
                               {branch.name || branch.branchName || '—'}
@@ -860,18 +856,20 @@ export function BranchesView() {
                         </>
                       )}
 
-                      <TableCell align="right" sx={{ whiteSpace: 'nowrap', width: 148 }}>
-                        {siteSwitcherEnabled ? (
-                          <Tooltip title={`Go to this ${entityLabel.toLowerCase()}`} arrow>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleOpenSite(branch)}
-                            >
-                              <Iconify icon="eva:arrow-ios-forward-fill" width={20} />
-                            </IconButton>
-                          </Tooltip>
-                        ) : null}
+                      <TableCell
+                        align="right"
+                        sx={{ whiteSpace: 'nowrap', width: 148 }}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <Tooltip title={`Open ${entityLabel.toLowerCase()}`} arrow>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenSite(branch)}
+                          >
+                            <Iconify icon="eva:arrow-ios-forward-fill" width={20} />
+                          </IconButton>
+                        </Tooltip>
                         {viewOnly ? null : (
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleOpenEdit(branch)}>
@@ -921,6 +919,9 @@ export function BranchesView() {
         entityLabel={entityLabel}
         addressOnly={userMode}
         showComplianceFields={homeCareCompanyMode}
+        hideImages={careHomeMode}
+        hideInsurance={careHomeMode}
+        hideState={careHomeMode}
       />
 
       <ConfirmDialog

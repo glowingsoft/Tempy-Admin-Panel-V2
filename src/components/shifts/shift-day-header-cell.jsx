@@ -1,10 +1,11 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { format } from 'date-fns';
 
+import { Iconify } from 'src/components/iconify';
 import { ShiftWeatherIcon } from 'src/components/weather/shift-weather-icon';
 import { getDayWeather } from 'src/components/weather/shift-weather-utils';
 
@@ -41,11 +42,41 @@ export function ShiftDayHeaderCell({
   const clickable = typeof onClick === 'function';
   const weatherTooltip = buildWeatherTooltip(dayWeather);
   const dateLabel = format(day, 'EEE d MMM');
+  const requestHint = clickHint || `Request a shift for ${dateLabel}`;
   const tooltip = clickable
-    ? [clickHint || `Request staff for ${dateLabel}`, weatherTooltip].filter(Boolean).join(' · ')
+    ? [requestHint, weatherTooltip].filter(Boolean).join(' · ')
     : weatherTooltip;
 
-  const content = (
+  const handleRequest = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClick?.(day);
+  };
+
+  const cellSx = {
+    width: dayColWidth,
+    minWidth: dayColWidth,
+    borderRight: (theme) =>
+      `1px solid ${typeof gridLine === 'string' && gridLine ? gridLine : theme.vars.palette.divider
+      }`,
+    py: 0.35,
+    px: 0.25,
+    flexShrink: 0,
+    alignSelf: 'stretch',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0.15,
+    ...(clickable
+      ? {
+          cursor: 'pointer',
+          '&:hover': { bgcolor: 'action.hover' },
+        }
+      : null),
+  };
+
+  const dateBlock = (
     <Stack
       direction="row"
       alignItems="center"
@@ -89,54 +120,33 @@ export function ShiftDayHeaderCell({
     </Stack>
   );
 
-  const cellSx = {
-    width: dayColWidth,
-    minWidth: dayColWidth,
-    borderRight: (theme) =>
-      `1px solid ${typeof gridLine === 'string' && gridLine ? gridLine : theme.vars.palette.divider
-      }`,
-    py: 0.5,
-    px: 0.25,
-    flexShrink: 0,
-    alignSelf: 'stretch',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  if (!clickable) {
-    return (
-      <Box sx={cellSx}>
-        {tooltip ? (
-          <Tooltip title={tooltip} arrow placement="bottom" disableInteractive>
-            <Box sx={{ minWidth: 0, maxWidth: '100%' }}>{content}</Box>
-          </Tooltip>
-        ) : (
-          content
-        )}
-      </Box>
-    );
-  }
-
-  const button = (
-    <ButtonBase
+  const cell = (
+    <Box
       data-date-header="true"
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClick(day);
-      }}
-      sx={{
-        ...cellSx,
-        cursor: 'pointer',
-        '&:hover': {
-          bgcolor: 'action.hover',
-        },
-      }}
+      onClick={clickable ? handleRequest : undefined}
+      sx={cellSx}
     >
-      {content}
-    </ButtonBase>
+      {dateBlock}
+
+      {clickable ? (
+        <IconButton
+          size="small"
+          aria-label={requestHint}
+          onClick={handleRequest}
+          sx={{
+            width: 22,
+            height: 22,
+            color: 'primary.main',
+            '&:hover': { bgcolor: 'action.selected' },
+          }}
+        >
+          <Iconify icon="eva:plus-fill" width={14} />
+        </IconButton>
+      ) : null}
+    </Box>
   );
+
+  if (!tooltip) return cell;
 
   return (
     <Tooltip
@@ -150,7 +160,7 @@ export function ShiftDayHeaderCell({
         },
       }}
     >
-      {button}
+      {cell}
     </Tooltip>
   );
 }

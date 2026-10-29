@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Select from '@mui/material/Select';
-import Switch from '@mui/material/Switch';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
@@ -16,11 +15,9 @@ import Typography from '@mui/material/Typography';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 import FormHelperText from '@mui/material/FormHelperText';
-import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { DesktopTimePicker } from '@mui/x-date-pickers/DesktopTimePicker';
-import { renderTimeViewClock } from '@mui/x-date-pickers/timeViewRenderers';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -98,17 +95,95 @@ function isActiveBranch(branch) {
   return true;
 }
 
-const CLOCK_TIME_VIEWS = {
-  hours: renderTimeViewClock,
-  minutes: renderTimeViewClock,
-};
-
 function hhmmToDayjs(hhmm) {
   if (!hhmm) return null;
   const value = dayjs(`2000-01-01T${hhmm}`);
   return value.isValid() ? value : null;
 }
 
+const TIME_PICKER_POPUP_SX = {
+  zIndex: 1600,
+  '& .MuiPaper-root': {
+    overflow: 'hidden',
+    borderRadius: 2.5,
+    border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+    boxShadow: (theme) => theme.customShadows?.dropdown || theme.shadows[8],
+    maxWidth: 220,
+  },
+};
+
+const TIME_PICKER_LAYOUT_SX = {
+  minWidth: 0,
+  '& .MuiPickersLayout-contentWrapper': {
+    maxHeight: 212,
+    alignItems: 'stretch',
+  },
+  '& .MuiMultiSectionDigitalClock-root': {
+    maxHeight: 196,
+    width: '100%',
+    borderBottom: 'none',
+    justifyContent: 'center',
+    gap: 0,
+  },
+  '& .MuiMultiSectionDigitalClockSection-root': {
+    maxHeight: 196,
+    width: 64,
+    flex: '1 1 0',
+    overflowY: 'auto !important',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    borderLeft: 'none !important',
+    px: 0.5,
+    '&::-webkit-scrollbar': { width: 0, height: 0 },
+    '&:hover': {
+      scrollbarWidth: 'thin',
+      '&::-webkit-scrollbar': { width: 4 },
+      '&::-webkit-scrollbar-thumb': {
+        borderRadius: 8,
+        backgroundColor: 'rgba(145, 158, 171, 0.45)',
+      },
+    },
+    '&:not(:first-of-type)': {
+      borderLeft: (theme) => `1px solid ${theme.vars.palette.divider} !important`,
+    },
+    '&::after': { display: 'none' },
+  },
+  '& .MuiMultiSectionDigitalClockSection-item': {
+    my: '2px',
+    mx: 0.5,
+    minHeight: 32,
+    height: 32,
+    borderRadius: 1.5,
+    fontSize: 13,
+    fontWeight: 600,
+    fontVariantNumeric: 'tabular-nums',
+    '&.Mui-selected': {
+      fontWeight: 700,
+      boxShadow: 'none',
+    },
+  },
+  '& .MuiPickersLayout-actionBar': {
+    px: 1.25,
+    pt: 0.75,
+    pb: 1.25,
+    gap: 1,
+    borderTop: (theme) => `1px solid ${theme.vars.palette.divider}`,
+    '& .MuiButton-root': {
+      minWidth: 72,
+      borderRadius: 1.5,
+      textTransform: 'none',
+      fontWeight: 700,
+      px: 2,
+      color: (theme) => `${theme.vars.palette.primary.contrastText} !important`,
+      backgroundColor: (theme) => `${theme.vars.palette.primary.main} !important`,
+      '&:hover': {
+        backgroundColor: (theme) => `${theme.vars.palette.primary.dark} !important`,
+      },
+    },
+  },
+};
+
+/** Digital time lists — 00–59 mins, compact + polished popup. */
 function JobScheduleTimeField({ label, value, onChange, disabled, error, helperText, minTime }) {
   const minValue = hhmmToDayjs(minTime);
 
@@ -117,9 +192,8 @@ function JobScheduleTimeField({ label, value, onChange, disabled, error, helperT
       ampm
       label={label}
       value={hhmmToDayjs(value)}
-      minutesStep={1}
+      timeSteps={{ hours: 1, minutes: 1 }}
       views={['hours', 'minutes']}
-      viewRenderers={CLOCK_TIME_VIEWS}
       format="hh:mm A"
       disabled={disabled}
       minTime={minValue || undefined}
@@ -135,15 +209,28 @@ function JobScheduleTimeField({ label, value, onChange, disabled, error, helperT
           helperText,
           InputLabelProps: { shrink: true },
           sx: {
-            '& .MuiInputBase-root': { bgcolor: 'background.paper' },
+            '& .MuiInputBase-root': {
+              bgcolor: 'background.paper',
+              borderRadius: 1.5,
+            },
           },
         },
+        layout: { sx: TIME_PICKER_LAYOUT_SX },
         popper: {
-          sx: { zIndex: 1600 },
+          placement: 'bottom-start',
+          sx: TIME_PICKER_POPUP_SX,
+        },
+        actionBar: {
+          actions: ['accept'],
         },
       }}
     />
   );
+}
+
+function resolveBreakMode(entry) {
+  if (entry?.breakIncluded === false || !(Number(entry?.breakMins) > 0)) return 'none';
+  return entry?.breakPaid === false ? 'unpaid' : 'paid';
 }
 
 export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
@@ -280,36 +367,47 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                   borderTop: (theme) => `1px dashed ${theme.vars.palette.divider}`,
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minHeight: 36 }}>
-                  <Switch
-                    checked={entry.breakIncluded !== false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      onChange(
-                        schedules.map((schedule) =>
-                          schedule.id === entry.id
-                            ? {
-                              ...schedule,
-                              breakIncluded: checked,
-                              breakMins: checked ? schedule.breakMins || 30 : 0,
-                            }
-                            : schedule
-                        )
-                      );
-                    }}
-                    color="primary"
-                    size="small"
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    Break Included
-                  </Typography>
-                </Stack>
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Break"
+                  value={resolveBreakMode(entry)}
+                  onChange={(e) => {
+                    const mode = e.target.value;
+                    onChange(
+                      schedules.map((schedule) => {
+                        if (schedule.id !== entry.id) return schedule;
+                        if (mode === 'none') {
+                          return {
+                            ...schedule,
+                            breakIncluded: false,
+                            breakPaid: true,
+                            breakMins: 0,
+                          };
+                        }
+                        return {
+                          ...schedule,
+                          breakIncluded: true,
+                          breakPaid: mode === 'paid',
+                          breakMins: Number(schedule.breakMins) > 0 ? schedule.breakMins : 30,
+                        };
+                      })
+                    );
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper' } }}
+                >
+                  <MenuItem value="none">No break</MenuItem>
+                  <MenuItem value="paid">Paid break</MenuItem>
+                  <MenuItem value="unpaid">Unpaid break</MenuItem>
+                </TextField>
 
-                {entry.breakIncluded !== false && (
+                {entry.breakIncluded !== false && Number(entry.breakMins) > 0 ? (
                   <TextField
                     fullWidth
                     size="small"
-                    label="Break Mins"
+                    label="Break mins"
                     type="number"
                     value={entry.breakMins ?? 30}
                     onChange={(e) =>
@@ -318,13 +416,13 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                     error={Boolean(breakError)}
                     helperText={breakError || undefined}
                     inputProps={{
-                      min: 0,
+                      min: 1,
                       step: 5,
                       max: shiftMinutes != null ? shiftMinutes : undefined,
                     }}
                     sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper' } }}
                   />
-                )}
+                ) : null}
               </Stack>
             </Stack>
           </Box>
@@ -436,14 +534,18 @@ export function JobDraftForm({
     [calendarTeamLabels]
   );
 
-  const allJobTypes = useMemo(
-    () => typesList.filter((item) => item.status === 'active' || !item.status),
-    [typesList]
-  );
+  const allJobTypes = useMemo(() => {
+    const list = typesList.filter((item) => item.status === 'active' || !item.status);
+    return [...list].sort((a, b) => {
+      const left = String(a.label || a.title || a.name || '').toLowerCase();
+      const right = String(b.label || b.title || b.name || '').toLowerCase();
+      return left.localeCompare(right);
+    });
+  }, [typesList]);
   const jobTypes = useMemo(() => {
     if (!teamLabels?.length) return allJobTypes;
     return allJobTypes.filter((opt) =>
-      jobTypeMatchesAnyTeam(opt?.title || opt?.name || '', teamLabels)
+      jobTypeMatchesAnyTeam(opt?.title || opt?.name || opt?.label || '', teamLabels)
     );
   }, [allJobTypes, teamLabels]);
 
@@ -452,12 +554,10 @@ export function JobDraftForm({
     [branchesData]
   );
 
-  // API only — never fall back to local demo branches (Head Office / North Branch).
   const branches = apiBranches;
 
   const locationLabel = 'Location';
 
-  // Edit only: the API says whether the rate and shift times can still change.
   const rateAndTimesLocked = Boolean(draft.id) && draft.canEditRateAndShiftTimes === false;
 
   const selectedTypeId = draft.typeId || '';
@@ -491,10 +591,12 @@ export function JobDraftForm({
 
     didAutoSelectTypeRef.current = true;
     if (typeof onChange === 'function') {
+      const typeName = best.title || best.name || best.label || preferred;
       onChange({
         typeId: best.id,
-        type: best.title || best.name || preferred,
-        typeTitle: best.title || best.name || preferred,
+        type: typeName,
+        typeTitle: typeName,
+        name: typeName,
       });
     }
   }, [
@@ -561,306 +663,278 @@ export function JobDraftForm({
 
   return (
     <>
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <Stack spacing={2.5}>
-          <TextField
-            fullWidth
-            size="small"
-            label="Job name"
-            value={draft.name || ''}
-            onChange={(e) => handleFieldChange('name', e.target.value)}
-            placeholder="e.g. Night shift RN"
-          />
-
-          <FormControl fullWidth size="small" error={typesError} sx={{ overflow: 'visible' }}>
-            <InputLabel id="job-draft-type-label" shrink sx={OUTLINED_LABEL_SX}>
-              {typeFieldLabel}
-            </InputLabel>
-            <Select
-              labelId="job-draft-type-label"
-              value={typeSelectValue}
-              label={typeFieldLabel}
-              notched
-              displayEmpty
-              onChange={(e) => {
-                const nextId = e.target.value;
-                const selected = jobTypes.find((item) => item.id === nextId);
-                handleFieldChange({
-                  typeId: nextId,
-                  type: selected?.title || '',
-                  typeTitle: selected?.title || '',
-                });
-              }}
-              MenuProps={{
-                disablePortal: false,
-                anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-                transformOrigin: { vertical: 'top', horizontal: 'left' },
-                PaperProps: { sx: { maxHeight: 280, zIndex: (theme) => theme.zIndex.modal + 2 } },
-              }}
-              disabled={typesLoading}
-              endAdornment={
-                typesLoading ? (
-                  <CircularProgress color="inherit" size={16} sx={{ mr: 2 }} />
-                ) : null
-              }
-            >
-              <MenuItem value="" disabled>
-                <em>Select {typeFieldLabel.toLowerCase()}</em>
-              </MenuItem>
-              {jobTypes.map((opt) => (
-                <MenuItem key={opt.id} value={opt.id}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" fontWeight={600} noWrap>
-                      {opt.title}
-                    </Typography>
-                    {opt.department ? (
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {opt.department}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-            {typesError && (
-              <FormHelperText>Could not load job types. Please retry.</FormHelperText>
-            )}
-            {!typesLoading && !typesError && !jobTypes.length && (
-              <FormHelperText>
-                {teamLabels?.length
-                  ? 'No roles match this site. Add a matching job type, or post from Add Job.'
-                  : 'No active job types found.'}
-              </FormHelperText>
-            )}
-            {!typesLoading && !typesError && jobTypes.length > 0 && teamLabels?.length ? (
-              <FormHelperText>Roles for this site</FormHelperText>
-            ) : null}
-          </FormControl>
-
-          <FormControl fullWidth size="small" required error={branchesError} sx={{ overflow: 'visible' }}>
-            <InputLabel id="job-draft-branch-label" shrink sx={OUTLINED_LABEL_SX}>
-              {locationLabel}
-            </InputLabel>
-            <Select
-              labelId="job-draft-branch-label"
-              value={branchSelectValue}
-              label={locationLabel}
-              notched
-              displayEmpty
-              open={locationMenuOpen}
-              onOpen={() => setLocationMenuOpen(true)}
-              onClose={() => setLocationMenuOpen(false)}
-              onChange={(e) => {
-                const nextId = e.target.value;
-                if (!nextId) {
-                  handleFieldChange({ branchId: '', address: '', location: null });
-                  return;
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Stack spacing={2.5}>
+            <FormControl fullWidth size="small" error={typesError} sx={{ overflow: 'visible' }}>
+              <InputLabel id="job-draft-type-label" shrink sx={OUTLINED_LABEL_SX}>
+                {typeFieldLabel}
+              </InputLabel>
+              <Select
+                labelId="job-draft-type-label"
+                value={typeSelectValue}
+                label={typeFieldLabel}
+                notched
+                displayEmpty
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  const selected = jobTypes.find((item) => item.id === nextId);
+                  const typeName = selected?.title || selected?.name || selected?.label || '';
+                  handleFieldChange({
+                    typeId: nextId,
+                    type: typeName,
+                    typeTitle: typeName,
+                    name: typeName,
+                  });
+                }}
+                MenuProps={{
+                  disablePortal: false,
+                  anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                  transformOrigin: { vertical: 'top', horizontal: 'left' },
+                  PaperProps: { sx: { maxHeight: 320, zIndex: (theme) => theme.zIndex.modal + 2 } },
+                }}
+                disabled={typesLoading}
+                endAdornment={
+                  typesLoading ? (
+                    <CircularProgress color="inherit" size={16} sx={{ mr: 2 }} />
+                  ) : null
                 }
-                const branch =
-                  branches.find((item) => String(item.id) === String(nextId)) ||
-                  branches.find((item) => String(item._id) === String(nextId));
-                handleFieldChange({
-                  branchId: nextId,
-                  address: formatBranchAddress(branch),
-                  location: branch?.location || null,
-                });
-              }}
-              MenuProps={{
-                disablePortal: false,
-                anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-                transformOrigin: { vertical: 'top', horizontal: 'left' },
-                PaperProps: {
-                  sx: { maxHeight: 320, maxWidth: 420, zIndex: (theme) => theme.zIndex.modal + 2 },
-                },
-              }}
-              disabled={branchesLoading}
-              endAdornment={
-                branchesLoading ? (
-                  <CircularProgress color="inherit" size={16} sx={{ mr: 2 }} />
-                ) : null
-              }
-            >
-              <MenuItem value="" sx={{ display: 'none' }}>
-                Select location
-              </MenuItem>
-              <Box
-                sx={{ px: 1, py: 1 }}
-                onMouseDown={(event) => event.preventDefault()}
               >
-                <Button
-                  fullWidth
-                  size="small"
-                  variant="outlined"
-                  color="inherit"
-                  startIcon={<Iconify icon="mingcute:add-line" width={16} />}
-                  onClick={() => {
-                    setLocationMenuOpen(false);
-                    setAddLocationOpen(true);
-                  }}
-                >
-                  Add location
-                </Button>
-              </Box>
-              {branches.map((branch) => (
-                <MenuItem key={branch.id} value={branch.id}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, width: 1 }}>
-                    <Iconify
-                      icon="solar:map-point-bold"
-                      width={18}
-                      sx={{ color: 'text.secondary', flexShrink: 0 }}
-                    />
+                <MenuItem value="" disabled>
+                  <em>Select {typeFieldLabel.toLowerCase()}</em>
+                </MenuItem>
+                {jobTypes.map((opt) => (
+                  <MenuItem key={opt.id} value={opt.id}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" noWrap fontWeight={600}>
-                        {branch.name || branch.branchName || 'Location'}
+                      <Typography variant="body2" fontWeight={600} noWrap>
+                        {opt.label || opt.title}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {getAgencyBranchLocationLabel(branch)}
-                      </Typography>
+                      {opt.department && opt.title && opt.label !== opt.title ? (
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                          {opt.title}
+                        </Typography>
+                      ) : null}
                     </Box>
-                  </Stack>
-                </MenuItem>
-              ))}
-            </Select>
-            {branchesError && (
-              <FormHelperText>
-                Could not load locations. Please retry.
-              </FormHelperText>
-            )}
-            {!branchesLoading && !branchesError && !branches.length && (
-              <FormHelperText>
-                No locations found — add them under Locations on your dashboard first.
-              </FormHelperText>
-            )}
-          </FormControl>
+                  </MenuItem>
+                ))}
+              </Select>
+              {typesError && (
+                <FormHelperText>Could not load job types. Please retry.</FormHelperText>
+              )}
+              {!typesLoading && !typesError && !jobTypes.length && (
+                <FormHelperText>
+                  {teamLabels?.length
+                    ? 'No roles match this site. Add a matching job type, or post from Add Job.'
+                    : 'No active job types found.'}
+                </FormHelperText>
+              )}
+              {!typesLoading && !typesError && jobTypes.length > 0 && teamLabels?.length ? (
+                <FormHelperText>Roles for this site</FormHelperText>
+              ) : null}
+            </FormControl>
 
-          <TextField
-            fullWidth
-            size="small"
-            required={!draft.id}
-            label={draft.id ? 'Rate per hour' : 'Rate per hour (required)'}
-            type="number"
-            value={draft.hourlyRate ?? ''}
-            onChange={(e) => handleFieldChange('hourlyRate', e.target.value)}
-            disabled={rateAndTimesLocked}
-            InputLabelProps={{ shrink: true }}
-            InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
-            inputProps={{ min: 0.01, step: 0.01 }}
-            helperText={
-              rateAndTimesLocked
-                ? undefined
-                : draft.id
-                  ? 'Suppliers can sort jobs by rate.'
-                  : 'Required. Suppliers can sort jobs by this rate.'
-            }
-          />
-
-          {rateAndTimesLocked && (
-            <Alert severity="info">
-              The rate and shift dates and times can&apos;t be changed once a job has bids or a
-              booked shift. You can still edit everything else.
-            </Alert>
-          )}
-
-          <JobSchedulesEditor
-            schedules={draft.schedules}
-            onChange={onSchedulesChange}
-            lockTimes={rateAndTimesLocked}
-          />
-        </Stack>
-      </Grid>
-
-      <Grid item xs={12} md={6}>
-        <Stack spacing={2.5}>
-          <JobImageUpload
-            required={!draft.id}
-            value={draft.image || ''}
-            onChange={(value) => handleFieldChange('image', value)}
-          />
-
-          {(draft.agencyName || draft.agencyId) && (
-            <Box
-              sx={{
-                px: 2,
-                py: 1.5,
-                borderRadius: 1,
-                border: (theme) => `1px solid ${theme.vars.palette.divider}`,
-                bgcolor: 'background.neutral',
-              }}
-            >
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Agency
-              </Typography>
-              <Typography variant="subtitle2" fontWeight={700}>
-                {draft.agencyName || 'Partner agency'}
-              </Typography>
-            </Box>
-          )}
-
-          <TextField
-            fullWidth
-            multiline
-            rows={5}
-            size="small"
-            label="Description/Notes (optional)"
-            value={draft.description}
-            onChange={(e) => handleFieldChange('description', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{
-              overflow: 'visible',
-              '& .MuiInputLabel-root': OUTLINED_LABEL_SX,
-            }}
-          />
-
-          <FormControl fullWidth size="small" sx={{ overflow: 'visible' }}>
-            <InputLabel id="job-draft-gender-label" shrink sx={OUTLINED_LABEL_SX}>
-              Gender (Dependent/Care recipient)
-            </InputLabel>
-            <Select
-              labelId="job-draft-gender-label"
-              value={draft.gender || ''}
-              label="Gender (Dependent/Care recipient)"
-              displayEmpty
-              notched
-              onChange={(e) => handleFieldChange('gender', e.target.value)}
-              MenuProps={{
-                disablePortal: false,
-                anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-                transformOrigin: { vertical: 'top', horizontal: 'left' },
-                marginThreshold: 8,
-                PaperProps: {
-                  sx: {
-                    maxHeight: 280,
-                    zIndex: (theme) => theme.zIndex.modal + 2,
+            <FormControl fullWidth size="small" required error={branchesError} sx={{ overflow: 'visible' }}>
+              <InputLabel id="job-draft-branch-label" shrink sx={OUTLINED_LABEL_SX}>
+                {locationLabel}
+              </InputLabel>
+              <Select
+                labelId="job-draft-branch-label"
+                value={branchSelectValue}
+                label={locationLabel}
+                notched
+                displayEmpty
+                open={locationMenuOpen}
+                onOpen={() => setLocationMenuOpen(true)}
+                onClose={() => setLocationMenuOpen(false)}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  if (!nextId) {
+                    handleFieldChange({ branchId: '', address: '', location: null });
+                    return;
+                  }
+                  const branch =
+                    branches.find((item) => String(item.id) === String(nextId)) ||
+                    branches.find((item) => String(item._id) === String(nextId));
+                  handleFieldChange({
+                    branchId: nextId,
+                    address: formatBranchAddress(branch),
+                    location: branch?.location || null,
+                  });
+                }}
+                MenuProps={{
+                  disablePortal: false,
+                  anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                  transformOrigin: { vertical: 'top', horizontal: 'left' },
+                  PaperProps: {
+                    sx: { maxHeight: 320, maxWidth: 420, zIndex: (theme) => theme.zIndex.modal + 2 },
                   },
-                },
-              }}
-            >
-              <MenuItem value="" disabled>
-                <em>Select gender</em>
-              </MenuItem>
-              {GENDER_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                }}
+                disabled={branchesLoading}
+                endAdornment={
+                  branchesLoading ? (
+                    <CircularProgress color="inherit" size={16} sx={{ mr: 2 }} />
+                  ) : null
+                }
+              >
+                <MenuItem value="" sx={{ display: 'none' }}>
+                  Select location
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Stack>
-      </Grid>
-    </Grid>
+                <Box
+                  sx={{ px: 1, py: 1 }}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                    onClick={() => {
+                      setLocationMenuOpen(false);
+                      setAddLocationOpen(true);
+                    }}
+                  >
+                    Add location
+                  </Button>
+                </Box>
+                {branches.map((branch) => (
+                  <MenuItem key={branch.id} value={branch.id}>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, width: 1 }}>
+                      <Iconify
+                        icon="solar:map-point-bold"
+                        width={18}
+                        sx={{ color: 'text.secondary', flexShrink: 0 }}
+                      />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" noWrap fontWeight={600}>
+                          {branch.name || branch.branchName || 'Location'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                          {getAgencyBranchLocationLabel(branch)}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </Select>
+              {branchesError && (
+                <FormHelperText>
+                  Could not load locations. Please retry.
+                </FormHelperText>
+              )}
+              {!branchesLoading && !branchesError && !branches.length && (
+                <FormHelperText>
+                  No locations found — add them under Locations on your dashboard first.
+                </FormHelperText>
+              )}
+            </FormControl>
 
-    <BranchFormDialog
-      open={addLocationOpen}
-      onClose={() => setAddLocationOpen(false)}
-      currentBranch={null}
-      onSubmit={handleAddLocation}
-      submitting={creatingLocation}
-      entityLabel="Location"
-      addressOnly={isUser}
-      showComplianceFields={isHomeCareCompany}
-      sx={{ zIndex: (theme) => theme.zIndex.modal + 5 }}
-    />
+            {rateAndTimesLocked && (
+              <Alert severity="info">
+                Shift dates and times can&apos;t be changed once a job has bids or a booked shift. You
+                can still edit everything else.
+              </Alert>
+            )}
+
+            <JobSchedulesEditor
+              schedules={draft.schedules}
+              onChange={onSchedulesChange}
+              lockTimes={rateAndTimesLocked}
+            />
+          </Stack>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Stack spacing={2.5}>
+            <JobImageUpload
+              required={!draft.id}
+              value={draft.image || ''}
+              onChange={(value) => handleFieldChange('image', value)}
+            />
+
+            {(draft.agencyName || draft.agencyId) && (
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+                  bgcolor: 'background.neutral',
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Agency
+                </Typography>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {draft.agencyName || 'Partner agency'}
+                </Typography>
+              </Box>
+            )}
+
+            <TextField
+              fullWidth
+              multiline
+              rows={5}
+              size="small"
+              label="Description/Notes (optional)"
+              value={draft.description}
+              onChange={(e) => handleFieldChange('description', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{
+                overflow: 'visible',
+                '& .MuiInputLabel-root': OUTLINED_LABEL_SX,
+              }}
+            />
+
+            <FormControl fullWidth size="small" sx={{ overflow: 'visible' }}>
+              <InputLabel id="job-draft-gender-label" shrink sx={OUTLINED_LABEL_SX}>
+                Gender (Dependent/Care recipient)
+              </InputLabel>
+              <Select
+                labelId="job-draft-gender-label"
+                value={draft.gender || ''}
+                label="Gender (Dependent/Care recipient)"
+                displayEmpty
+                notched
+                onChange={(e) => handleFieldChange('gender', e.target.value)}
+                MenuProps={{
+                  disablePortal: false,
+                  anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                  transformOrigin: { vertical: 'top', horizontal: 'left' },
+                  marginThreshold: 8,
+                  PaperProps: {
+                    sx: {
+                      maxHeight: 280,
+                      zIndex: (theme) => theme.zIndex.modal + 2,
+                    },
+                  },
+                }}
+              >
+                <MenuItem value="" disabled>
+                  <em>Select gender</em>
+                </MenuItem>
+                {GENDER_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </Grid>
+      </Grid>
+
+      <BranchFormDialog
+        open={addLocationOpen}
+        onClose={() => setAddLocationOpen(false)}
+        currentBranch={null}
+        onSubmit={handleAddLocation}
+        submitting={creatingLocation}
+        entityLabel="Location"
+        addressOnly={isUser}
+        showComplianceFields={isHomeCareCompany}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 5 }}
+      />
     </>
   );
 }

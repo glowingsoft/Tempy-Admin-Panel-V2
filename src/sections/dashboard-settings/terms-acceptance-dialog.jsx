@@ -27,19 +27,8 @@ import { getRelationshipSide } from 'src/sections/supplier-relationship/supplier
 import { RICH_TEXT_SX } from './rich-text-sx';
 import { resolveSettingsAccountKey } from './dashboard-settings-api-utils';
 
-// ----------------------------------------------------------------------
-
-/**
- * Suppliers accept the terms once (they say they won't go direct with the
- * customer), and again whenever admin publishes a new version.
- *
- * Without `open` it opens by itself while the supplier still has to accept and
- * can't be dismissed. With `open` (e.g. from a "terms updated" notification)
- * the caller controls it and it can be closed.
- */
 export function TermsAcceptanceDialog({ open: openProp, onClose, onAccepted }) {
   const { user } = useSelector((state) => state.user);
-  // Admin viewing a supplier's account is not the supplier: it is never asked to accept.
   const viewOnly = useViewOnly();
   const isSupplier = getRelationshipSide(user) === 'supplier' && !viewOnly;
   const controlled = openProp !== undefined;
@@ -51,7 +40,6 @@ export function TermsAcceptanceDialog({ open: openProp, onClose, onAccepted }) {
   });
   const open = controlled ? Boolean(openProp) : Boolean(isSupplier && status?.needsAcceptance);
   const alreadyAccepted = controlled && status?.needsAcceptance === false;
-  // Nothing to accept here: either done already, or admin is only viewing the account.
   const readOnly = alreadyAccepted || viewOnly;
 
   const accountKey = resolveSettingsAccountKey(user);

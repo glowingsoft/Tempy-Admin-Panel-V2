@@ -160,13 +160,40 @@ function withQueryCity(item, query) {
   };
 }
 
-function fetchGoogleJsPredictions(input, service, sessionToken) {
+const UK_NATION_NAMES = new Set(['england', 'scotland', 'wales', 'northern ireland']);
+
+/** Prefer real county over nation/country so County ≠ Country. */
+function pickStateAndCountry({
+  county = '',
+  adminArea = '',
+  state = '',
+  country = '',
+} = {}) {
+  const countryName = String(country || '').trim();
+  const countyName = String(county || '').trim();
+  const adminName = String(adminArea || state || '').trim();
+  const adminIsNation = UK_NATION_NAMES.has(adminName.toLowerCase());
+  const adminIsCountry =
+    Boolean(countryName) && adminName.toLowerCase() === countryName.toLowerCase();
+
+  let region = countyName;
+  if (!region && adminName && !adminIsNation && !adminIsCountry) {
+    region = adminName;
+  }
+
+  return {
+    state: region,
+    country: countryName,
+  };
+}
+
+function fetchGoogleJsPredictions(input, service, sessionToken, countryRestriction = 'gb') {
   return new Promise((resolve, reject) => {
     const queryCity = extractQueryCity(input);
     const request = {
       input,
       sessionToken,
-      componentRestrictions: { country: 'pk' },
+      componentRestrictions: { country: countryRestriction },
     };
     if (queryCity && CITY_BIAS[queryCity] && window.google?.maps?.LatLng) {
       request.location = new window.google.maps.LatLng(
@@ -226,8 +253,8 @@ export async function fetchPhotonSuggestions(input) {
     params.lat = String(bias.latitude);
     params.lon = String(bias.longitude);
   } else {
-    params.lat = '30.3753';
-    params.lon = '69.3451';
+    params.lat = '54.5';
+    params.lon = '-2.5';
   }
 
   const res = await fetch(
@@ -239,15 +266,19 @@ export async function fetchPhotonSuggestions(input) {
   const mapped = (data.features ?? []).map((feature) => {
     const properties = feature.properties || {};
     const [lng, lat] = feature.geometry?.coordinates || [];
-    const city =
-      properties.city || properties.town || properties.village || properties.county || '';
+    const city = properties.city || properties.town || properties.village || '';
+    const { state, country } = pickStateAndCountry({
+      county: properties.county,
+      adminArea: properties.state,
+      country: properties.country,
+    });
     const parts = [
       properties.name,
       properties.housenumber,
       properties.street,
       city,
-      properties.state,
-      properties.country,
+      state,
+      country,
     ].filter(Boolean);
 
     return withQueryCity(
@@ -259,8 +290,8 @@ export async function fetchPhotonSuggestions(input) {
         latitude: Number.isFinite(lat) ? lat : null,
         longitude: Number.isFinite(lng) ? lng : null,
         city,
-        state: properties.state || '',
-        country: properties.country || '',
+        state,
+        country,
         postalCode: properties.postcode || '',
       },
       input
@@ -277,21 +308,28 @@ export async function fetchPhotonSuggestions(input) {
   return preferred.length ? preferred : mapped;
 }
 
-async function fetchNominatimSuggestions(input) {
+async function fetchNominatimSuggestions(input, countryRestriction = 'gb') {
   const res = await fetch(
     `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
       q: input,
       format: 'jsonv2',
       addressdetails: '1',
       limit: '8',
-      countrycodes: 'pk',
+      countrycodes: countryRestriction,
     })}`
   );
   if (!res.ok) throw new Error('Nominatim failed');
   const data = await res.json();
 
-  return (Array.isArray(data) ? data : []).map((item) =>
-    withQueryCity(
+  return (Array.isArray(data) ? data : []).map((item) => {
+    const address = item.address || {};
+    const { state, country } = pickStateAndCountry({
+      county: address.county,
+      adminArea: address.state,
+      country: address.country,
+    });
+
+    return withQueryCity(
       {
         label: item.display_name,
         mainText: item.name || item.display_name,
@@ -299,14 +337,14 @@ async function fetchNominatimSuggestions(input) {
         placeId: `osm-${item.place_id}`,
         latitude: Number(item.lat),
         longitude: Number(item.lon),
-        city: item.address?.city || item.address?.town || item.address?.village || '',
-        state: item.address?.state || '',
-        country: item.address?.country || '',
-        postalCode: item.address?.postcode || '',
+        city: address.city || address.town || address.village || '',
+        state,
+        country,
+        postalCode: address.postcode || '',
       },
       input
-    )
-  );
+    );
+  });
 }
 
 function hasCoordinates(place) {
@@ -315,7 +353,7 @@ function hasCoordinates(place) {
   return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
 }
 
-export async function geocodeAddress(query) {
+export async function geocodeAddress(query, { countryRestriction = 'gb' } = {}) {
   const text = String(query || '').trim();
   if (!text) return null;
 
@@ -337,7 +375,7 @@ export async function geocodeAddress(query) {
   }
 
   try {
-    const nominatimResults = await fetchNominatimSuggestions(text);
+    const nominatimResults = await fetchNominatimSuggestions(text, countryRestriction);
     const match =
       (queryCity &&
         nominatimResults.find((item) =>
@@ -357,7 +395,7 @@ export async function geocodeAddress(query) {
       city: toTitleCase(queryCity),
       latitude: CITY_BIAS[queryCity].latitude,
       longitude: CITY_BIAS[queryCity].longitude,
-      country: 'Pakistan',
+      country: countryRestriction === 'gb' ? 'United Kingdom' : 'Pakistan',
     };
   }
 
@@ -373,7 +411,7 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-async function searchLocations(input, apiKey, serviceRef, sessionTokenRef) {
+async function searchLocations(input, apiKey, serviceRef, sessionTokenRef, countryRestriction = 'gb') {
   const googlePromise = apiKey
     ? withTimeout(
       (async () => {
@@ -384,7 +422,12 @@ async function searchLocations(input, apiKey, serviceRef, sessionTokenRef) {
         if (!sessionTokenRef.current) {
           sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
         }
-        return fetchGoogleJsPredictions(input, serviceRef.current, sessionTokenRef.current);
+        return fetchGoogleJsPredictions(
+          input,
+          serviceRef.current,
+          sessionTokenRef.current,
+          countryRestriction
+        );
       })(),
       3000
     ).catch((error) => {
@@ -411,21 +454,30 @@ function parseGoogleJsPlace(place, fallbackLabel) {
     components.find((item) => item.types.includes(type))?.long_name || '';
 
   const label = place?.formatted_address || fallbackLabel || '';
+  const adminLevel2 = String(getComponent('administrative_area_level_2') || '').replace(
+    / district/i,
+    ''
+  );
   const city =
     getComponent('locality') ||
     getComponent('postal_town') ||
-    String(getComponent('administrative_area_level_2') || '').replace(/ district/i, '') ||
     getComponent('sublocality') ||
     deriveCityFromLabel(label) ||
     '';
+
+  const { state, country } = pickStateAndCountry({
+    county: adminLevel2,
+    adminArea: getComponent('administrative_area_level_1'),
+    country: getComponent('country'),
+  });
 
   return {
     label,
     latitude: location ? location.lat() : null,
     longitude: location ? location.lng() : null,
     city,
-    state: getComponent('administrative_area_level_1'),
-    country: getComponent('country'),
+    state,
+    country,
     postalCode: getComponent('postal_code'),
   };
 }
@@ -440,6 +492,7 @@ export function StandaloneAddressInput({
   error,
   helperText,
   showDetectGps = true,
+  countryRestriction = 'gb',
   sx,
   ...other
 }) {
@@ -470,7 +523,8 @@ export function StandaloneAddressInput({
           query,
           googleApiKey,
           serviceRef,
-          sessionTokenRef
+          sessionTokenRef,
+          countryRestriction
         );
         setOptions(results);
         setOpen(true);
@@ -481,7 +535,7 @@ export function StandaloneAddressInput({
         setLoading(false);
       }
     },
-    [googleApiKey]
+    [countryRestriction, googleApiKey]
   );
 
   const debouncedFetch = useMemo(() => debounce(fetchSuggestions, 350), [fetchSuggestions]);
@@ -526,7 +580,9 @@ export function StandaloneAddressInput({
     }
 
     if (!hasCoordinates(resolved)) {
-      const geocoded = await geocodeAddress(resolved.label || option.label);
+      const geocoded = await geocodeAddress(resolved.label || option.label, {
+        countryRestriction,
+      });
       if (geocoded) {
         const selectedCity =
           resolved.city || deriveCityFromLabel(resolved.label || option.label);
@@ -546,7 +602,10 @@ export function StandaloneAddressInput({
             latitude: bias?.latitude ?? resolved.latitude,
             longitude: bias?.longitude ?? resolved.longitude,
             state: resolved.state || geocoded.state || '',
-            country: resolved.country || geocoded.country || 'Pakistan',
+            country:
+              resolved.country ||
+              geocoded.country ||
+              (countryRestriction === 'gb' ? 'United Kingdom' : 'Pakistan'),
           };
         } else {
           resolved = {
@@ -571,9 +630,10 @@ export function StandaloneAddressInput({
 
   const handleSelect = async (option) => {
     setOpen(false);
+    setOptions([]);
     if (!option) return;
 
-    onChange(option.label);
+    onChange(option.label || option.mainText || '');
     const resolved = await resolvePlaceWithCoords(option);
     emitPlace(resolved);
   };
@@ -597,6 +657,8 @@ export function StandaloneAddressInput({
 
   return (
     <ClickAwayListener
+      mouseEvent="onMouseDown"
+      touchEvent="onTouchStart"
       onClickAway={(event) => {
         if (listRef.current?.contains(event.target)) return;
         setOpen(false);
@@ -671,7 +733,10 @@ export function StandaloneAddressInput({
           anchorEl={inputRef.current}
           placement="bottom-start"
           disablePortal={false}
-          sx={{ zIndex: 1500, width: inputRef.current?.offsetWidth || 280 }}
+          sx={{
+            zIndex: (theme) => theme.zIndex.modal + 4,
+            width: inputRef.current?.offsetWidth || 280,
+          }}
         >
           <Paper
             ref={listRef}
@@ -688,19 +753,30 @@ export function StandaloneAddressInput({
               options.map((option) => (
                 <MenuItem
                   key={option.placeId}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => handleSelect(option)}
-                  sx={{ alignItems: 'flex-start', whiteSpace: 'normal', py: 1 }}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleSelect(option);
+                  }}
+                  sx={{
+                    alignItems: 'flex-start',
+                    whiteSpace: 'normal',
+                    py: 1.25,
+                    cursor: 'pointer',
+                    width: 1,
+                  }}
                 >
                   <Iconify
                     icon="solar:map-point-bold"
                     width={18}
                     sx={{ mr: 1.25, mt: 0.25, color: 'primary.main', flexShrink: 0 }}
                   />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2">{option.mainText || option.label}</Typography>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {option.mainText || option.label}
+                    </Typography>
                     {option.secondaryText ? (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" display="block">
                         {option.secondaryText}
                       </Typography>
                     ) : null}

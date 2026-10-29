@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import { useLocation, useParams } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
@@ -26,14 +27,24 @@ import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { ModuleLoading } from 'src/components/loading-screen';
 
+import { useViewOnly } from 'src/hooks/use-view-only';
+
 import { useActiveBranch } from '../active-branch-context';
 import { getBranchDisplayName } from '../active-branch';
 import { getAgencyBranchLocationLabel } from '../agency-branch-utils';
 import { getBranchesNav } from '../branch-paths';
 import { CQC_RATING_OPTIONS } from '../branches-constants';
-import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
+function isCareHomeUser(user) {
+  const permission = Number(user?.permission);
+  const accountType = user?.accountState?.accountType || user?.accountType || user?.userType;
+  return (
+    permission === 2 ||
+    accountType === 'care_home' ||
+    accountType === 'careHome'
+  );
+}
+
 
 function statusColor(status) {
   const value = String(status || 'active').toLowerCase();
@@ -144,12 +155,13 @@ function DocumentList({ files, emptyText }) {
 }
 
 export function BranchDetailsView() {
-  // Admin viewing this account cannot post jobs.
   const viewOnly = useViewOnly();
   const { id = '' } = useParams();
   const pathname = usePathname();
   const location = useLocation();
   const router = useRouter();
+  const { user } = useSelector((state) => state.user);
+  const careHomeMode = isCareHomeUser(user);
   const nav = getBranchesNav(pathname);
   const { allBranches, branches, loading, setActiveBranchId } = useActiveBranch();
   const stateBranch = location.state?.branch;
@@ -244,89 +256,89 @@ export function BranchDetailsView() {
       {branch ? (
         <Stack spacing={3}>
           <Stack spacing={1}>
-          <Button
-            component={RouterLink}
-            href={nav.list}
-            color="inherit"
-            size="medium"
-            sx={{ alignSelf: 'flex-start' }}
-          >
-            Back to {nav.nounPlural.toLowerCase()}
-          </Button>
-          <Card sx={{ p: { xs: 2, md: 2.5 } }}>
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={2}
-              alignItems={{ xs: 'stretch', md: 'center' }}
-              justifyContent="space-between"
+            <Button
+              component={RouterLink}
+              href={nav.list}
+              color="inherit"
+              size="medium"
+              sx={{ alignSelf: 'flex-start' }}
             >
-              <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
-                <Avatar src={profileIconUrl} alt={name} sx={{ width: 56, height: 56, flexShrink: 0 }}>
-                  {name.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                    <Typography variant="h5" noWrap>
-                      {name}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={branch.status || 'active'}
-                      color={statusColor(branch.status)}
-                      sx={{ textTransform: 'capitalize' }}
-                    />
-                  </Stack>
-                  {placeLine ? (
-                    <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
-                      {placeLine}
-                    </Typography>
-                  ) : null}
-                </Box>
-              </Stack>
-
+              Back to {nav.nounPlural.toLowerCase()}
+            </Button>
+            <Card sx={{ p: { xs: 2, md: 2.5 } }}>
               <Stack
-                direction="row"
-                spacing={1}
-                flexWrap="wrap"
-                useFlexGap
-                justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
-                sx={{ flexShrink: 0 }}
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={2}
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                justifyContent="space-between"
               >
-                {nav.shifts ? (
-                  <Button
-                    size="medium"
-                    variant="contained"
-                    startIcon={<Iconify icon="solar:calendar-bold" />}
-                    onClick={() => goToSection(nav.shifts)}
-                  >
-                    Shifts
-                  </Button>
-                ) : null}
-                {nav.jobs ? (
-                  <Button
-                    size="medium"
-                    variant="outlined"
-                    color="inherit"
-                    startIcon={<Iconify icon="solar:case-round-bold" />}
-                    onClick={() => goToSection(nav.jobs)}
-                  >
-                    Jobs
-                  </Button>
-                ) : null}
-                {nav.postJob && !viewOnly ? (
-                  <Button
-                    size="medium"
-                    variant="outlined"
-                    color="inherit"
-                    startIcon={<Iconify icon="mingcute:add-line" />}
-                    onClick={() => goToSection(nav.postJob)}
-                  >
-                    Post job
-                  </Button>
-                ) : null}
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Avatar src={profileIconUrl} alt={name} sx={{ width: 56, height: 56, flexShrink: 0 }}>
+                    {name.charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <Typography variant="h5" noWrap>
+                        {name}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={branch.status || 'active'}
+                        color={statusColor(branch.status)}
+                        sx={{ textTransform: 'capitalize' }}
+                      />
+                    </Stack>
+                    {placeLine ? (
+                      <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
+                        {placeLine}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                </Stack>
+
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  flexWrap="wrap"
+                  useFlexGap
+                  justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+                  sx={{ flexShrink: 0 }}
+                >
+                  {nav.shifts ? (
+                    <Button
+                      size="medium"
+                      variant="contained"
+                      startIcon={<Iconify icon="solar:calendar-bold" />}
+                      onClick={() => goToSection(nav.shifts)}
+                    >
+                      Shifts
+                    </Button>
+                  ) : null}
+                  {nav.jobs ? (
+                    <Button
+                      size="medium"
+                      variant="outlined"
+                      color="inherit"
+                      startIcon={<Iconify icon="solar:case-round-bold" />}
+                      onClick={() => goToSection(nav.jobs)}
+                    >
+                      Jobs
+                    </Button>
+                  ) : null}
+                  {nav.postJob && !viewOnly ? (
+                    <Button
+                      size="medium"
+                      variant="outlined"
+                      color="inherit"
+                      startIcon={<Iconify icon="mingcute:add-line" />}
+                      onClick={() => goToSection(nav.postJob)}
+                    >
+                      Post job
+                    </Button>
+                  ) : null}
+                </Stack>
               </Stack>
-            </Stack>
-          </Card>
+            </Card>
           </Stack>
 
           <SectionCard title="Details">
@@ -344,7 +356,9 @@ export function BranchDetailsView() {
                 <DetailItem label="Full address" value={branch.location?.fullAddress} />
               </Box>
               <DetailItem label="City" value={branch.location?.city} />
-              <DetailItem label="State" value={branch.location?.state} />
+              {!careHomeMode ? (
+                <DetailItem label="State" value={branch.location?.state} />
+              ) : null}
               <DetailItem label="Country" value={branch.location?.country} />
               <DetailItem label="Postal code" value={branch.location?.postalCode} />
               <DetailItem label="Created" value={branch.createdAt ? fDateTime(branch.createdAt) : ''} />
@@ -367,10 +381,12 @@ export function BranchDetailsView() {
               <DetailItem label="Registered with CQC" value={branch.cqcRegistered ? 'Yes' : 'No'} />
               <DetailItem label="CQC registration number" value={branch.cqcRegistrationNumber} />
               <DetailItem label="CQC rating" value={cqcLabel(branch.cqcRating)} />
-              <DetailItem
-                label="Insurance expiry date"
-                value={branch.insuranceExpiryDate ? fDate(branch.insuranceExpiryDate) : ''}
-              />
+              {!careHomeMode ? (
+                <DetailItem
+                  label="Insurance expiry date"
+                  value={branch.insuranceExpiryDate ? fDate(branch.insuranceExpiryDate) : ''}
+                />
+              ) : null}
             </DetailGrid>
 
             <Divider sx={{ my: 3, borderStyle: 'dashed' }} />
@@ -380,48 +396,60 @@ export function BranchDetailsView() {
             </Typography>
             <DocumentList files={certifications} emptyText="No certifications uploaded." />
 
-            <Typography variant="subtitle2" sx={{ mt: 3, mb: 1.5 }}>
-              Insurance documents ({insuranceDocuments.length})
-            </Typography>
-            <DocumentList files={insuranceDocuments} emptyText="No insurance documents uploaded." />
+            {!careHomeMode ? (
+              <>
+                <Typography variant="subtitle2" sx={{ mt: 3, mb: 1.5 }}>
+                  Insurance documents ({insuranceDocuments.length})
+                </Typography>
+                <DocumentList files={insuranceDocuments} emptyText="No insurance documents uploaded." />
+              </>
+            ) : null}
           </SectionCard>
 
-          <SectionCard title={`Photos (${images.length})`}>
-            {images.length ? (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gap: 1.5,
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-                }}
-              >
-                {images.map((src, imageIndex) => {
-                  const url = resolveProfileAssetUrl(src);
-                  return (
-                    <Box
-                      key={`${src}-${imageIndex}`}
-                      component="a"
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{ display: 'block' }}
-                    >
+          {!careHomeMode ? (
+            <SectionCard title={`Photos (${images.length})`}>
+              {images.length ? (
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 1.5,
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+                  }}
+                >
+                  {images.map((src, imageIndex) => {
+                    const url = resolveProfileAssetUrl(src);
+                    return (
                       <Box
-                        component="img"
-                        src={url}
-                        alt=""
-                        sx={{ width: 1, height: 120, objectFit: 'cover', borderRadius: 1, display: 'block' }}
-                      />
-                    </Box>
-                  );
-                })}
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No photos uploaded.
-              </Typography>
-            )}
-          </SectionCard>
+                        key={`${src}-${imageIndex}`}
+                        component="a"
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ display: 'block' }}
+                      >
+                        <Box
+                          component="img"
+                          src={url}
+                          alt=""
+                          sx={{
+                            width: 1,
+                            height: 120,
+                            objectFit: 'cover',
+                            borderRadius: 1,
+                            display: 'block',
+                          }}
+                        />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No photos uploaded.
+                </Typography>
+              )}
+            </SectionCard>
+          ) : null}
         </Stack>
       ) : (
         <Button variant="contained" onClick={() => router.push(nav.list)}>

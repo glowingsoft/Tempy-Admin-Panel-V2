@@ -147,7 +147,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
   const clientPaged = payments.length > rowsPerPage;
   const visiblePayments = clientPaged ? payments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) : payments;
   const totalRecords = data?.meta?.hasTotal ? data.meta.totalRecords : null;
-  const count = clientPagedose
+  const count = clientPaged
     ? payments.length
     : totalRecords != null
       ? totalRecords
