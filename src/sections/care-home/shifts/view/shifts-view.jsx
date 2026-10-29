@@ -1275,7 +1275,9 @@ function getJobTypeRoleCode(jobType, staffId) {
 }
 
 function buildJobGridShift(draft, staffId, schedule, scheduleIndex, allSchedules) {
-  const member = ALL_STAFF.find((s) => s.id === staffId);
+  const member =
+    ALL_STAFF.find((s) => String(s.id) === String(staffId)) ||
+    null;
   const key = `${staffId}-${schedule.date}`;
   const normalizedSchedule = normalizeSchedule(schedule, draft);
   const normalizedSchedules = allSchedules.map((entry) => normalizeSchedule(entry, draft));
@@ -2113,7 +2115,9 @@ function ShiftCell({
   dayColWidth = DAY_COL_W,
 }) {
   const canSelectEmpty = !shift && !member?.isVacant;
+  const canRequestVacant = !shift && Boolean(member?.isVacant) && !viewOnly;
   const canClickFilled = Boolean(shift);
+  const canClick = canSelectEmpty || canRequestVacant || (!viewOnly && canClickFilled);
 
   const cellHeight = getShiftRowHeight();
 
@@ -2126,7 +2130,7 @@ function ShiftCell({
     display: 'flex',
     alignItems: 'stretch',
     justifyContent: 'center',
-    cursor: canSelectEmpty || (!viewOnly && canClickFilled) ? 'pointer' : 'default',
+    cursor: canClick ? 'pointer' : 'default',
     p: '1px',
     flexShrink: 0,
     overflow: 'hidden',
@@ -2141,7 +2145,7 @@ function ShiftCell({
   const card = resolveShiftCard(shift, member, team);
 
   const handleClick = (event) => {
-    if (canSelectEmpty) {
+    if (canSelectEmpty || canRequestVacant) {
       onClick(event.currentTarget, null);
       return;
     }
@@ -2154,7 +2158,7 @@ function ShiftCell({
     <Box
       sx={cellSx}
       data-shift-cell={cellKey}
-      onClick={canSelectEmpty || canClickFilled ? handleClick : undefined}
+      onClick={canClick ? handleClick : undefined}
     >
       <Box
         sx={{
@@ -2177,11 +2181,14 @@ function ShiftCell({
             onRateWorker={onRateWorker}
             viewOnly={viewOnly}
           />
-        ) : canSelectEmpty ? (
-          <Tooltip title="Click to book a shift" arrow>
+        ) : canSelectEmpty || canRequestVacant ? (
+          <Tooltip
+            title={canRequestVacant ? 'Request a shift for this date' : 'Click to book a shift'}
+            arrow
+          >
             <Box
               className="empty-plus"
-              aria-label="Add on this day"
+              aria-label={canRequestVacant ? 'Request a shift' : 'Add on this day'}
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -3408,12 +3415,22 @@ function ShiftsViewContent({
         '';
 
       const clickedStaffId =
-        postJobContext?.staffId || selectedStaff?.id || allStaff.find((s) => !s.isVacant)?.id;
-      const { staffId: targetStaffId, teamMatched, team: matchedTeam } = resolveStaffIdForJobType(
+        postJobContext?.staffId ||
+        selectedStaff?.id ||
+        allStaff.find((s) => !s.isVacant)?.id ||
+        '';
+      const { staffId: resolvedStaffId, teamMatched, team: matchedTeam } = resolveStaffIdForJobType(
         draft.type || draft.typeTitle,
         clickedStaffId,
         teams
       );
+      // Always pin the card to a visible rota row so Request staff is never invisible.
+      const targetStaffId =
+        resolvedStaffId ||
+        clickedStaffId ||
+        allStaff.find((s) => !s.isVacant)?.id ||
+        teams.flatMap((team) => team.staff || []).find((s) => !s.isVacant)?.id ||
+        '';
       const validSchedules = schedules.filter(
         (entry) => entry.date && entry.startTime && entry.endTime
       );
@@ -3429,34 +3446,42 @@ function ShiftsViewContent({
           : validSchedules[0].date;
 
         setFocusedShiftDate(focusDate);
-        if (sortedDates.length) setWeekStart(sortedDates[0]);
+        if (sortedDates.length) setWeekStart(startOfWeek(sortedDates[0], { weekStartsOn: 1 }));
         if (matchedTeam?.id) {
           setCollapsed((prev) => ({ ...prev, [matchedTeam.id]: false }));
         }
 
-        const targetMember = allStaff.find((s) => s.id === targetStaffId);
+        const targetMember =
+          allStaff.find((s) => String(s.id) === String(targetStaffId)) ||
+          teams
+            .flatMap((team) => team.staff || [])
+            .find((s) => String(s.id) === String(targetStaffId));
         if (targetMember) {
           setSelectedStaff(targetMember);
           setShowStaffDetail(true);
         }
 
+        const draftJobId = createdJobId || String(draft.id || draft._id || '').trim();
 
         setShifts((prev) => {
           const next = { ...prev };
           validSchedules.forEach((schedule, index) => {
             const built = buildJobGridShift(
-              { ...draft, id: createdJobId || draft.id, schedules: validSchedules },
+              { ...draft, id: draftJobId || `local-${schedule.date}-${targetStaffId}`, schedules: validSchedules },
               targetStaffId,
               schedule,
               index,
               validSchedules
             );
-            const key = built.id;
+            const key = `${targetStaffId}-${schedule.date}`;
             if (prev[key]?.bookingId && !prev[key]?.fromJob) return;
             next[key] = {
               ...built,
+              id: key,
+              staffId: targetStaffId,
               fromJob: true,
-              jobId: createdJobId || built.jobId,
+              jobId: draftJobId || built.jobId,
+              receivingBids: true,
             };
           });
           return next;
@@ -3464,7 +3489,8 @@ function ShiftsViewContent({
 
         if (!teamMatched) {
           toast.warning(
-            `No matching team row for "${draft.type || draft.typeTitle}". Job posted on the selected staff row.`
+            `No "${draft.type || draft.typeTitle}" row on this rota — showing the request on ${targetMember?.name || 'the selected staff'
+            } for that date.`
           );
         }
       }
@@ -3648,23 +3674,40 @@ function ShiftsViewContent({
     setShifts((prev) => {
       const apiShifts = calendarData.shifts || {};
       const next = { ...apiShifts };
-      const apiJobIds = new Set(
-        Object.values(apiShifts)
-          .map((shift) => String(shift?.jobId || '').trim())
-          .filter(Boolean)
-      );
 
+      // Staff ids actually rendered on the rota (calendar teams, else dashboard staff).
+      const visibleStaffIds = new Set();
+      const apiTeams = Array.isArray(calendarData.teams) ? calendarData.teams : [];
+      const rosterTeams = apiTeams.length > 0 ? apiTeams : staffApiTeams;
+      rosterTeams.forEach((team) => {
+        (team?.staff || []).forEach((member) => {
+          if (member?.id != null) visibleStaffIds.add(String(member.id));
+        });
+      });
+
+      // Job ids the calendar already drew on a *visible* row.
+      const apiJobIdsOnVisibleRows = new Set();
+      Object.entries(apiShifts).forEach(([key, shift]) => {
+        const jobId = String(shift?.jobId || '').trim();
+        if (!jobId) return;
+        const staffId = String(
+          shift?.staffId != null ? shift.staffId : String(key).replace(/-\d{4}-\d{2}-\d{2}$/, '')
+        );
+        if (visibleStaffIds.has(staffId)) apiJobIdsOnVisibleRows.add(jobId);
+      });
+
+      // Keep optimistic "from job" cards (e.g. Request staff) when the calendar
+      // omits them or places them on a role/row that is not on this rota.
       Object.entries(prev).forEach(([key, shift]) => {
         if (!shift?.fromJob) return;
         if (next[key]) return;
         const jobId = String(shift.jobId || '').trim();
-        if (!jobId) return;
-        if (apiJobIds.has(jobId)) return;
+        if (jobId && apiJobIdsOnVisibleRows.has(jobId)) return;
         next[key] = shift;
       });
       return next;
     });
-  }, [useCalendarApi, calendarData]);
+  }, [useCalendarApi, calendarData, staffApiTeams]);
 
   useEffect(() => {
     if (!useCalendarApi || !isCalendarError) return;
@@ -3765,8 +3808,40 @@ function ShiftsViewContent({
   );
 
   const handleSidebarAddJob = useCallback(() => {
-    const staff = selectedStaff || visibleTeams[0]?.staff?.[0] || teams[0]?.staff?.[0];
-    if (!staff) return;
+    if (isLocked) {
+      notifyLocked();
+      return;
+    }
+
+    if (!days?.length) {
+      toast.info('No dates on this rota yet — change the week and try again');
+      return;
+    }
+
+    const date =
+      (focusedShiftDate && String(focusedShiftDate).trim()) || format(days[0], 'yyyy-MM-dd');
+    const singleSiteId =
+      locations.filter((item) => !item.isAll).length === 1
+        ? locations.find((item) => !item.isAll)?.id
+        : '';
+    const siteId =
+      location && location !== ALL_LOCATIONS_ID
+        ? location
+        : singleSiteId || (isUserApi ? location : '') || '';
+
+    const staffCandidate =
+      selectedStaff || visibleTeams[0]?.staff?.[0] || teams[0]?.staff?.[0] || null;
+    const staff = staffCandidate?.isVacant ? null : staffCandidate;
+
+    if (!staff) {
+      handleOpenPostJob({
+        intent: 'bookShift',
+        date,
+        branchId: siteId,
+      });
+      return;
+    }
+
     const team = staffTeamMap[staff.id] || visibleTeams[0] || teams[0];
     const agencyId = String(staff.agencyId || '').trim();
     const directId = resolveDirectRequestTargetId(
@@ -3780,7 +3855,7 @@ function ShiftsViewContent({
     handleOpenPostJob({
       intent: 'bookShift',
       staffId: staff.id,
-      date: format(days[0], 'yyyy-MM-dd'),
+      date,
       team,
       defaultJobType: teamLabelToJobType(team?.label),
       agencyId: agencyId || undefined,
@@ -3788,17 +3863,21 @@ function ShiftsViewContent({
       requestFromAgency: Boolean(agencyId || staff.fromAgency),
       workerId: directId,
       employeeId: directId,
-      branchId: location && location !== ALL_LOCATIONS_ID ? location : '',
+      branchId: siteId,
     });
   }, [
     days,
+    focusedShiftDate,
     handleOpenPostJob,
+    isLocked,
+    isUserApi,
+    location,
+    locations,
     selectedStaff,
     staffTeamMap,
     teams,
     visibleTeams,
     resolveDirectRequestTargetId,
-    location,
   ]);
 
   const selectedStaffWithHours = useMemo(() => {
@@ -3971,7 +4050,25 @@ function ShiftsViewContent({
         return;
       }
 
-      if (staff?.isVacant) return;
+      if (staff?.isVacant) {
+        setFocusedShiftDate(date);
+        const singleSiteId =
+          locations.filter((item) => !item.isAll).length === 1
+            ? locations.find((item) => !item.isAll)?.id
+            : '';
+        const siteId =
+          location && location !== ALL_LOCATIONS_ID
+            ? location
+            : singleSiteId || (isUserApi ? location : '') || '';
+        handleOpenPostJob({
+          intent: 'request',
+          date,
+          team: team || undefined,
+          defaultJobType: team ? teamLabelToJobType(team.label) : '',
+          branchId: siteId,
+        });
+        return;
+      }
 
       setSelectedStaff(staff);
       setFocusedShiftDate(date);
@@ -3995,7 +4092,7 @@ function ShiftsViewContent({
         'Use the shift menu to cancel a booking, or Book shift on an empty cell to post a job.'
       );
     },
-    [isLocked, viewOnly]
+    [handleOpenPostJob, isLocked, isUserApi, location, locations, viewOnly]
   );
 
   const closeCellActionMenu = useCallback(() => {
@@ -4057,22 +4154,19 @@ function ShiftsViewContent({
           ? locations.find((item) => !item.isAll)?.id
           : '';
       const siteId =
-        location && location !== ALL_LOCATIONS_ID ? location : singleSiteId || '';
+        location && location !== ALL_LOCATIONS_ID
+          ? location
+          : singleSiteId || (isUserApi ? location : '') || '';
 
-      if (!isUserApi && !siteId) {
-        toast.info('Select a site first — each site has its own roles');
-        return;
-      }
-
-      const siteTeams = siteId ? teams : [];
-      const onlyTeam = siteTeams.length === 1 ? siteTeams[0] : null;
+      const onlyTeam =
+        siteId && location !== ALL_LOCATIONS_ID && teams.length === 1 ? teams[0] : null;
 
       handleOpenPostJob({
         intent: 'request',
         date,
         team: onlyTeam || undefined,
         defaultJobType: onlyTeam ? teamLabelToJobType(onlyTeam.label) : '',
-        branchId: siteId || (isUserApi ? location : ''),
+        branchId: siteId,
       });
     },
     [handleOpenPostJob, isLocked, isUserApi, location, locations, teams]
@@ -4148,23 +4242,6 @@ function ShiftsViewContent({
   }, []);
 
   const router = useRouter();
-
-  const staffListPath = useMemo(() => {
-    switch (apiRole) {
-      case 'hospital':
-        return paths.dashboard.hospital.staff;
-      case 'localAuthority':
-        return paths.dashboard.localAuthority.staff;
-      case 'agency':
-        return paths.dashboard.agency.staff;
-      case 'homeCareCompany':
-        return paths.dashboard.homeCareCompany.staff;
-      case 'user':
-        return paths.dashboard.individualHomeCare.staff;
-      default:
-        return paths.dashboard.staff.root;
-    }
-  }, [apiRole]);
 
   const showCompanyRolesEmpty =
     useCalendarApi && calendarSynced && visibleTeams.length === 0;
@@ -4674,7 +4751,7 @@ function ShiftsViewContent({
                         weatherType={apiWeather?.type || null}
                         dayWeather={apiWeather}
                         onClick={handleDateHeaderClick}
-                        clickHint="Request staff for this date"
+                        clickHint="Request a shift for this date"
                       />
                     );
                   })}
@@ -4698,16 +4775,7 @@ function ShiftsViewContent({
                     <EmptyContent
                       filled
                       title="No company roles on this rota yet"
-                      description="Shifts are not pre-filled with default roles. Add staff with their roles and teams, then they appear here for your company."
-                      action={
-                        <Button
-                          variant="contained"
-                          onClick={() => router.push(staffListPath)}
-                          sx={{ mt: 2.5 }}
-                        >
-                          Open Staff
-                        </Button>
-                      }
+                      description="Shifts are not pre-filled with default roles. Add staff with their roles and teams from Staff, then they appear here for your company."
                       sx={{ px: 4, py: 7, minHeight: 360 }}
                     />
                   </Box>

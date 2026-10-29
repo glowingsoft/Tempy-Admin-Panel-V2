@@ -110,8 +110,16 @@ export function buildBranchProfilePayload(data = {}) {
     insuranceCertificates
   );
 
+  const websiteRaw = String(data.website || '').trim();
+  const website = websiteRaw
+    ? websiteRaw.includes('://')
+      ? websiteRaw
+      : `https://${websiteRaw}`
+    : '';
+
   return {
     bio: String(data.bio || '').trim(),
+    ...(website ? { website } : {}),
     images,
     certifications,
     cqcRegistered: Boolean(data.cqcRegistered),
@@ -167,7 +175,6 @@ export function mapAgencyBranchFromApi(item) {
   const compliance =
     item?.compliance && typeof item.compliance === 'object' ? item.compliance : {};
 
-  // `cqc` / `insurance` are objects in the API contract; older rows stored a bare string.
   const rawCqc = item?.cqc || compliance.cqc || '';
   const rawInsurance = item?.insurance || compliance.insurance || '';
   const cqcCertificate =
@@ -188,12 +195,12 @@ export function mapAgencyBranchFromApi(item) {
     title: name,
     locationName,
     status,
-    // pending / active / etc. are usable; only deleted & inactive are off
     isActive: !['deleted', 'delete', 'inactive'].includes(status),
     createdAt: item?.createdAt || null,
     updatedAt: item?.updatedAt || null,
     user: item?.user || null,
     bio: item?.bio || profile.bio || '',
+    website: String(item?.website || profile.website || location.website || '').trim(),
     images: asStringList(item?.images || profile.images),
     certifications: asStringList(
       item?.certifications || profile.certifications || cqcCertificate

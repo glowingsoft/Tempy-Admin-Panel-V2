@@ -596,13 +596,26 @@ export function createDefaultSchedule(from = new Date()) {
     startTime: '09:00',
     endTime: '17:00',
     breakIncluded: true,
+    breakPaid: true,
     breakMins: 30,
     receivingBids: true,
   };
 }
 
 export function normalizeSchedule(entry, fallback = {}) {
-  const breakIncluded = entry?.breakIncluded ?? fallback.breakIncluded ?? true;
+  const breakMins = Number(entry?.breakMins ?? fallback.breakMins ?? 0);
+  const breakIncluded =
+    entry?.breakIncluded != null
+      ? Boolean(entry.breakIncluded)
+      : fallback.breakIncluded != null
+        ? Boolean(fallback.breakIncluded)
+        : breakMins > 0;
+  const breakPaid =
+    entry?.breakPaid != null
+      ? Boolean(entry.breakPaid)
+      : fallback.breakPaid != null
+        ? Boolean(fallback.breakPaid)
+        : true;
   const receivingBids = entry?.receivingBids ?? fallback.receivingBids ?? true;
 
   return {
@@ -611,7 +624,8 @@ export function normalizeSchedule(entry, fallback = {}) {
     startTime: entry?.startTime || '09:00',
     endTime: entry?.endTime || '17:00',
     breakIncluded,
-    breakMins: breakIncluded ? Number(entry?.breakMins ?? fallback.breakMins ?? 30) : 0,
+    breakPaid,
+    breakMins: breakIncluded ? (breakMins > 0 ? breakMins : 30) : 0,
     receivingBids: Boolean(receivingBids),
   };
 }
@@ -755,10 +769,13 @@ export function formatTimeLabel(timeValue) {
 }
 
 export function getScheduleBreakLabel(schedule, jobFallback) {
-  const breakIncluded = schedule?.breakIncluded ?? jobFallback?.breakIncluded ?? true;
-  const breakMins = schedule?.breakMins ?? jobFallback?.breakMins ?? 30;
+  const breakMins = Number(schedule?.breakMins ?? jobFallback?.breakMins ?? 0);
+  const breakIncluded =
+    schedule?.breakIncluded ?? jobFallback?.breakIncluded ?? breakMins > 0;
+  if (!breakIncluded || !(breakMins > 0)) return 'No break';
 
-  return breakIncluded ? `Break: ${breakMins} min` : 'No break';
+  const breakPaid = schedule?.breakPaid ?? jobFallback?.breakPaid ?? true;
+  return `${breakPaid === false ? 'Unpaid' : 'Paid'} break: ${breakMins} min`;
 }
 
 export function formatScheduleLabel(schedule, jobFallback) {
@@ -887,7 +904,6 @@ export function validateJobDraft(draft, now = new Date()) {
   if (!GENDER_OPTIONS.some((option) => option.value === draft.gender)) {
     return 'Please select gender';
   }
-  if (!String(draft.name || '').trim()) return 'Please enter a job name';
   if (!draft.typeId && !draft.type) return 'Please select a job type';
   if (!draft.branchId) {
     return 'Please select a location';
@@ -895,11 +911,6 @@ export function validateJobDraft(draft, now = new Date()) {
 
   if (!draft.id && !String(draft.image || '').trim()) {
     return 'Please add a job image';
-  }
-
-  if (!draft.id) {
-    const createRate = String(draft.hourlyRate ?? '').trim();
-    if (!createRate || !(Number(createRate) > 0)) return 'Please enter a rate per hour';
   }
 
   if (!draft.schedules?.length) return 'Please add at least one date and time';
@@ -922,9 +933,6 @@ export function validateJobDraft(draft, now = new Date()) {
 
   const longBreak = draft.schedules.find((entry) => getScheduleBreakError(entry));
   if (longBreak) return getScheduleBreakError(longBreak);
-
-  const rateText = String(draft.hourlyRate ?? '').trim();
-  if (draft.id && rateText && !(Number(rateText) > 0)) return 'Rate must be above 0';
 
   if (draft.requestFromAgency && !draft.agencyId && !draft.workerId && !draft.employeeId && !draft.worker && !draft.employee) {
     return 'Please select the agency or worker for this direct request';

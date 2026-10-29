@@ -259,7 +259,8 @@ function mapShiftToSchedule(shift = {}) {
     date: toDateKey(shift.date),
     startTime: shift.startTime || '',
     endTime: shift.endTime || '',
-    breakIncluded: Boolean(shift.isBreak),
+    breakIncluded: Number(shift.breakMin) > 0,
+    breakPaid: Boolean(shift.isBreak),
     breakMins: Number(shift.breakMin) || 0,
     receivingBids: shift.isBiddingAllowed !== false,
     status: String(shift.status || '').toLowerCase(),
@@ -462,7 +463,7 @@ export function buildCareHomeJobPayload(draft = {}, branch = null, options = {})
         date: entry.date,
         startTime: entry.startTime,
         endTime: entry.endTime,
-        isBreak: breakMin > 0,
+        isBreak: breakMin > 0 ? entry.breakPaid !== false : false,
         breakMin,
         allowedPersons: Number(entry.allowedPersons) > 0 ? Number(entry.allowedPersons) : 1,
         isBiddingAllowed: entry.receivingBids !== false,
@@ -492,9 +493,7 @@ export function buildCareHomeJobPayload(draft = {}, branch = null, options = {})
   };
 
   const rate = toJobRate(draft.hourlyRate);
-  if (!draft.id) {
-    if (rate != null) body.rate = rate;
-  } else if (draft.canEditRateAndShiftTimes !== false) {
+  if (draft.id && draft.canEditRateAndShiftTimes !== false && rate != null) {
     body.rate = rate;
   }
 

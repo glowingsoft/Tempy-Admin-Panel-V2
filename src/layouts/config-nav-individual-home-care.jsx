@@ -2,14 +2,14 @@ import { paths } from 'src/routes/paths';
 
 import { NAV_ICONS } from './nav-icons';
 
+
 export const navDataIndividualHomeCare = [
   {
     items: [
+      { title: 'Book a shift', countKey: 'shifts', path: paths.dashboard.individualHomeCare.shifts, icon: NAV_ICONS.calendar },
       { title: 'Dashboard', path: paths.dashboard.individualHomeCare.root, icon: NAV_ICONS.dashboard },
       { title: 'Locations', path: paths.dashboard.individualHomeCare.locations, icon: NAV_ICONS.branches, deep: true },
-      { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.individualHomeCare.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.individualHomeCare.staff, icon: NAV_ICONS.user },
-      { title: 'Chat', countKey: 'chat', path: paths.dashboard.individualHomeCare.messages, icon: NAV_ICONS.chat },
       {
         title: 'Jobs',
         path: paths.dashboard.individualHomeCare.jobs.created,
@@ -21,6 +21,7 @@ export const navDataIndividualHomeCare = [
           { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.individualHomeCare.jobs.agreedRates },
         ],
       },
+      { title: 'Chat', countKey: 'chat', path: paths.dashboard.individualHomeCare.messages, icon: NAV_ICONS.chat },
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.individualHomeCare.contracts, icon: NAV_ICONS.contract },
       { title: 'Compliance', path: paths.dashboard.individualHomeCare.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.individualHomeCare.payments, icon: NAV_ICONS.banking },

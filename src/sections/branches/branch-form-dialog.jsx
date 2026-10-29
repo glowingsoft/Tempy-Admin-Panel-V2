@@ -44,58 +44,92 @@ const ADDRESS_FIELDS = [
   'status',
 ];
 
-const PROFILE_FIELDS = ['bio', 'images', 'certifications', 'insuranceCertificates'];
+const DEFAULT_UK_COUNTRY = 'United Kingdom';
 
-const BranchSchema = zod
-  .object({
-    name: zod.string().trim().min(1, 'Name is required'),
-    locationName: zod.string().trim().min(1, 'Location name is required'),
-    longitude: zod.coerce.number().optional(),
-    latitude: zod.coerce.number().optional(),
-    fullAddress: zod.string().trim().min(1, 'Location is required'),
-    city: zod.string().trim().min(1, 'City is required'),
-    country: zod.string().trim().min(1, 'Country is required'),
-    state: zod.string().trim().min(1, 'State is required'),
-    postalCode: zod.string().trim().min(1, 'Postal code is required'),
-    status: zod.enum([
-      BRANCH_STATUS.ACTIVE,
-      BRANCH_STATUS.PENDING,
-      BRANCH_STATUS.INACTIVE,
-      BRANCH_STATUS.DELETED,
-    ]),
-    bio: zod
+function buildBranchSchema({
+  hideImages = false,
+  hideInsurance = false,
+  showWebsite = false,
+  hideState = false,
+  stateLabel = 'State',
+} = {}) {
+  const websiteField = showWebsite
+    ? zod
       .string()
       .trim()
-      .min(1, 'Bio is required')
-      .max(2000, 'Bio must be under 2000 characters'),
-    images: zod.array(zod.any()).min(1, 'At least one image is required').default([]),
-    certifications: zod
-      .array(zod.any())
-      .min(1, 'At least one certification is required')
-      .default([]),
-    cqcRegistered: zod.boolean().optional(),
-    cqcRegistrationNumber: zod.string().optional(),
-    cqcRating: zod.string().optional(),
-    insuranceCertificates: zod
-      .array(zod.any())
-      .min(1, 'At least one insurance document is required')
-      .default([]),
-    insuranceExpiryDate: zod.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (
-      data.longitude != null &&
-      data.latitude != null &&
-      (data.longitude !== 0 || data.latitude !== 0) &&
-      !isValidLngLat(data.longitude, data.latitude)
-    ) {
-      ctx.addIssue({
-        code: zod.ZodIssueCode.custom,
-        path: ['fullAddress'],
-        message: 'Pick a location from the suggestions',
-      });
-    }
-  });
+      .optional()
+      .refine(
+        (value) => {
+          if (!value) return true;
+          try {
+            const parsed = new URL(value.includes('://') ? value : `https://${value}`);
+            return Boolean(parsed.hostname);
+          } catch {
+            return false;
+          }
+        },
+        { message: 'Enter a valid website URL' }
+      )
+    : zod.string().optional();
+
+  return zod
+    .object({
+      name: zod.string().trim().min(1, 'Name is required'),
+      locationName: zod.string().trim().min(1, 'Location name is required'),
+      longitude: zod.coerce.number().optional(),
+      latitude: zod.coerce.number().optional(),
+      fullAddress: zod.string().trim().min(1, 'Location is required'),
+      city: zod.string().trim().min(1, 'City is required'),
+      country: zod.string().trim().min(1, 'Country is required'),
+      state: hideState
+        ? zod.string().trim().optional().default('')
+        : zod.string().trim().min(1, `${stateLabel} is required`),
+      postalCode: zod.string().trim().min(1, 'Postal code is required'),
+      status: zod.enum([
+        BRANCH_STATUS.ACTIVE,
+        BRANCH_STATUS.PENDING,
+        BRANCH_STATUS.INACTIVE,
+        BRANCH_STATUS.DELETED,
+      ]),
+      bio: zod
+        .string()
+        .trim()
+        .min(1, 'Bio is required')
+        .max(2000, 'Bio must be under 2000 characters'),
+      website: websiteField,
+      images: hideImages
+        ? zod.array(zod.any()).default([])
+        : zod.array(zod.any()).min(1, 'At least one image is required').default([]),
+      certifications: zod
+        .array(zod.any())
+        .min(1, 'At least one certification is required')
+        .default([]),
+      cqcRegistered: zod.boolean().optional(),
+      cqcRegistrationNumber: zod.string().optional(),
+      cqcRating: zod.string().optional(),
+      insuranceCertificates: hideInsurance
+        ? zod.array(zod.any()).default([])
+        : zod
+          .array(zod.any())
+          .min(1, 'At least one insurance document is required')
+          .default([]),
+      insuranceExpiryDate: zod.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (
+        data.longitude != null &&
+        data.latitude != null &&
+        (data.longitude !== 0 || data.latitude !== 0) &&
+        !isValidLngLat(data.longitude, data.latitude)
+      ) {
+        ctx.addIssue({
+          code: zod.ZodIssueCode.custom,
+          path: ['fullAddress'],
+          message: 'Pick a location from the suggestions',
+        });
+      }
+    });
+}
 
 function getCoords(branch) {
   const parsed = parseCoordinates(branch?.location?.coordinates);
@@ -131,7 +165,7 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
       coordinates: toApiCoordinates(data.latitude, data.longitude),
       fullAddress: String(data.fullAddress || '').trim(),
       city: String(data.city || '').trim(),
-      country: String(data.country || '').trim(),
+      country: String(data.country || '').trim() || DEFAULT_UK_COUNTRY,
       state: String(data.state || '').trim(),
       postalCode: String(data.postalCode || '').trim(),
     },
@@ -166,6 +200,11 @@ export function BranchFormDialog({
   entityLabel = 'Location',
   addressOnly = false,
   showComplianceFields = false,
+  hideImages = false,
+  hideInsurance = false,
+  showWebsite = false,
+  hideState = false,
+  stateLabel = 'State',
   sx,
 }) {
   const isEdit = Boolean(currentBranch);
@@ -173,6 +212,34 @@ export function BranchFormDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const nameLabel = isLocationEntity ? 'Title' : 'Location name';
+
+  const branchSchema = useMemo(
+    () =>
+      buildBranchSchema({
+        hideImages,
+        hideInsurance,
+        showWebsite,
+        hideState,
+        stateLabel,
+      }),
+    [hideImages, hideInsurance, showWebsite, hideState, stateLabel]
+  );
+
+  const addressFields = useMemo(
+    () =>
+      ADDRESS_FIELDS.filter(
+        (field) => field !== 'locationName' && !(hideState && field === 'state')
+      ),
+    [hideState]
+  );
+
+  const profileFields = useMemo(() => {
+    const fields = ['bio', 'certifications'];
+    if (showWebsite) fields.push('website');
+    if (!hideImages) fields.push('images');
+    if (!hideInsurance) fields.push('insuranceCertificates');
+    return fields;
+  }, [hideImages, hideInsurance, showWebsite]);
 
   const steps = useMemo(() => {
     const list = [
@@ -210,14 +277,15 @@ export function BranchFormDialog({
         (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
         '',
       city: locationObj?.city || '',
-      country: locationObj?.country || '',
-      state: locationObj?.state || '',
+      country: locationObj?.country || (hideState ? DEFAULT_UK_COUNTRY : ''),
+      state: hideState ? locationObj?.state || '' : locationObj?.state || '',
       postalCode:
         locationObj?.postalCode != null && locationObj?.postalCode !== ''
           ? String(locationObj.postalCode)
           : '',
       status: resolveBranchStatus(currentBranch?.status),
       bio: currentBranch?.bio || '',
+      website: currentBranch?.website || locationObj?.website || '',
       images: Array.isArray(currentBranch?.images) ? currentBranch.images : [],
       certifications: Array.isArray(currentBranch?.certifications)
         ? currentBranch.certifications
@@ -230,10 +298,10 @@ export function BranchFormDialog({
         : [],
       insuranceExpiryDate: currentBranch?.insuranceExpiryDate || '',
     };
-  }, [currentBranch, isLocationEntity]);
+  }, [currentBranch, hideState, isLocationEntity]);
 
   const methods = useForm({
-    resolver: zodResolver(BranchSchema),
+    resolver: zodResolver(branchSchema),
     defaultValues,
   });
 
@@ -261,7 +329,11 @@ export function BranchFormDialog({
     await handleSubmit(async (data) => {
       try {
         setIsSubmitting(true);
-        const nextData = { ...data, locationName: String(data.name || '').trim() };
+        const nextData = {
+          ...data,
+          locationName: String(data.name || '').trim(),
+          country: String(data.country || '').trim() || DEFAULT_UK_COUNTRY,
+        };
         await onSubmit?.(nextData);
         onClose?.();
       } catch {
@@ -278,9 +350,12 @@ export function BranchFormDialog({
         addressField: 'fullAddress',
         updateSearchLabel: true,
       });
+      if (hideState) {
+        setValue('state', String(place.state || '').trim(), { shouldDirty: true });
+      }
       clearErrors('fullAddress');
     },
-    [clearErrors, setValue]
+    [clearErrors, hideState, setValue]
   );
 
   const ensureCoordinates = useCallback(async () => {
@@ -299,8 +374,7 @@ export function BranchFormDialog({
 
   const handleNext = useCallback(async () => {
     if (stepKey === 'address') {
-      const fields = ADDRESS_FIELDS.filter((field) => field !== 'locationName');
-      const valid = await trigger(fields);
+      const valid = await trigger(addressFields);
       if (!valid) return;
 
       const hasCoords = await ensureCoordinates();
@@ -314,7 +388,7 @@ export function BranchFormDialog({
     }
 
     if (stepKey === 'profile') {
-      const valid = await trigger(PROFILE_FIELDS);
+      const valid = await trigger(profileFields);
       if (!valid) return;
     }
 
@@ -326,8 +400,10 @@ export function BranchFormDialog({
     setActiveStep((prev) => prev + 1);
   }, [
     activeStep,
+    addressFields,
     ensureCoordinates,
     lastStepIndex,
+    profileFields,
     saveForm,
     setError,
     stepKey,
@@ -386,10 +462,11 @@ export function BranchFormDialog({
                 label="Location"
                 size="small"
                 labelPlacement="outlined"
+                countryRestriction="gb"
                 error={Boolean(errors.fullAddress)}
                 helperText={
                   errors.fullAddress?.message ||
-                  'Search an address or tap Detect GPS latitude and longitude are set automatically'
+                  'Search an address or tap Detect GPS — latitude and longitude are set automatically'
                 }
               />
 
@@ -401,23 +478,26 @@ export function BranchFormDialog({
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-                <Field.Text
-                  name="state"
-                  label="State"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
+                {hideState ? (
+                  <Field.Text
+                    name="country"
+                    label="Country"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                ) : (
+                  <Field.Text
+                    name="state"
+                    label={stateLabel}
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                )}
               </Stack>
 
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <Field.Text
-                  name="country"
-                  label="Country"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
+              {hideState ? (
                 <Field.Text
                   name="postalCode"
                   label="Postal code"
@@ -425,7 +505,24 @@ export function BranchFormDialog({
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-              </Stack>
+              ) : (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Field.Text
+                    name="country"
+                    label="Country"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                  <Field.Text
+                    name="postalCode"
+                    label="Postal code"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </Stack>
+              )}
 
               <Field.Select
                 name="status"
@@ -458,28 +555,42 @@ export function BranchFormDialog({
                 }
               />
 
-              <Box>
-                <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
-                  Images
-                </Typography>
-                <Field.Upload
-                  multiple
-                  thumbnail
-                  name="images"
-                  maxSize={5 * 1024 * 1024}
-                  onRemove={(inputFile) =>
-                    setValue(
-                      'images',
-                      watchedImages.filter((file) => file !== inputFile),
-                      { shouldValidate: true, shouldDirty: true }
-                    )
-                  }
-                  onRemoveAll={() =>
-                    setValue('images', [], { shouldValidate: true, shouldDirty: true })
-                  }
-                  helperText="Upload photos of the premises (max 5 MB each)"
+              {showWebsite ? (
+                <Field.Text
+                  name="website"
+                  label="Website"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  placeholder="https://example.com"
+                  helperText="Optional link to this location’s website"
+                  fullWidth
                 />
-              </Box>
+              ) : null}
+
+              {!hideImages ? (
+                <Box>
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                    Images
+                  </Typography>
+                  <Field.Upload
+                    multiple
+                    thumbnail
+                    name="images"
+                    maxSize={5 * 1024 * 1024}
+                    onRemove={(inputFile) =>
+                      setValue(
+                        'images',
+                        watchedImages.filter((file) => file !== inputFile),
+                        { shouldValidate: true, shouldDirty: true }
+                      )
+                    }
+                    onRemoveAll={() =>
+                      setValue('images', [], { shouldValidate: true, shouldDirty: true })
+                    }
+                    helperText="Upload photos of the premises (max 5 MB each)"
+                  />
+                </Box>
+              ) : null}
 
               <StaffDocumentUploadRow
                 name="certifications"
@@ -491,24 +602,28 @@ export function BranchFormDialog({
                 }
               />
 
-              <StaffDocumentUploadRow
-                name="insuranceCertificates"
-                label="Insurance"
-                helperText={
-                  isLocationEntity
-                    ? 'Upload insurance documents (PDF / DOC)'
-                    : 'Upload insurance documents for this location (PDF / DOC)'
-                }
-              />
+              {!hideInsurance ? (
+                <>
+                  <StaffDocumentUploadRow
+                    name="insuranceCertificates"
+                    label="Insurance"
+                    helperText={
+                      isLocationEntity
+                        ? 'Upload insurance documents (PDF / DOC)'
+                        : 'Upload insurance documents for this location (PDF / DOC)'
+                    }
+                  />
 
-              <Field.Text
-                name="insuranceExpiryDate"
-                label="Insurance expiry date"
-                type="date"
-                size="small"
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-              />
+                  <Field.Text
+                    name="insuranceExpiryDate"
+                    label="Insurance expiry date"
+                    type="date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </>
+              ) : null}
             </Stack>
           )}
 

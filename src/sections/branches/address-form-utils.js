@@ -26,9 +26,15 @@ export function applyAddressPlaceToForm(
 
   const city =
     String(place.city || '').trim() || deriveCityFromLabel(place.label || place.secondaryText || '');
+  const country = String(place.country || '').trim();
+  let state = String(place.state || '').trim();
+  if (state && country && state.toLowerCase() === country.toLowerCase()) {
+    state = '';
+  }
+
   setValue('city', city, { shouldDirty: true, shouldValidate: true });
-  setValue('state', String(place.state || '').trim(), { shouldDirty: true, shouldValidate: true });
-  setValue('country', String(place.country || '').trim(), { shouldDirty: true, shouldValidate: true });
+  setValue('state', state, { shouldDirty: true, shouldValidate: true });
+  setValue('country', country, { shouldDirty: true, shouldValidate: true });
   setValue('postalCode', String(place.postalCode || '').trim(), {
     shouldDirty: true,
     shouldValidate: true,

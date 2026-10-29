@@ -2,14 +2,14 @@ import { paths } from 'src/routes/paths';
 
 import { NAV_ICONS } from './nav-icons';
 
+
 export const navDataHospital = [
   {
     items: [
+      { title: 'Book a shift', countKey: 'shifts', path: paths.dashboard.hospital.shifts, icon: NAV_ICONS.calendar },
       { title: 'Dashboard', path: paths.dashboard.hospital.root, icon: NAV_ICONS.dashboard },
       { title: 'Locations', path: paths.dashboard.hospital.branches, icon: NAV_ICONS.branches, deep: true },
-      { title: 'Shifts', countKey: 'shifts', path: paths.dashboard.hospital.shifts, icon: NAV_ICONS.calendar },
       { title: 'Staff', path: paths.dashboard.hospital.staff, icon: NAV_ICONS.user },
-      { title: 'Chat', countKey: 'chat', path: paths.dashboard.hospital.messages, icon: NAV_ICONS.chat },
       {
         title: 'Jobs',
         path: paths.dashboard.hospital.jobs.created,
@@ -20,6 +20,7 @@ export const navDataHospital = [
           { title: 'Job Bids', countKey: 'jobBids', path: paths.dashboard.hospital.jobs.bids },
         ],
       },
+      { title: 'Chat', countKey: 'chat', path: paths.dashboard.hospital.messages, icon: NAV_ICONS.chat },
       { title: 'Compliance', path: paths.dashboard.hospital.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.hospital.payments, icon: NAV_ICONS.banking },
       {
