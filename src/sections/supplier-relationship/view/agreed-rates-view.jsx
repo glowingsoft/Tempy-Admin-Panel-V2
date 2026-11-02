@@ -35,10 +35,11 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { rowInPage, TablePaginationCustom, useTable } from 'src/components/table';
+import { TablePaginationCustom, useTable } from 'src/components/table';
 
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import {
   useGetAgreedRatesQuery,
   useCreateAgreedRateMutation,
@@ -60,7 +61,6 @@ import { RowActionButton } from '../row-action-button';
 import { AgreedRateDetailsDialog } from '../relationship-details-dialogs';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
 /** Rate changes usually start on 1 April. */
 function nextFirstOfApril() {
@@ -109,35 +109,41 @@ function findDuplicateSpecialDays(days) {
   return clashes;
 }
 
-// ----------------------------------------------------------------------
 
 export function SupplierAgreedRatesView() {
-  // Admin viewing this account: rates can be viewed, not offered, changed or answered.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const isSupplier = getRelationshipSide(user) === 'supplier';
   const base = getRoleApiBase(user);
 
-  // null = closed; {} = new offer; { row } = edit; { row, change: true } = propose a change
   const [form, setForm] = useState(null);
   const [reviewing, setReviewing] = useState(null);
   const [viewing, setViewing] = useState(null);
 
-  const { data, isLoading, isError } = useGetAgreedRatesQuery({ base }, { skip: !base });
+  const table = useTable({ defaultRowsPerPage: 10 });
+  const { data, isLoading, isError } = useGetAgreedRatesQuery(
+    { base, page: table.page, limit: table.rowsPerPage },
+    { skip: !base }
+  );
   const [respond, { isLoading: isResponding }] = useRespondToAgreedRateMutation();
 
   const rows = data?.data || [];
-  const table = useTable({ defaultRowsPerPage: 10 });
-  const pageCount = Math.max(1, Math.ceil(rows.length / table.rowsPerPage));
-  const safePage = Math.min(table.page, pageCount - 1);
-  const pageRows = rowInPage(rows, safePage, table.rowsPerPage);
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
 
   const handleAction = async (row, action) => {
+    const fallback =
+      action === 'withdraw'
+        ? 'Rate withdrawn'
+        : action === 'accept'
+          ? 'Rate accepted'
+          : action === 'reject'
+            ? 'Rate rejected'
+            : 'Rate updated';
     try {
-      await respond({ base, id: row.id, action }).unwrap();
-      toast.success(`Rate ${action === 'withdraw' ? 'withdrawn' : `${action}ed`}`);
+      const response = await respond({ base, id: row.id, action }).unwrap();
+      toast.success(pickApiToastMessage(response, fallback));
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not update the rate.');
+      toast.error(handleApiError(err) || 'Could not update the rate.');
     }
   };
 
@@ -194,7 +200,7 @@ export function SupplierAgreedRatesView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageRows.map((row) => {
+              {rows.map((row) => {
                 const party = isSupplier ? row.customer : row.supplier;
                 const status = RATE_STATUS[row.status] || RATE_STATUS.pending;
                 const isOpen = OPEN_RATE_STATUSES.includes(row.status);
@@ -300,8 +306,8 @@ export function SupplierAgreedRatesView() {
           </Table>
         </Scrollbar>
         <TablePaginationCustom
-          page={safePage}
-          count={rows.length}
+          page={table.page}
+          count={totalCount}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           onRowsPerPageChange={table.onChangeRowsPerPage}
@@ -321,7 +327,6 @@ export function SupplierAgreedRatesView() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function RateFormDialog({ base, user, form, onClose }) {
   const { row, change } = form;
@@ -376,15 +381,18 @@ function RateFormDialog({ base, user, form, onClose }) {
   const handleSubmit = async () => {
     const body = { rates: numericRates, effectiveFrom: effectiveFrom || undefined };
     try {
-      if (isEdit) {
-        await updateRate({ base, id: row.id, ...body }).unwrap();
-      } else {
-        await createRate({ base, customer, jobType, ...body }).unwrap();
-      }
-      toast.success('Rate sent to the customer');
+      const response = isEdit
+        ? await updateRate({ base, id: row.id, ...body }).unwrap()
+        : await createRate({ base, customer, jobType, ...body }).unwrap();
+      toast.success(
+        pickApiToastMessage(
+          response,
+          isEdit ? 'Rate updated' : change ? 'Rate change proposed' : 'Rate sent to the customer'
+        )
+      );
       onClose();
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not save the rate.');
+      toast.error(handleApiError(err) || 'Could not save the rate.');
     }
   };
 
@@ -567,7 +575,6 @@ function RateFormDialog({ base, user, form, onClose }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function RequestReviewDialog({ base, row, onClose }) {
   const [note, setNote] = useState('');
@@ -575,11 +582,16 @@ function RequestReviewDialog({ base, row, onClose }) {
 
   const handleSubmit = async () => {
     try {
-      await respond({ base, id: row.id, action: 'review', note: note.trim() }).unwrap();
-      toast.success('Review requested');
+      const response = await respond({
+        base,
+        id: row.id,
+        action: 'review',
+        note: note.trim(),
+      }).unwrap();
+      toast.success(pickApiToastMessage(response, 'Review requested'));
       onClose();
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not request a review.');
+      toast.error(handleApiError(err) || 'Could not request a review.');
     }
   };
 

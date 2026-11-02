@@ -86,15 +86,19 @@ export function getDateFilterRange(filter, from = new Date()) {
 /**
  * @param {{ shiftDate?: string, shiftStartTime?: string }} item
  * @param {string} filter
+ * @param {Date} [from]
+ * @param {{ keepUndated?: boolean }} [options]
  */
-export function matchesJobDateFilter(item, filter, from = new Date()) {
+export function matchesJobDateFilter(item, filter, from = new Date(), options = {}) {
   if (!filter || filter === 'all') return true;
 
   const range = getDateFilterRange(filter, from);
   if (!range) return true;
 
   const shiftDate = parseJobShiftDate(item?.shiftDate);
-  if (!shiftDate) return false;
+  if (!shiftDate) {
+    return Boolean(options.keepUndated);
+  }
 
   if (filter === 'urgent' || filter === 'next24Hours') {
     const shiftStart = parseJobShiftStart(item);

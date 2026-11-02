@@ -26,6 +26,7 @@ import { usePersistedViewMode } from 'src/hooks/use-persisted-view-mode';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { EmptyContent } from 'src/components/empty-content';
+import { matchesJobDateFilter } from 'src/components/jobs/job-date-filters';
 
 import {
   useGetCareHomeJobBidsQuery,
@@ -375,7 +376,10 @@ export function JobBidsView({ mode = 'careHome' }) {
       } else if (dateFilter === filter.value && apiHasTotal) {
         acc[filter.value] = serverTotal;
       } else {
-        acc[filter.value] = 0;
+        acc[filter.value] = source.filter((bid) => {
+          if (!bid?.shiftDate) return false;
+          return matchesJobDateFilter(bid, filter.value);
+        }).length;
       }
       return acc;
     }, {});
@@ -646,12 +650,16 @@ export function JobBidsView({ mode = 'careHome' }) {
 
       setUpdatingBidId(id);
       try {
-        await updateJobBid({ id, status: toCareHomeBidApiStatus('accepted') }).unwrap();
+        const response = await updateJobBid({
+          id,
+          status: toCareHomeBidApiStatus('accepted'),
+        }).unwrap();
 
         setBidOverrides((prev) => ({
           ...prev,
           [id]: { ...(prev[id] || {}), status: 'accepted' },
         }));
+        return response;
       } catch (err) {
         toast.error(
           getJobApiErrorMessage(err) || err?.data?.message || err?.error || err?.message || 'Could not accept bid'

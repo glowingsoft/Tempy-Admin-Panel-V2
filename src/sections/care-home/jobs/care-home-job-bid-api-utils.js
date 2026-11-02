@@ -2,7 +2,6 @@ import { format, isValid, parseISO } from 'date-fns';
 
 import { fToNow } from 'src/utils/format-time';
 
-// ----------------------------------------------------------------------
 
 function toDateKey(value) {
   if (!value) return '';
@@ -98,24 +97,79 @@ function normalizeSpecialities(...values) {
     .filter((value, index, list) => value && list.indexOf(value) === index);
 }
 
+/** Prefer the first non-empty yyyy-MM-dd (or parseable) date among candidates. */
+function firstDateKey(...values) {
+  for (const value of values) {
+    const key = toDateKey(value);
+    if (key) return key;
+  }
+  return '';
+}
+
+/**
+ * Bid payloads sometimes omit `shift.date` (empty object / id-only ref) while the
+ * date still lives on snapshot schedules or top-level fields. Recover it so the
+ * UI does not treat the bid as undated and drop it from date filters.
+ */
+function resolveBidShiftFields(item = {}, snapshot = {}) {
+  const shiftObj =
+    item.shift && typeof item.shift === 'object' && !Array.isArray(item.shift) ? item.shift : null;
+  const snapshotShift =
+    snapshot.shift && typeof snapshot.shift === 'object' && !Array.isArray(snapshot.shift)
+      ? snapshot.shift
+      : null;
+  const scheduleLists = [
+    Array.isArray(item.shift) ? item.shift : null,
+    Array.isArray(snapshot.shift) ? snapshot.shift : null,
+    Array.isArray(snapshot.shifts) ? snapshot.shifts : null,
+    Array.isArray(item.shifts) ? item.shifts : null,
+    Array.isArray(snapshot.schedules) ? snapshot.schedules : null,
+    Array.isArray(item.schedules) ? item.schedules : null,
+  ].filter(Boolean);
+
+  let scheduleShift = null;
+  for (const list of scheduleLists) {
+    scheduleShift = list.find((entry) => entry && typeof entry === 'object') || null;
+    if (scheduleShift) break;
+  }
+
+  const shift = shiftObj || snapshotShift || scheduleShift || {};
+
+  const shiftDate = firstDateKey(
+    shift.date,
+    shift.startDate,
+    shift.shiftDate,
+    item.date,
+    item.shiftDate,
+    item.scheduleDate,
+    snapshot.date,
+    snapshot.shiftDate,
+    scheduleShift?.date
+  );
+
+  return {
+    shift,
+    shiftId: pickId(shift._id, shift.id, item.shiftId, scheduleShift?._id, scheduleShift?.id),
+    shiftDate,
+    startTime: String(shift.startTime || scheduleShift?.startTime || item.startTime || '').trim(),
+    endTime: String(shift.endTime || scheduleShift?.endTime || item.endTime || '').trim(),
+  };
+}
+
 /**
  * Map GET `/web/care-home/job/bids` item → Job Bids card shape.
  * Keeps all useful API fields so the existing UI can render without removals.
  */
 export function mapCareHomeJobBidFromApi(item = {}) {
   const user = item.user && typeof item.user === 'object' ? item.user : {};
-  const shift = item.shift && typeof item.shift === 'object' ? item.shift : {};
   const snapshot = item.snapshot && typeof item.snapshot === 'object' ? item.snapshot : {};
   const type = item.type && typeof item.type === 'object' ? item.type : {};
   const location = snapshot.location && typeof snapshot.location === 'object' ? snapshot.location : {};
   const workStats = item.workStats && typeof item.workStats === 'object' ? item.workStats : {};
+  const { shift, shiftId, shiftDate, startTime, endTime } = resolveBidShiftFields(item, snapshot);
 
   const id = pickId(item._id, item.id);
   const jobId = pickId(item.job, snapshot._id, snapshot.id);
-  const shiftId = pickId(shift._id, shift.id);
-  const startTime = shift.startTime || '';
-  const endTime = shift.endTime || '';
-  const shiftDate = toDateKey(shift.date);
 
   const totalPrice = Number(item.bid ?? item.totalPrice ?? 0) || 0;
   const totalHours = Number(item.totalHours ?? 0) || 0;
@@ -174,7 +228,6 @@ export function mapCareHomeJobBidFromApi(item = {}) {
     shiftBreak: Boolean(shift.isBreak),
     shiftBreakMin: Number(shift.breakMin) || 0,
     shiftStatus: String(shift.status || '').toLowerCase(),
-    // Only bookings the customer can see come back (never `pending` ones).
     bookingId: pickId(item.booking, item.bookingId, shift.booking, shift.bookingId),
     description: String(item.note || snapshot.description || '').trim(),
     note: String(item.note || '').trim(),

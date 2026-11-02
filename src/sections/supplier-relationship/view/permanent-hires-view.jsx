@@ -29,7 +29,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { rowInPage, TablePaginationCustom, useTable } from 'src/components/table';
+import { TablePaginationCustom, useTable } from 'src/components/table';
 
 import {
   useGetPermanentHiresQuery,
@@ -45,14 +45,8 @@ import { PermanentHireDetailsDialog } from '../relationship-details-dialogs';
 import { HIRE_STATUS, getRoleApiBase, getRelationshipSide } from '../supplier-relationship-utils';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
-/**
- * Temp to permanent. A care home can request permanent status for agency or
- * home care company staff after the minimum shifts. There is no fee.
- */
 export function PermanentHiresView() {
-  // Admin viewing this account: hires can be viewed, not started or answered.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const isCareHome = getRelationshipSide(user) === 'customer';
@@ -61,15 +55,16 @@ export function PermanentHiresView() {
   const [hireOpen, setHireOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
 
+  const table = useTable({ defaultRowsPerPage: 10 });
   const { data: settings } = useGetPermanentHireSettingsQuery({ base }, { skip: !base });
-  const { data, isLoading, isError, error } = useGetPermanentHiresQuery({ base }, { skip: !base });
+  const { data, isLoading, isError, error } = useGetPermanentHiresQuery(
+    { base, page: table.page, limit: table.rowsPerPage },
+    { skip: !base }
+  );
   const [respond, { isLoading: isResponding }] = useRespondToPermanentHireMutation();
 
   const rows = data?.data || [];
-  const table = useTable({ defaultRowsPerPage: 10 });
-  const pageCount = Math.max(1, Math.ceil(rows.length / table.rowsPerPage));
-  const safePage = Math.min(table.page, pageCount - 1);
-  const pageRows = rowInPage(rows, safePage, table.rowsPerPage);
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
 
   const handleAction = async (row, action) => {
     try {
@@ -134,7 +129,7 @@ export function PermanentHiresView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageRows.map((row) => {
+              {rows.map((row) => {
                 const status = HIRE_STATUS[row.status] || HIRE_STATUS.pending;
                 const isPending = row.status === 'pending';
 
@@ -208,8 +203,8 @@ export function PermanentHiresView() {
           </Table>
         </Scrollbar>
         <TablePaginationCustom
-          page={safePage}
-          count={rows.length}
+          page={table.page}
+          count={totalCount}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           onRowsPerPageChange={table.onChangeRowsPerPage}
@@ -225,7 +220,6 @@ export function PermanentHiresView() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function HireDialog({ base, settings, onClose }) {
   const [selectedId, setSelectedId] = useState('');

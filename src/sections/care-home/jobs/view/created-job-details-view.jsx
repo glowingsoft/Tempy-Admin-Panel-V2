@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Avatar from '@mui/material/Avatar';
@@ -32,6 +33,7 @@ import { EmptyContent } from 'src/components/empty-content';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { JobMediaThumb, resolveJobImageSrc } from 'src/components/jobs/job-image';
 import { ModuleLoading } from 'src/components/loading-screen';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 
 import {
   useGetCareHomeJobByIdQuery,
@@ -70,7 +72,6 @@ import {
   normalizeJobStatus,
 } from '../care-home-job-utils';
 
-// ----------------------------------------------------------------------
 
 const FIELD_LABELS = {
   _id: 'Job ID',
@@ -103,15 +104,12 @@ const FIELD_LABELS = {
   'user.phone': 'Phone',
 };
 
-/** Full field paths the API returns but the details page should not show. */
 const HIDDEN_FIELD_PATHS = ['location.title'];
 
 const IMAGE_KEY_HINTS = ['image', 'icon', 'avatar', 'photo', 'picture', 'logo'];
 
-/** Words that must stay uppercase when a label or value is title-cased. */
 const TITLE_ACRONYMS = new Set(['ID', 'NHS', 'DBS', 'RTW', 'URL', 'FAQ', 'UK', 'PIN']);
 
-/** Values under these keys are identifiers or free-form — never re-case them. */
 const VERBATIM_VALUE_HINTS = [
   'email',
   'phone',
@@ -125,10 +123,8 @@ const VERBATIM_VALUE_HINTS = [
   'slug',
 ];
 
-/** `snake_case` / `kebab-case` / `camelCase` / `CONSTANT` — a single unspaced word. */
 const TOKEN_VALUE_PATTERN = /^[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)*$/;
 
-/** Capitalize each word, preserving acronyms and any existing inner caps (McDonald). */
 function toTitleCase(text) {
   return String(text)
     .split(/\s+/)
@@ -141,10 +137,7 @@ function toTitleCase(text) {
     .join(' ');
 }
 
-/**
- * True only for enum-like API values (`care_home`, `partTime`, `ACTIVE`).
- * Sentences, emails, URLs, ids, hashes and dates are left exactly as the API sent them.
- */
+
 function isConvertibleToken(key, value) {
   if (typeof value !== 'string') return false;
 
@@ -162,7 +155,6 @@ function isConvertibleToken(key, value) {
   return TOKEN_VALUE_PATTERN.test(trimmed);
 }
 
-/** `care_home` / `partTime` / `ACTIVE` -> `Care Home` / `Part Time` / `Active`. */
 function formatTokenValue(value) {
   return toTitleCase(
     String(value)
@@ -232,7 +224,6 @@ function flattenJobFields(source, prefix = '', depth = 0, seen = new WeakSet()) 
     return [{ key: prefix || 'value', label: humanizeKey(prefix || 'value'), value: source }];
   }
 
-  // Avoid blank-screen stack overflows from circular / huge API payloads.
   if (depth > 5) {
     if (isHiddenIdField(prefix)) return [];
     return [
@@ -261,7 +252,6 @@ function flattenJobFields(source, prefix = '', depth = 0, seen = new WeakSet()) 
   return Object.entries(source).flatMap(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key;
     if (isHiddenIdField(path)) return [];
-    // Skip noisy / recursive API blobs that are not useful in the details table.
     if (['raw', 'password', '__v', 'bids', 'coordinates'].includes(key)) return [];
     if (HIDDEN_FIELD_PATHS.includes(path)) return [];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -324,6 +314,13 @@ function DetailsSection({ title, fields, fallbackAlt }) {
   );
 }
 
+function isNotFoundApiError(error) {
+  const status = Number(error?.status || error?.originalStatus || error?.data?.statusCode || 0);
+  if (status === 404) return true;
+  const message = String(error?.data?.message || error?.error || error?.message || '').toLowerCase();
+  return message.includes('not found') || message.includes('no job');
+}
+
 function useCreatedJob(mode, id) {
   const skip = !id;
   const userById = useGetUserJobByIdQuery(id, { skip: skip || mode !== 'user' });
@@ -346,43 +343,42 @@ function useCreatedJob(mode, id) {
     { skip: skip || mode !== 'localAuthority' }
   );
 
-  const listRaw =
-    (mode === 'user' && userList.data?.data) ||
-    (mode === 'careHome' && careList.data?.data) ||
-    (mode === 'hospital' && hospitalList.data?.data) ||
-    (mode === 'localAuthority' && authorityList.data?.data) ||
-    [];
-  const list = Array.isArray(listRaw) ? listRaw : [];
-
-  const fromList = list.find((job) => String(job?.id || job?._id) === String(id));
-  const fromId =
-    (mode === 'user' && userById.data?.id && userById.data) ||
-    (mode === 'careHome' && careById.data?.id && careById.data) ||
-    (mode === 'hospital' && hospitalById.data?.id && hospitalById.data) ||
-    (mode === 'localAuthority' && authorityById.data?.id && authorityById.data) ||
+  const byIdQuery =
+    (mode === 'user' && userById) ||
+    (mode === 'careHome' && careById) ||
+    (mode === 'hospital' && hospitalById) ||
+    (mode === 'localAuthority' && authorityById) ||
     null;
-  const job = fromId || fromList || null;
-  const isLoading =
-    userById.isLoading ||
-    careById.isLoading ||
-    hospitalById.isLoading ||
-    authorityById.isLoading ||
-    userList.isLoading ||
-    careList.isLoading ||
-    hospitalList.isLoading ||
-    authorityList.isLoading;
-  const isError =
-    (mode === 'user' && userById.isError && userList.isError) ||
-    (mode === 'careHome' && careById.isError && careList.isError) ||
-    (mode === 'hospital' && hospitalById.isError && hospitalList.isError) ||
-    (mode === 'localAuthority' && authorityById.isError && authorityList.isError);
+  const listQuery =
+    (mode === 'user' && userList) ||
+    (mode === 'careHome' && careList) ||
+    (mode === 'hospital' && hospitalList) ||
+    (mode === 'localAuthority' && authorityList) ||
+    null;
 
-  return { job, isLoading, isError };
+  const listRaw = listQuery?.data?.data;
+  const list = Array.isArray(listRaw) ? listRaw : [];
+  const fromList = list.find((job) => String(job?.id || job?._id) === String(id));
+  const fromId = byIdQuery?.data?.id ? byIdQuery.data : null;
+  const job = fromId || fromList || null;
+
+  const isLoading = Boolean(byIdQuery?.isLoading || listQuery?.isLoading);
+  const byIdFailed = Boolean(byIdQuery?.isError);
+  const byIdNotFound = byIdFailed && isNotFoundApiError(byIdQuery?.error);
+  const isError = Boolean(!job && byIdFailed && !byIdNotFound);
+  const isNotFound = Boolean(!isLoading && !job && !isError);
+
+  return {
+    job,
+    isLoading,
+    isError,
+    isNotFound,
+    error: byIdQuery?.error || listQuery?.error || null,
+  };
 }
 
 const JOB_TYPES_ARGS = { page: 0, limit: 200 };
 
-/** Job types for the active role — the API sends `type` as a bare id on the job payload. */
 function useJobTypeTitles(mode) {
   const { data: list } = useRoleJobTypes(mode, { args: JOB_TYPES_ARGS });
 
@@ -397,7 +393,6 @@ function useJobTypeTitles(mode) {
   }, [list]);
 }
 
-/** Readable job type: populated object → mapped title → job-type lookup → job name. */
 function resolveJobTypeLabel(job, raw, titleById) {
   const typeValue = raw?.type ?? job?.type;
 
@@ -415,11 +410,9 @@ function resolveJobTypeLabel(job, raw, titleById) {
   const matched = typeId ? titleById.get(typeId) : '';
   if (matched) return matched;
 
-  // `name` is written from the job type title when the job is created.
   return String(job?.name || raw?.name || '').trim();
 }
 
-/** Collapse `type` (id string, or an expanded object) into one readable row, in place. */
 function withResolvedJobType(fields, label) {
   if (!label) return fields;
 
@@ -470,13 +463,12 @@ function splitFields(fields) {
 }
 
 export function CreatedJobDetailsView() {
-  // Admin viewing this account cannot rate the worker.
   const viewOnly = useViewOnly();
   const { id = '' } = useParams();
   const pathname = usePathname();
   const mode = getModeFromPath(pathname);
   const jobTypeTitles = useJobTypeTitles(mode);
-  const { job: loadedJob, isLoading, isError } = useCreatedJob(mode, id);
+  const { job: loadedJob, isLoading, isError, isNotFound, error } = useCreatedJob(mode, id);
   const reviewDialog = useBoolean();
   const attendanceDialog = useBoolean();
   const [createReview, { isLoading: creatingReview }] = useCreateReviewMutation();
@@ -561,7 +553,7 @@ export function CreatedJobDetailsView() {
 
       try {
         if (reviewJob.review?.id) {
-          await updateReview({
+          const response = await updateReview({
             id: reviewJob.review.id,
             rating,
             comment,
@@ -569,7 +561,7 @@ export function CreatedJobDetailsView() {
             objectId: reviewJob.review.objectId || target.objectId,
           }).unwrap();
           rememberReview(reviewJob.id, { ...reviewJob.review, rating, comment });
-          toast.success('Rating updated');
+          toast.success(pickApiToastMessage(response, 'Rating updated'));
         } else {
           const response = await createReview({
             reviewType: target.reviewType,
@@ -581,11 +573,11 @@ export function CreatedJobDetailsView() {
             reviewJob.id,
             mapReviewMutationResponse(response) || { ...target, id: '', rating, comment }
           );
-          toast.success('Worker rated');
+          toast.success(pickApiToastMessage(response, 'Worker rated'));
         }
         reviewDialog.onFalse();
       } catch (err) {
-        toast.error(err?.data?.message || err?.error || err?.message || 'Could not save rating');
+        toast.error(handleApiError(err) || 'Could not save rating');
       }
     },
     [createReview, rememberReview, reviewDialog, reviewJob, updateReview]
@@ -615,10 +607,14 @@ export function CreatedJobDetailsView() {
 
       {isLoading ? (
         <ModuleLoading />
-      ) : isError || !job ? (
+      ) : isError ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {handleApiError(error) || 'Could not load this job. Please try again.'}
+        </Alert>
+      ) : isNotFound || !job ? (
         <EmptyContent
           title="Job Not Found"
-          description="This job could not be loaded."
+          description="This job could not be found."
           action={
             <Button component={RouterLink} href={createdHref} variant="contained" sx={{ mt: 2 }}>
               Back to jobs

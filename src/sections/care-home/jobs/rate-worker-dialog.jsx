@@ -20,7 +20,6 @@ import {
   getWorkerRatingOption,
 } from './care-home-job-utils';
 
-// ----------------------------------------------------------------------
 
 function commentWithoutLabel(comment = '') {
   return String(comment || '')
@@ -33,13 +32,16 @@ export function RateWorkerDialog({
   job,
   onClose,
   onSubmit,
+  onDelete,
   submitting = false,
+  deleting = false,
 }) {
   const [ratingId, setRatingId] = useState('');
   const [comment, setComment] = useState('');
 
   const isEditing = Boolean(job?.review?.id || job?.review?.rating);
   const workerName = getJobWorkerName(job);
+  const busy = submitting || deleting;
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +53,7 @@ export function RateWorkerDialog({
   const selected = WORKER_RATING_OPTIONS.find((option) => option.id === ratingId);
 
   const handleSubmit = () => {
-    if (!selected || submitting) return;
+    if (!selected || busy) return;
     const notes = comment.trim();
     onSubmit?.({
       rating: selected.rating,
@@ -61,7 +63,7 @@ export function RateWorkerDialog({
   };
 
   return (
-    <Dialog open={open} onClose={submitting ? undefined : onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>{isEditing ? 'Update worker rating' : 'Rate worker'}</DialogTitle>
 
       <DialogContent dividers sx={{ pt: 2.5 }}>
@@ -107,19 +109,35 @@ export function RateWorkerDialog({
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button color="inherit" variant="outlined" onClick={onClose} disabled={submitting}>
-          Cancel
-        </Button>
-        <LoadingButton
-          variant="contained"
-          color="primary"
-          disabled={!selected}
-          loading={submitting}
-          onClick={handleSubmit}
-        >
-          {isEditing ? 'Update rating' : 'Submit rating'}
-        </LoadingButton>
+      <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+        <Box>
+          {isEditing && onDelete ? (
+            <LoadingButton
+              color="error"
+              variant="outlined"
+              loading={deleting}
+              disabled={submitting}
+              onClick={onDelete}
+            >
+              Delete
+            </LoadingButton>
+          ) : null}
+        </Box>
+
+        <Stack direction="row" spacing={1.25}>
+          <Button color="inherit" variant="outlined" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <LoadingButton
+            variant="contained"
+            color="primary"
+            disabled={!selected || deleting}
+            loading={submitting}
+            onClick={handleSubmit}
+          >
+            {isEditing ? 'Update rating' : 'Submit rating'}
+          </LoadingButton>
+        </Stack>
       </DialogActions>
     </Dialog>
   );

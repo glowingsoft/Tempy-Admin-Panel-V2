@@ -77,7 +77,7 @@ export function AgencyPaymentsView() {
         </Box>
 
         {isCustomer ? <CustomerMandateCard userId={userId} /> : <SupplierBankCard userId={userId} />}
-        <BookingPaymentsList role={apiRole} />
+        <BookingPaymentsList role={apiRole} isCustomer={isCustomer} />
       </Stack>
     </DashboardContent>
   );

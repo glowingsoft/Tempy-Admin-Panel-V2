@@ -15,22 +15,6 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { useSelector } from 'react-redux';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -2516,31 +2500,6 @@ function TeamGroup({
   );
 }
 
-function SortableTeamGroup({ team, ...rest }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(team.id),
-  });
-
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.72 : 1,
-        zIndex: isDragging ? 2 : 'auto',
-        position: 'relative',
-      }}
-    >
-      <TeamGroup
-        team={team}
-        dragHandleProps={{ ...attributes, ...listeners }}
-        {...rest}
-      />
-    </Box>
-  );
-}
-
 
 function LeftSidebar({
   location,
@@ -2888,43 +2847,6 @@ function LeftSidebar({
   );
 }
 
-function loadTeamOrder(storageKey) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTeamOrder(storageKey, order) {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(order.map(String)));
-  } catch {
-  }
-}
-
-function sortTeamsByOrder(teamsList = [], orderIds = []) {
-  if (!teamsList.length) return [];
-  if (!orderIds.length) return teamsList;
-
-  const byId = new Map(teamsList.map((team) => [String(team.id), team]));
-  const ordered = [];
-
-  orderIds.forEach((id) => {
-    const team = byId.get(String(id));
-    if (team) {
-      ordered.push(team);
-      byId.delete(String(id));
-    }
-  });
-
-  byId.forEach((team) => ordered.push(team));
-  return ordered;
-}
-
-
 export function ShiftsView({
   rotaConfig,
   enableBookingCalendar: _enableBookingCalendar = true,
@@ -3022,8 +2944,6 @@ function ShiftsViewContent({
   const [shifts, setShifts] = useState({});
   const [collapsed, setCollapsed] = useState({});
   const [location, setLocation] = useState(defaultLocationId || ALL_LOCATIONS_ID);
-  const teamOrderStorageKey = `tempy-shifts-team-order-${apiRole || 'careHome'}`;
-  const [teamOrderIds, setTeamOrderIds] = useState(() => loadTeamOrder(teamOrderStorageKey));
   const [cellActionMenu, setCellActionMenu] = useState(null);
   const [postJobIntent, setPostJobIntent] = useState('bookShift');
 
@@ -3424,7 +3344,6 @@ function ShiftsViewContent({
         clickedStaffId,
         teams
       );
-      // Always pin the card to a visible rota row so Request staff is never invisible.
       const targetStaffId =
         resolvedStaffId ||
         clickedStaffId ||
@@ -3675,7 +3594,6 @@ function ShiftsViewContent({
       const apiShifts = calendarData.shifts || {};
       const next = { ...apiShifts };
 
-      // Staff ids actually rendered on the rota (calendar teams, else dashboard staff).
       const visibleStaffIds = new Set();
       const apiTeams = Array.isArray(calendarData.teams) ? calendarData.teams : [];
       const rosterTeams = apiTeams.length > 0 ? apiTeams : staffApiTeams;
@@ -3685,7 +3603,6 @@ function ShiftsViewContent({
         });
       });
 
-      // Job ids the calendar already drew on a *visible* row.
       const apiJobIdsOnVisibleRows = new Set();
       Object.entries(apiShifts).forEach(([key, shift]) => {
         const jobId = String(shift?.jobId || '').trim();
@@ -3696,8 +3613,6 @@ function ShiftsViewContent({
         if (visibleStaffIds.has(staffId)) apiJobIdsOnVisibleRows.add(jobId);
       });
 
-      // Keep optimistic "from job" cards (e.g. Request staff) when the calendar
-      // omits them or places them on a role/row that is not on this rota.
       Object.entries(prev).forEach(([key, shift]) => {
         if (!shift?.fromJob) return;
         if (next[key]) return;
@@ -3756,48 +3671,10 @@ function ShiftsViewContent({
 
   const rosterCtx = useMemo(() => ({ shifts, days }), [shifts, days]);
 
+
   const visibleTeams = useMemo(
-    () => sortTeamsByOrder(mapTeamsByRosterScope(teams, rosterScope, rosterCtx), teamOrderIds),
-    [teams, rosterScope, rosterCtx, teamOrderIds]
-  );
-
-  useEffect(() => {
-    if (!teams?.length) return;
-    setTeamOrderIds((prev) => {
-      const ids = teams.map((team) => String(team.id));
-      const next = [...prev.filter((id) => ids.includes(String(id)))];
-      ids.forEach((id) => {
-        if (!next.includes(id)) next.push(id);
-      });
-      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
-        return prev;
-      }
-      saveTeamOrder(teamOrderStorageKey, next);
-      return next;
-    });
-  }, [teams, teamOrderStorageKey]);
-
-  const teamSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const handleTeamDragEnd = useCallback(
-    (event) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-
-      setTeamOrderIds((prev) => {
-        const current = sortTeamsByOrder(visibleTeams, prev).map((team) => String(team.id));
-        const oldIndex = current.indexOf(String(active.id));
-        const newIndex = current.indexOf(String(over.id));
-        if (oldIndex < 0 || newIndex < 0) return prev;
-        const next = arrayMove(current, oldIndex, newIndex);
-        saveTeamOrder(teamOrderStorageKey, next);
-        return next;
-      });
-    },
-    [teamOrderStorageKey, visibleTeams]
+    () => mapTeamsByRosterScope(teams, rosterScope, rosterCtx),
+    [teams, rosterScope, rosterCtx]
   );
 
   const visibleStaffCount = useMemo(() => countRosterMembers(visibleTeams), [visibleTeams]);
@@ -4402,27 +4279,27 @@ function ShiftsViewContent({
 
       try {
         if (reviewJob.review?.id) {
-          await updateReview({
+          const response = await updateReview({
             id: reviewJob.review.id,
             rating,
             comment,
             reviewType: reviewJob.review.reviewType || target.reviewType,
             objectId: reviewJob.review.objectId || target.objectId,
           }).unwrap();
-          toast.success('Rating updated');
+          toast.success(pickApiToastMessage(response, 'Rating updated'));
         } else {
-          await createReview({
+          const response = await createReview({
             reviewType: target.reviewType,
             objectId: target.objectId,
             rating,
             comment,
           }).unwrap();
-          toast.success('Worker rated');
+          toast.success(pickApiToastMessage(response, 'Worker rated'));
         }
         handleCloseReviewDialog();
         refetchReviews?.();
       } catch (err) {
-        toast.error(err?.data?.message || err?.error || err?.message || 'Could not save rating');
+        toast.error(handleApiError(err) || 'Could not save rating');
       }
     },
     [createReview, handleCloseReviewDialog, refetchReviews, reviewJob, updateReview]
@@ -4780,40 +4657,29 @@ function ShiftsViewContent({
                     />
                   </Box>
                 ) : (
-                  <DndContext
-                    sensors={teamSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTeamDragEnd}
-                  >
-                    <SortableContext
-                      items={visibleTeams.map((team) => String(team.id))}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {visibleTeams.map((team) => (
-                        <SortableTeamGroup
-                          key={team.id}
-                          team={team}
-                          days={days}
-                          shifts={shifts}
-                          selectedStaffId={showStaffDetail ? selectedStaff?.id : null}
-                          activeCell={activeCell}
-                          formPreview={formPreview}
-                          onCellClick={handleCellClick}
-                          onStaffSelect={handleStaffSelect}
-                          onStaffPick={handleCardStaffPick}
-                          onOpenDetails={handleOpenShiftDetails}
-                          onViewBids={handleViewBids}
-                          onIncreaseRate={viewOnly ? undefined : handleIncreaseRate}
-                          onRateWorker={viewOnly ? undefined : handleRateWorker}
-                          viewOnly={viewOnly}
-                          collapsed={!!collapsed[team.id]}
-                          onToggle={() => setCollapsed((p) => ({ ...p, [team.id]: !p[team.id] }))}
-                          staffColWidth={staffColWidth}
-                          dayColWidth={dayColWidth}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                  visibleTeams.map((team) => (
+                    <TeamGroup
+                      key={team.id}
+                      team={team}
+                      days={days}
+                      shifts={shifts}
+                      selectedStaffId={showStaffDetail ? selectedStaff?.id : null}
+                      activeCell={activeCell}
+                      formPreview={formPreview}
+                      onCellClick={handleCellClick}
+                      onStaffSelect={handleStaffSelect}
+                      onStaffPick={handleCardStaffPick}
+                      onOpenDetails={handleOpenShiftDetails}
+                      onViewBids={handleViewBids}
+                      onIncreaseRate={viewOnly ? undefined : handleIncreaseRate}
+                      onRateWorker={viewOnly ? undefined : handleRateWorker}
+                      viewOnly={viewOnly}
+                      collapsed={!!collapsed[team.id]}
+                      onToggle={() => setCollapsed((p) => ({ ...p, [team.id]: !p[team.id] }))}
+                      staffColWidth={staffColWidth}
+                      dayColWidth={dayColWidth}
+                    />
+                  ))
                 )}
 
                 <Box sx={{ flex: 1, minHeight: 32, bgcolor: rotaPaper }} />

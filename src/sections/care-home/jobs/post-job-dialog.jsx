@@ -159,14 +159,12 @@ export function PostJobDialog({
       return;
     }
 
-    if (!editingJob) {
-      const careError = validateCareDetails(draft);
-      if (careError) {
-        setFormError(careError);
-        toast.error(careError);
-        setStep(2);
-        return;
-      }
+    const careError = validateCareDetails(draft);
+    if (careError) {
+      setFormError(careError);
+      toast.error(careError);
+      setStep(2);
+      return;
     }
 
     setSubmitting(true);
@@ -213,11 +211,9 @@ export function PostJobDialog({
     >
       <DialogTitle>
         {dialogTitle}
-        {!editingJob ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
-            Step {step} of 2 — {step === 1 ? 'Job details' : 'Care details'}
-          </Typography>
-        ) : null}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
+          Step {step} of 2 — {step === 1 ? 'Job details' : 'Care details'}
+        </Typography>
       </DialogTitle>
 
       <DialogContent

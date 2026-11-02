@@ -30,7 +30,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { rowInPage, TablePaginationCustom, useTable } from 'src/components/table';
+import { TablePaginationCustom, useTable } from 'src/components/table';
 
 import { dataUrlToFile } from 'src/sections/staff-member/jobs/nurse-checkin-api-utils';
 import { SignaturePad } from 'src/sections/staff-member/jobs/staff-member-check-dialogs';
@@ -53,10 +53,8 @@ import {
 import { RowActionButton } from '../row-action-button';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
 export function ContractsView() {
-  // Admin viewing this account: contracts can be viewed, not uploaded or signed.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const side = getRelationshipSide(user);
@@ -66,12 +64,13 @@ export function ContractsView() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [signing, setSigning] = useState(null);
 
-  const { data, isLoading, isError } = useGetContractsQuery({ base }, { skip: !side });
-  const rows = data?.data || [];
   const table = useTable({ defaultRowsPerPage: 10 });
-  const pageCount = Math.max(1, Math.ceil(rows.length / table.rowsPerPage));
-  const safePage = Math.min(table.page, pageCount - 1);
-  const pageRows = rowInPage(rows, safePage, table.rowsPerPage);
+  const { data, isLoading, isError } = useGetContractsQuery(
+    { base, page: table.page, limit: table.rowsPerPage },
+    { skip: !side }
+  );
+  const rows = data?.data || [];
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
 
   return (
     <DashboardContent maxWidth={false}>
@@ -124,7 +123,7 @@ export function ContractsView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageRows.map((row) => {
+              {rows.map((row) => {
                 const party = isSupplier ? row.customer : row.supplier;
                 const status = CONTRACT_STATUS[row.status] || CONTRACT_STATUS.none;
                 const canSign = !isSupplier && row.status === 'awaitingCustomer';
@@ -197,8 +196,8 @@ export function ContractsView() {
           </Table>
         </Scrollbar>
         <TablePaginationCustom
-          page={safePage}
-          count={rows.length}
+          page={table.page}
+          count={totalCount}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           onRowsPerPageChange={table.onChangeRowsPerPage}
@@ -219,7 +218,6 @@ export function ContractsView() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function UploadContractDialog({ base, open, onClose }) {
   const [customerType, setCustomerType] = useState('careHome');
@@ -242,8 +240,6 @@ function UploadContractDialog({ base, open, onClose }) {
   const handleSubmit = async () => {
     try {
       const uploaded = await uploadFile(file).unwrap();
-      // Save the full S3 link: the backend returns contract.document as-is, so a bare key
-      // would resolve against the API server and 404.
       await uploadContract({ base, customer, document: uploaded.fileUrl || uploaded.file }).unwrap();
       toast.success('Contract sent to the customer to sign');
       handleClose();
@@ -319,9 +315,7 @@ function UploadContractDialog({ base, open, onClose }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
-/** Signed date plus the drawn signature (older rows may hold a typed name instead). */
 function SignedBy({ label, date, signature }) {
   const isImage = /^https?:\/\//i.test(signature || '');
 
@@ -341,10 +335,8 @@ function SignedBy({ label, date, signature }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function SignContractDialog({ base, row, isSupplier, onClose }) {
-  // Drawn signature as a PNG data URL, same as check-in / check-out.
   const [signature, setSignature] = useState(null);
 
   const [uploadFile, { isLoading: isUploading }] = useUploadAwsFileMutation();

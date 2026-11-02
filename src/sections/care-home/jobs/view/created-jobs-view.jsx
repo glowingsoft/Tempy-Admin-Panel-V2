@@ -81,6 +81,8 @@ import { useActiveBranch } from 'src/sections/branches/active-branch-context';
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 import { ALL_SITES_ID, jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
 
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
+
 import {
   buildCareHomeJobPayload,
   isJobCreateSoftError,
@@ -1248,7 +1250,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
       try {
         if (reviewJob.review?.id) {
-          await updateReview({
+          const response = await updateReview({
             id: reviewJob.review.id,
             rating,
             comment,
@@ -1256,7 +1258,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
             objectId: reviewJob.review.objectId || target.objectId,
           }).unwrap();
           rememberReview(reviewJob.id, { ...reviewJob.review, rating, comment });
-          toast.success('Rating updated');
+          toast.success(pickApiToastMessage(response, 'Rating updated'));
         } else {
           const response = await createReview({
             reviewType: target.reviewType,
@@ -1268,12 +1270,12 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
             reviewJob.id,
             mapReviewMutationResponse(response) || { ...target, id: '', rating, comment }
           );
-          toast.success('Worker rated');
+          toast.success(pickApiToastMessage(response, 'Worker rated'));
         }
         handleCloseReviewDialog();
         refetch();
       } catch (err) {
-        toast.error(err?.data?.message || err?.error || err?.message || 'Could not save rating');
+        toast.error(handleApiError(err) || 'Could not save rating');
       }
     },
     [createReview, handleCloseReviewDialog, refetch, rememberReview, reviewJob, updateReview]

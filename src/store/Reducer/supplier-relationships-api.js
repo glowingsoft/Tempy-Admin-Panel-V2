@@ -12,7 +12,6 @@ import {
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
 
-// ----------------------------------------------------------------------
 
 function extractList(response) {
   const data = response?.data ?? response;
@@ -46,14 +45,24 @@ function mapList(mapItem) {
       })
       .filter((item) => item?.id);
     const meta = response?.meta || response?.data?.meta || {};
-    return { data, meta };
+    const totalRecords = meta.totalRecords ?? meta.total ?? meta.total_count ?? data.length;
+    return {
+      data,
+      meta: { ...meta, totalRecords },
+      total_length: totalRecords,
+    };
   };
 }
 
-/**
- * Supplier ↔ customer: contracts, agreed rates and temp-to-permanent hires.
- * Every call takes `base`, the role prefix from getRoleApiBase(user), e.g. /web/agency.
- */
+function listParams({ page = 0, limit = 10, ...rest } = {}) {
+  const params = { page: page + 1, limit };
+  Object.entries(rest).forEach(([key, value]) => {
+    if (value != null && value !== '') params[key] = value;
+  });
+  return params;
+}
+
+
 export const supplierRelationshipsApi = createApi({
   reducerPath: 'supplierRelationshipsApi',
   baseQuery: createCustomFetchBaseQuery(),
@@ -62,7 +71,6 @@ export const supplierRelationshipsApi = createApi({
   tagTypes: ['Contract', 'AgreedRate', 'PermanentHire'],
 
   endpoints: (builder) => ({
-    /** GET agreed-rates/users?userType=careHome|user — customers a supplier can pick */
     getCustomerOptions: builder.query({
       query: ({ base, userType }) => ({
         url: `${API_ROUTES.AGREED_RATES(base)}/users`,
@@ -72,21 +80,22 @@ export const supplierRelationshipsApi = createApi({
       transformResponse: mapList(mapUserOption),
     }),
 
-    // Contracts ----------------------------------------------------------
 
     getContracts: builder.query({
-      query: ({ base }) => ({ url: API_ROUTES.CONTRACTS(base), method: 'GET', params: { limit: 100 } }),
+      query: ({ base, page = 0, limit = 10 } = {}) => ({
+        url: API_ROUTES.CONTRACTS(base),
+        method: 'GET',
+        params: listParams({ page, limit }),
+      }),
       transformResponse: mapList(mapRelationshipFromApi),
       providesTags: ['Contract'],
     }),
 
-    /** Supplier: { customer, document } */
     uploadContract: builder.mutation({
       query: ({ base, ...body }) => ({ url: API_ROUTES.CONTRACTS(base), method: 'POST', body }),
       invalidatesTags: ['Contract'],
     }),
 
-    /** action: sign (customer, first) | countersign (supplier, completes it) */
     signContract: builder.mutation({
       query: ({ base, id, action, signature }) => ({
         url: API_ROUTES.CONTRACT_ACTION(base, id, action),
@@ -96,9 +105,7 @@ export const supplierRelationshipsApi = createApi({
       invalidatesTags: ['Contract'],
     }),
 
-    // Agreed rates -------------------------------------------------------
 
-    /** GET {base}/agreed-rates/current?customer=&jobType — rates already agreed for this customer and role */
     getCurrentAgreedRate: builder.query({
       query: ({ base, customer, jobType }) => ({
         url: API_ROUTES.AGREED_RATES_CURRENT(base),
@@ -110,18 +117,20 @@ export const supplierRelationshipsApi = createApi({
     }),
 
     getAgreedRates: builder.query({
-      query: ({ base }) => ({ url: API_ROUTES.AGREED_RATES(base), method: 'GET', params: { limit: 100 } }),
+      query: ({ base, page = 0, limit = 10 } = {}) => ({
+        url: API_ROUTES.AGREED_RATES(base),
+        method: 'GET',
+        params: listParams({ page, limit }),
+      }),
       transformResponse: mapList(mapAgreedRateFromApi),
       providesTags: ['AgreedRate'],
     }),
 
-    /** Supplier: { customer, jobType, rates: { day, night, weekend }, effectiveFrom } */
     createAgreedRate: builder.mutation({
       query: ({ base, ...body }) => ({ url: API_ROUTES.AGREED_RATES(base), method: 'POST', body }),
       invalidatesTags: ['AgreedRate'],
     }),
 
-    /** Supplier, while still open: { rates, effectiveFrom } — goes back to pending */
     updateAgreedRate: builder.mutation({
       query: ({ base, id, ...body }) => ({
         url: API_ROUTES.AGREED_RATE_BY_ID(base, id),
@@ -131,7 +140,6 @@ export const supplierRelationshipsApi = createApi({
       invalidatesTags: ['AgreedRate'],
     }),
 
-    /** action: withdraw (supplier) | accept | reject | review (customer, body { note }) */
     respondToAgreedRate: builder.mutation({
       query: ({ base, id, action, ...body }) => ({
         url: API_ROUTES.AGREED_RATE_ACTION(base, id, action),
@@ -141,15 +149,12 @@ export const supplierRelationshipsApi = createApi({
       invalidatesTags: ['AgreedRate'],
     }),
 
-    // Temp to permanent --------------------------------------------------
 
-    /** { minShifts, fee } set by admin */
     getPermanentHireSettings: builder.query({
       query: ({ base }) => ({ url: API_ROUTES.PERMANENT_HIRE_SETTINGS(base), method: 'GET' }),
       transformResponse: (response) => response?.data || {},
     }),
 
-    /** Care home: agency workers and solo nurses who have worked there, with shift counts */
     getEligibleWorkers: builder.query({
       query: ({ base }) => ({ url: API_ROUTES.PERMANENT_HIRE_ELIGIBLE(base), method: 'GET' }),
       transformResponse: mapList(mapEligibleWorkerFromApi),
@@ -157,22 +162,20 @@ export const supplierRelationshipsApi = createApi({
     }),
 
     getPermanentHires: builder.query({
-      query: ({ base }) => ({
+      query: ({ base, page = 0, limit = 10 } = {}) => ({
         url: API_ROUTES.PERMANENT_HIRES(base),
         method: 'GET',
-        params: { limit: 100 },
+        params: listParams({ page, limit }),
       }),
       transformResponse: mapList(mapPermanentHireFromApi),
       providesTags: ['PermanentHire'],
     }),
 
-    /** Care home: { worker, supplier? } — supplier is the agency id, left out for a solo nurse */
     requestPermanentHire: builder.mutation({
       query: ({ base, ...body }) => ({ url: API_ROUTES.PERMANENT_HIRES(base), method: 'POST', body }),
       invalidatesTags: ['PermanentHire'],
     }),
 
-    /** action: cancel (care home) | accept | reject (agency / nurse) */
     respondToPermanentHire: builder.mutation({
       query: ({ base, id, action }) => ({
         url: API_ROUTES.PERMANENT_HIRE_ACTION(base, id, action),
