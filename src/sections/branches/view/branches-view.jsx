@@ -921,7 +921,7 @@ export function BranchesView() {
         showComplianceFields={homeCareCompanyMode}
         hideImages={careHomeMode}
         hideInsurance={careHomeMode}
-        hideState={careHomeMode}
+        stateLabel={careHomeMode ? 'County' : 'State'}
       />
 
       <ConfirmDialog

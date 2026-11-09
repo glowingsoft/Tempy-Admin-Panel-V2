@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import Box from '@mui/material/Box';
@@ -93,36 +93,69 @@ function CustomerMandateCard({ userId }) {
   const mandate = savedMandate?.status ? savedMandate : data;
   const active = isUsableCustomerMandate(mandate);
 
-  useEffect(() => {
-    if (active) window.clearInterval(pollRef.current);
-  }, [active]);
+  const stopMandatePoll = useCallback(() => {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = 0;
+    }
+  }, []);
 
-  useEffect(() => () => window.clearInterval(pollRef.current), []);
-
-  const handleSetup = async () => {
-    if (active) return;
-    try {
-      const result = await setupMandate(cacheKey).unwrap();
-      if (isUsableCustomerMandate(result)) {
-        setSavedMandate(result);
-        dispatch(gocardlessApi.util.upsertQueryData('getGoCardlessMandate', cacheKey, result));
-      }
-      if (result?.redirectUrl) {
-        window.open(result.redirectUrl, '_blank', 'noopener,noreferrer');
-        window.clearInterval(pollRef.current);
-        const started = Date.now();
-        pollRef.current = window.setInterval(() => {
-          refetch();
-          if (Date.now() - started > 90000) window.clearInterval(pollRef.current);
-        }, 2000);
+  const startMandatePoll = useCallback(() => {
+    stopMandatePoll();
+    const started = Date.now();
+    // Slow poll only while the GoCardless popup may still be open — not a background loop.
+    pollRef.current = window.setInterval(() => {
+      if (Date.now() - started > 60000) {
+        stopMandatePoll();
         return;
       }
+      refetch();
+    }, 5000);
+  }, [refetch, stopMandatePoll]);
+
+  useEffect(() => {
+    if (active) stopMandatePoll();
+  }, [active, stopMandatePoll]);
+
+  useEffect(() => () => stopMandatePoll(), [stopMandatePoll]);
+
+  const handleSetup = async () => {
+    if (active || settingUp) return;
+
+    const popup = window.open('about:blank', '_blank');
+
+    try {
+      const result = await setupMandate(cacheKey).unwrap();
+
       if (isUsableCustomerMandate(result)) {
+        stopMandatePoll();
+        setSavedMandate(result);
+        dispatch(gocardlessApi.util.upsertQueryData('getGoCardlessMandate', cacheKey, result));
+        if (popup) popup.close();
         toast.success(pickApiToastMessage(result, 'Direct debit is already set up'));
         return;
       }
+
+      const setupUrl = String(result?.redirectUrl || '').trim();
+      if (setupUrl) {
+        if (popup && !popup.closed) {
+          try {
+            popup.opener = null;
+          } catch {
+          }
+          popup.location.href = setupUrl;
+        } else {
+          window.location.assign(setupUrl);
+          return;
+        }
+        startMandatePoll();
+        return;
+      }
+
+      if (popup) popup.close();
       toast.error('Could not open the direct debit page. The bank setup link was missing.');
     } catch (err) {
+      if (popup) popup.close();
       toast.error(handleApiError(err) || 'Could not set up the direct debit');
     }
   };
@@ -137,7 +170,7 @@ function CustomerMandateCard({ userId }) {
       </Stack>
 
       {isError ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mx: 0, mb: 2 }}>
           {handleApiError(error) || 'Could not load the mandate'}
         </Alert>
       ) : null}
@@ -147,7 +180,7 @@ function CustomerMandateCard({ userId }) {
         does not take another payment.
       </Typography>
 
-      <AppButton onClick={handleSetup} loading={settingUp} disabled={isLoading || active}>
+      <AppButton onClick={handleSetup} loading={settingUp} disabled={active}>
         {active ? 'Update direct debit' : 'Set up direct debit'}
       </AppButton>
       {active ? (

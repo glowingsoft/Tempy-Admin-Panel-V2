@@ -271,6 +271,19 @@ export const localAuthorityJobsApi = createApi({
       ],
     }),
 
+    cancelLocalAuthorityBooking: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.LOCAL_AUTHORITY_BOOKING_BY_ID(id),
+        method: 'PUT',
+        body: { status: 'cancel' },
+      }),
+      invalidatesTags: [
+        { type: 'LocalAuthorityJobBid', id: 'LIST' },
+        { type: 'LocalAuthorityJob', id: 'LIST' },
+        { type: 'LocalAuthorityBookingCalendar', id: 'LIST' },
+      ],
+    }),
+
     getLocalAuthorityBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -309,5 +322,6 @@ export const {
   useGetLocalAuthorityJobBidsQuery,
   useUpdateLocalAuthorityJobBidMutation,
   useCreateLocalAuthorityBookingMutation,
+  useCancelLocalAuthorityBookingMutation,
   useGetLocalAuthorityBookingCalendarQuery,
 } = localAuthorityJobsApi;

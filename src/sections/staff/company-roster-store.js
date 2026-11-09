@@ -1,7 +1,3 @@
-/**
- * Helpers for employer Shifts rota teams.
- * Roster rows come from the dashboard staff API — not localStorage.
- */
 
 const TEAM_COLORS = ['#e53935', '#212121', '#455a64', '#039be5', '#00897b', '#6d4c41', '#5e35b1'];
 
@@ -47,10 +43,6 @@ function teamLabelForStaff(member = {}) {
   );
 }
 
-/**
- * Build shifts rota teams from GET dashboard staff list when the booking
- * calendar returns no role/worker groups yet.
- */
 export function mapDashboardStaffToShiftTeams(staffList = []) {
   const staff = (Array.isArray(staffList) ? staffList : []).filter(
     (member) => member?.id && !member?.isVacant
@@ -96,6 +88,63 @@ export function mapDashboardStaffToShiftTeams(staffList = []) {
       fromStaffApi: true,
     };
   });
+}
+
+export function mergeShiftRosterTeams(calendarTeams = [], staffApiTeams = []) {
+  const calendar = Array.isArray(calendarTeams) ? calendarTeams : [];
+  const fromStaff = Array.isArray(staffApiTeams) ? staffApiTeams : [];
+  if (!calendar.length) return fromStaff;
+  if (!fromStaff.length) return calendar;
+
+  const seen = new Set();
+  calendar.forEach((team) => {
+    (team?.staff || []).forEach((member) => {
+      if (member?.id != null) seen.add(String(member.id));
+    });
+  });
+
+  const next = calendar.map((team) => ({
+    ...team,
+    staff: [...(team.staff || [])],
+  }));
+
+  fromStaff.forEach((staffTeam) => {
+    const missing = (staffTeam?.staff || []).filter(
+      (member) => member?.id != null && !seen.has(String(member.id))
+    );
+    if (!missing.length) return;
+
+    missing.forEach((member) => seen.add(String(member.id)));
+
+    const labelKey = String(staffTeam.label || '')
+      .trim()
+      .toLowerCase();
+    const existing = labelKey
+      ? next.find((team) => String(team.label || '').trim().toLowerCase() === labelKey)
+      : null;
+
+    if (existing) {
+      existing.staff = [...existing.staff, ...missing];
+      if (existing.totals && typeof existing.totals === 'object') {
+        existing.totals = {
+          ...existing.totals,
+          totalPeople: existing.staff.length,
+        };
+      }
+      return;
+    }
+
+    next.push({
+      ...staffTeam,
+      staff: missing,
+      totals: {
+        ...(staffTeam.totals || {}),
+        totalPeople: missing.length,
+      },
+    });
+  });
+
+  return next;
 }
 
 export function resolveRosterAccountKey(apiRole = 'careHome') {

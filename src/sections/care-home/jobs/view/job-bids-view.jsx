@@ -23,6 +23,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { usePersistedViewMode } from 'src/hooks/use-persisted-view-mode';
+import { useDebounce } from 'src/hooks/use-debounce';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { EmptyContent } from 'src/components/empty-content';
@@ -88,6 +89,32 @@ const DATE_FILTER_COUNT_KEYS = {
   nextWeek: 'nextWeekCount',
 };
 
+const PICKER_PAGE_SIZE = 50;
+
+function mapJobForPicker(job) {
+  if (!job?.id) return null;
+  return {
+    id: job.id,
+    type: job.name || job.type || 'Job',
+    name: job.name || job.type || 'Job',
+    address: job.address || '',
+    image: job.image || '',
+    status: job.status || 'active',
+    schedules: job.schedules || [],
+    branchId: job.branchId || '',
+    hourlyRate: job.hourlyRate,
+    bidCount: job.bidCount,
+    acceptedBidsCount: job.acceptedBidsCount,
+    hasAcceptedBid: job.hasAcceptedBid,
+  };
+}
+
+function readListTotal(data, fallbackLength = 0) {
+  const totalRaw = data?.meta?.totalRecords ?? data?.total_length;
+  if (totalRaw === undefined || totalRaw === null || totalRaw === '') return null;
+  return Number(totalRaw) || 0;
+}
+
 function hasBidCountMeta(meta) {
   return Boolean(meta) && meta.total != null;
 }
@@ -111,14 +138,20 @@ export function JobBidsView({ mode = 'careHome' }) {
   const isUser = mode === 'user';
   const isLocalAuthority = mode === 'localAuthority';
   const skipCareHome = isHospital || isUser || isLocalAuthority;
-  const { activeBranchId } = useActiveBranch();
+  const { activeBranchId, isAllSites } = useActiveBranch();
   const rateDialog = useBoolean();
   const [rateJob, setRateJob] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [jobFilter, setJobFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [jobPickerSearch, setJobPickerSearch] = useState('');
+  const [jobPickerLimit, setJobPickerLimit] = useState(PICKER_PAGE_SIZE);
+  const [branchPickerSearch, setBranchPickerSearch] = useState('');
+  const [branchPickerLimit, setBranchPickerLimit] = useState(PICKER_PAGE_SIZE);
+  const [selectedJobCache, setSelectedJobCache] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
   const [allBidsSnapshot, setAllBidsSnapshot] = useState([]);
   const [page, setPage] = useState(1);
@@ -127,6 +160,9 @@ export function JobBidsView({ mode = 'careHome' }) {
   const rowsPerPage = viewMode === 'grid' ? ROWS_PER_PAGE_GRID : ROWS_PER_PAGE_LIST;
   const scopedBranchId =
     activeBranchId && activeBranchId !== ALL_SITES_ID ? String(activeBranchId) : '';
+  const jobPickerKeyword = useDebounce(jobPickerSearch.trim(), 300);
+  const branchPickerKeyword = useDebounce(branchPickerSearch.trim(), 300);
+  const effectiveBranchId = scopedBranchId || (branchFilter !== 'all' ? String(branchFilter) : '');
 
   useEffect(() => {
     const next = searchQuery.trim();
@@ -138,18 +174,31 @@ export function JobBidsView({ mode = 'careHome' }) {
     return () => clearTimeout(timer);
   }, [searchKeyword, searchQuery]);
 
+  useEffect(() => {
+    setJobPickerLimit(PICKER_PAGE_SIZE);
+  }, [jobPickerKeyword, effectiveBranchId]);
+
+  useEffect(() => {
+    setBranchPickerLimit(PICKER_PAGE_SIZE);
+  }, [branchPickerKeyword]);
+
+  useEffect(() => {
+    setPage(1);
+    setBranchFilter('all');
+  }, [activeBranchId]);
+
   const listFilterArgs = useMemo(() => {
     const args = {
       status: statusFilter === 'all' ? '' : statusFilter,
       job: jobFilter === 'all' ? '' : jobFilter,
       keyword: searchKeyword,
-      ...(scopedBranchId ? { branch: scopedBranchId } : {}),
+      ...(effectiveBranchId ? { branch: effectiveBranchId } : {}),
     };
     if (dateFilter !== 'all') {
       args.dateFilter = dateFilter;
     }
     return args;
-  }, [dateFilter, jobFilter, scopedBranchId, searchKeyword, statusFilter]);
+  }, [dateFilter, effectiveBranchId, jobFilter, searchKeyword, statusFilter]);
 
   const bidsQueryArgs = useMemo(
     () => ({
@@ -170,21 +219,64 @@ export function JobBidsView({ mode = 'careHome' }) {
     return args;
   }, [listFilterArgs]);
 
-  const careHomeJobsQuery = useGetCareHomeJobsQuery({ page: 0, limit: 100 }, { skip: skipCareHome });
-  const hospitalJobsQuery = useGetHospitalJobsQuery({ page: 0, limit: 100 }, { skip: !isHospital });
-  const userJobsQuery = useGetUserJobsQuery({ page: 0, limit: 100 }, { skip: !isUser });
-  const localAuthorityJobsQuery = useGetLocalAuthorityJobsQuery({ page: 0, limit: 100 }, { skip: !isLocalAuthority });
+  const jobsPickerArgs = useMemo(
+    () => ({
+      page: 0,
+      limit: jobPickerLimit,
+      status: '',
+      keyword: jobPickerKeyword,
+      ...(effectiveBranchId ? { branch: effectiveBranchId } : {}),
+    }),
+    [effectiveBranchId, jobPickerKeyword, jobPickerLimit]
+  );
+
+  const branchPickerArgs = useMemo(
+    () => ({
+      page: 0,
+      limit: branchPickerLimit,
+      status: '',
+      keyword: branchPickerKeyword,
+    }),
+    [branchPickerKeyword, branchPickerLimit]
+  );
+
+  const careHomeJobsQuery = useGetCareHomeJobsQuery(jobsPickerArgs, { skip: skipCareHome });
+  const hospitalJobsQuery = useGetHospitalJobsQuery(jobsPickerArgs, { skip: !isHospital });
+  const userJobsQuery = useGetUserJobsQuery(jobsPickerArgs, { skip: !isUser });
+  const localAuthorityJobsQuery = useGetLocalAuthorityJobsQuery(jobsPickerArgs, {
+    skip: !isLocalAuthority,
+  });
   const {
     data: jobsData,
     isLoading: jobsLoading,
+    isFetching: jobsFetching,
     refetch: refetchJobs,
-  } = isLocalAuthority ? localAuthorityJobsQuery : isUser ? userJobsQuery : isHospital ? hospitalJobsQuery : careHomeJobsQuery;
+  } = isLocalAuthority
+    ? localAuthorityJobsQuery
+    : isUser
+      ? userJobsQuery
+      : isHospital
+        ? hospitalJobsQuery
+        : careHomeJobsQuery;
 
-  const careHomeBranchesQuery = useGetCareHomeBranchesQuery({ page: 0, limit: 100 }, { skip: skipCareHome });
-  const hospitalBranchesQuery = useGetHospitalBranchesQuery({ page: 0, limit: 100 }, { skip: !isHospital });
-  const localAuthorityBranchesQuery = useGetLocalAuthorityBranchesQuery({ page: 0, limit: 100 }, { skip: !isLocalAuthority });
-  const userBranchesQuery = useUserAddressesQuery({ page: 0, limit: 100 }, { skip: !isUser });
-  const branchesData = isLocalAuthority ? localAuthorityBranchesQuery.data : isUser ? userBranchesQuery.data : isHospital ? hospitalBranchesQuery.data : careHomeBranchesQuery.data;
+  const careHomeBranchesQuery = useGetCareHomeBranchesQuery(branchPickerArgs, { skip: skipCareHome });
+  const hospitalBranchesQuery = useGetHospitalBranchesQuery(branchPickerArgs, { skip: !isHospital });
+  const localAuthorityBranchesQuery = useGetLocalAuthorityBranchesQuery(branchPickerArgs, {
+    skip: !isLocalAuthority,
+  });
+  const userBranchesQuery = useUserAddressesQuery(branchPickerArgs, { skip: !isUser });
+  const activeBranchesQuery = isLocalAuthority
+    ? localAuthorityBranchesQuery
+    : isUser
+      ? userBranchesQuery
+      : isHospital
+        ? hospitalBranchesQuery
+        : careHomeBranchesQuery;
+  const {
+    data: branchesData,
+    isLoading: branchesLoading,
+    isFetching: branchesFetching,
+  } = activeBranchesQuery;
   const branches = useMemo(
     () =>
       (branchesData?.data || []).filter((branch) => {
@@ -194,6 +286,9 @@ export function JobBidsView({ mode = 'careHome' }) {
       }),
     [branchesData?.data]
   );
+  const branchesTotal = readListTotal(branchesData);
+  const branchesHasMore =
+    branchesTotal != null ? branches.length < branchesTotal : branches.length >= branchPickerLimit;
 
   const bidsQueryOptions = {
     refetchOnMountOrArgChange: 60,
@@ -282,34 +377,29 @@ export function JobBidsView({ mode = 'careHome' }) {
   );
 
   const careHomeJobs = useMemo(() => {
-    const fromJobsApi = apiJobs.map((job) => ({
-      id: job.id,
-      type: job.name || job.type || 'Job',
-      name: job.name || job.type || 'Job',
-      address: job.address || '',
-      image: job.image || '',
-      status: job.status || 'active',
-      schedules: job.schedules || [],
-      branchId: job.branchId || '',
-      hourlyRate: job.hourlyRate,
-      bidCount: job.bidCount,
-      acceptedBidsCount: job.acceptedBidsCount,
-      hasAcceptedBid: job.hasAcceptedBid,
-    }));
-
+    const fromJobsApi = apiJobs.map(mapJobForPicker).filter(Boolean);
     const fromBids = buildJobsFromCareHomeBids(bids);
     const byId = new Map();
-    [...fromJobsApi, ...fromBids].forEach((job) => {
-      if (!job?.id) return;
-      if (!byId.has(job.id)) byId.set(job.id, job);
+    [...fromJobsApi, ...fromBids, selectedJobCache].forEach((job) => {
+      const mapped = mapJobForPicker(job);
+      if (!mapped?.id) return;
+      if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
     });
     return Array.from(byId.values()).filter((job) => jobMatchesActiveBranch(job, activeBranchId));
-  }, [activeBranchId, apiJobs, bids]);
+  }, [activeBranchId, apiJobs, bids, selectedJobCache]);
+
+  const jobsTotal = readListTotal(jobsData);
+  const jobsHasMore = jobsTotal != null ? apiJobs.length < jobsTotal : apiJobs.length >= jobPickerLimit;
 
   const selectedJobForRate = useMemo(() => {
     if (!jobFilter || jobFilter === 'all') return null;
-    return apiJobs.find((job) => String(job.id) === String(jobFilter)) || careHomeJobs.find((job) => String(job.id) === String(jobFilter)) || null;
-  }, [apiJobs, careHomeJobs, jobFilter]);
+    return (
+      apiJobs.find((job) => String(job.id) === String(jobFilter)) ||
+      careHomeJobs.find((job) => String(job.id) === String(jobFilter)) ||
+      (String(selectedJobCache?.id) === String(jobFilter) ? selectedJobCache : null) ||
+      null
+    );
+  }, [apiJobs, careHomeJobs, jobFilter, selectedJobCache]);
 
   const selectedJobBidCount = useMemo(() => {
     if (!selectedJobForRate) return null;
@@ -326,18 +416,17 @@ export function JobBidsView({ mode = 'careHome' }) {
   const serverTotal = apiHasTotal ? Number(serverTotalRaw) || 0 : null;
 
   useEffect(() => {
-    setPage(1);
-    setJobFilter((current) => (current === 'all' || careHomeJobs.some((job) => job.id === current) ? current : 'all'));
-  }, [activeBranchId, careHomeJobs]);
-
-  useEffect(() => {
     const jobId = searchParams.get('jobId');
     if (!jobId) return;
-    if (careHomeJobs.some((job) => job.id === jobId) || bids.some((bid) => bid.jobId === jobId)) {
+    if (
+      careHomeJobs.some((job) => job.id === jobId) ||
+      bids.some((bid) => bid.jobId === jobId) ||
+      String(selectedJobCache?.id) === String(jobId)
+    ) {
       setJobFilter(jobId);
       setPage(1);
     }
-  }, [searchParams, careHomeJobs, bids]);
+  }, [searchParams, careHomeJobs, bids, selectedJobCache]);
 
   useEffect(() => {
     if (!bidsError) return;
@@ -513,13 +602,22 @@ export function JobBidsView({ mode = 'careHome' }) {
     setPage(1);
   }, []);
 
-  const hasActiveFilters = jobFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all' || Boolean(searchQuery.trim());
+  const hasActiveFilters =
+    jobFilter !== 'all' ||
+    (!scopedBranchId && branchFilter !== 'all') ||
+    statusFilter !== 'all' ||
+    dateFilter !== 'all' ||
+    Boolean(searchQuery.trim());
 
   const handleClearFilters = useCallback(() => {
     setJobFilter('all');
+    setSelectedJobCache(null);
+    setBranchFilter('all');
     setStatusFilter('all');
     setDateFilter('all');
     setSearchQuery('');
+    setJobPickerSearch('');
+    setBranchPickerSearch('');
     setPage(1);
     router.replace(bidsPath);
   }, [bidsPath, router]);
@@ -530,14 +628,34 @@ export function JobBidsView({ mode = 'careHome' }) {
       setPage(1);
 
       if (nextFilter === 'all') {
+        setSelectedJobCache(null);
         router.replace(bidsPath);
         return;
       }
 
+      const picked =
+        careHomeJobs.find((job) => String(job.id) === String(nextFilter)) ||
+        apiJobs.find((job) => String(job.id) === String(nextFilter)) ||
+        null;
+      if (picked) setSelectedJobCache(mapJobForPicker(picked));
+
       router.replace(`${bidsPath}?jobId=${encodeURIComponent(nextFilter)}`);
     },
-    [bidsPath, router]
+    [apiJobs, bidsPath, careHomeJobs, router]
   );
+
+  const handleBranchFilterChange = useCallback((nextFilter) => {
+    setBranchFilter(nextFilter || 'all');
+    setPage(1);
+  }, []);
+
+  const handleLoadMoreJobs = useCallback(() => {
+    setJobPickerLimit((prev) => prev + PICKER_PAGE_SIZE);
+  }, []);
+
+  const handleLoadMoreBranches = useCallback(() => {
+    setBranchPickerLimit((prev) => prev + PICKER_PAGE_SIZE);
+  }, []);
 
   const handleOpenIncreaseRate = useCallback(() => {
     if (!selectedJobForRate || !canIncreaseSelectedJobRate) return;
@@ -908,10 +1026,26 @@ export function JobBidsView({ mode = 'careHome' }) {
       <JobBidsToolbar
         jobs={careHomeJobs}
         showJobFilter={!isPerJobView}
+        showBranchFilter={isAllSites}
+        branches={branches}
+        branchFilter={branchFilter}
+        onBranchFilterChange={handleBranchFilterChange}
+        branchSearch={branchPickerSearch}
+        onBranchSearchChange={setBranchPickerSearch}
+        branchesLoading={branchesLoading}
+        branchesLoadingMore={branchesFetching && branches.length > 0}
+        branchesHasMore={branchesHasMore}
+        onLoadMoreBranches={handleLoadMoreBranches}
         search={searchQuery}
         onSearchChange={handleSearchChange}
         jobFilter={jobFilter}
         onJobFilterChange={handleJobFilterChange}
+        jobSearch={jobPickerSearch}
+        onJobSearchChange={setJobPickerSearch}
+        jobsLoading={jobsLoading}
+        jobsLoadingMore={jobsFetching && apiJobs.length > 0}
+        jobsHasMore={jobsHasMore}
+        onLoadMoreJobs={handleLoadMoreJobs}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
         statusCounts={statusCounts}

@@ -143,6 +143,7 @@ export const API_ROUTES = {
   HOSPITAL_JOB_BIDS: '/web/hospital/job/bids',
   HOSPITAL_JOB_BIDS_BY_ID: (id) => `/web/hospital/job/bids/${id}`,
   HOSPITAL_BOOKING: '/web/hospital/booking',
+  HOSPITAL_BOOKING_BY_ID: (id) => `/web/hospital/booking/${id}`,
   HOSPITAL_BOOKING_CALENDAR: '/web/hospital/booking/calender',
   HOSPITAL_DASHBOARD: '/web/hospital/dashboard',
 
@@ -155,6 +156,7 @@ export const API_ROUTES = {
   USER_JOB_BIDS_BY_ID: (id) => `/web/user/job/bids/${id}`,
   USER_BIDS_BY_ID: (id) => `/web/user/job/bids/${id}`,
   USER_BOOKING: '/web/user/booking',
+  USER_BOOKING_BY_ID: (id) => `/web/user/booking/${id}`,
   USER_BOOKING_CALENDAR: '/web/user/booking/calender',
   USER_DASHBOARD: '/web/user/dashboard',
 
@@ -171,6 +173,7 @@ export const API_ROUTES = {
   LOCAL_AUTHORITY_JOB_BIDS: '/web/local-authority/job/bids',
   LOCAL_AUTHORITY_JOB_BIDS_BY_ID: (id) => `/web/local-authority/job/bids/${id}`,
   LOCAL_AUTHORITY_BOOKING: '/web/local-authority/booking',
+  LOCAL_AUTHORITY_BOOKING_BY_ID: (id) => `/web/local-authority/booking/${id}`,
   LOCAL_AUTHORITY_BOOKING_CALENDAR: '/web/local-authority/booking/calender',
   LOCAL_AUTHORITY_DASHBOARD: '/web/local-authority/dashboard',
 

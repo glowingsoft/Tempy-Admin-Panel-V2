@@ -268,6 +268,19 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
+    cancelHospitalBooking: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.HOSPITAL_BOOKING_BY_ID(id),
+        method: 'PUT',
+        body: { status: 'cancel' },
+      }),
+      invalidatesTags: [
+        { type: 'HospitalJobBid', id: 'LIST' },
+        { type: 'HospitalJob', id: 'LIST' },
+        { type: 'HospitalBookingCalendar', id: 'LIST' },
+      ],
+    }),
+
     getHospitalBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -306,5 +319,6 @@ export const {
   useGetHospitalJobBidsQuery,
   useUpdateHospitalJobBidMutation,
   useCreateHospitalBookingMutation,
+  useCancelHospitalBookingMutation,
   useGetHospitalBookingCalendarQuery,
 } = hospitalJobsApi;

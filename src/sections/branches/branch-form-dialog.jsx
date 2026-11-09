@@ -30,6 +30,8 @@ import {
   BRANCH_STATUS,
   BRANCH_STATUS_OPTIONS,
   CQC_RATING_OPTIONS,
+  UK_COUNTY_OPTIONS,
+  matchUkCounty,
 } from './branches-constants';
 import { isValidLngLat, parseCoordinates, toApiCoordinates } from './geo-coordinates';
 
@@ -83,7 +85,15 @@ function buildBranchSchema({
       country: zod.string().trim().min(1, 'Country is required'),
       state: hideState
         ? zod.string().trim().optional().default('')
-        : zod.string().trim().min(1, `${stateLabel} is required`),
+        : String(stateLabel || '').toLowerCase() === 'county'
+          ? zod
+              .string()
+              .trim()
+              .min(1, `${stateLabel} is required`)
+              .refine((value) => UK_COUNTY_OPTIONS.includes(value), {
+                message: 'Select a county from the list',
+              })
+          : zod.string().trim().min(1, `${stateLabel} is required`),
       postalCode: zod.string().trim().min(1, 'Postal code is required'),
       status: zod.enum([
         BRANCH_STATUS.ACTIVE,
@@ -277,8 +287,11 @@ export function BranchFormDialog({
         (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
         '',
       city: locationObj?.city || '',
-      country: locationObj?.country || (hideState ? DEFAULT_UK_COUNTRY : ''),
-      state: hideState ? locationObj?.state || '' : locationObj?.state || '',
+      country: locationObj?.country || DEFAULT_UK_COUNTRY,
+      state:
+        String(stateLabel || '').toLowerCase() === 'county'
+          ? matchUkCounty(locationObj?.state || '')
+          : locationObj?.state || '',
       postalCode:
         locationObj?.postalCode != null && locationObj?.postalCode !== ''
           ? String(locationObj.postalCode)
@@ -298,7 +311,7 @@ export function BranchFormDialog({
         : [],
       insuranceExpiryDate: currentBranch?.insuranceExpiryDate || '',
     };
-  }, [currentBranch, hideState, isLocationEntity]);
+  }, [currentBranch, hideState, isLocationEntity, stateLabel]);
 
   const methods = useForm({
     resolver: zodResolver(branchSchema),
@@ -312,6 +325,7 @@ export function BranchFormDialog({
   const watchedName = watch('name');
   const watchedImages = watch('images') || [];
   const cqcRegistered = watch('cqcRegistered');
+  const stateIsCountyEnum = !hideState && String(stateLabel || '').toLowerCase() === 'county';
 
   useEffect(() => {
     if (!open) return;
@@ -349,13 +363,14 @@ export function BranchFormDialog({
       applyAddressPlaceToForm(setValue, place, {
         addressField: 'fullAddress',
         updateSearchLabel: true,
+        matchCountyEnum: stateIsCountyEnum,
       });
       if (hideState) {
         setValue('state', String(place.state || '').trim(), { shouldDirty: true });
       }
       clearErrors('fullAddress');
     },
-    [clearErrors, hideState, setValue]
+    [clearErrors, hideState, setValue, stateIsCountyEnum]
   );
 
   const ensureCoordinates = useCallback(async () => {
@@ -486,6 +501,23 @@ export function BranchFormDialog({
                     InputLabelProps={{ shrink: true }}
                     fullWidth
                   />
+                ) : stateIsCountyEnum ? (
+                  <Field.Select
+                    name="state"
+                    label={stateLabel}
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  >
+                    <MenuItem value="">
+                      <em>Select county</em>
+                    </MenuItem>
+                    {UK_COUNTY_OPTIONS.map((county) => (
+                      <MenuItem key={county} value={county}>
+                        {county}
+                      </MenuItem>
+                    ))}
+                  </Field.Select>
                 ) : (
                   <Field.Text
                     name="state"

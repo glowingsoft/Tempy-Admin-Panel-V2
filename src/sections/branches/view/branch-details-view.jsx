@@ -66,7 +66,6 @@ function fileNameFromUrl(url) {
   }
 }
 
-/** Distinct, non-empty stored file values. */
 function uniqueFiles(...lists) {
   return [...new Set(lists.flat().map((item) => String(item || '').trim()).filter(Boolean))];
 }
@@ -356,9 +355,10 @@ export function BranchDetailsView() {
                 <DetailItem label="Full address" value={branch.location?.fullAddress} />
               </Box>
               <DetailItem label="City" value={branch.location?.city} />
-              {!careHomeMode ? (
-                <DetailItem label="State" value={branch.location?.state} />
-              ) : null}
+              <DetailItem
+                label={careHomeMode ? 'County' : 'State'}
+                value={branch.location?.state}
+              />
               <DetailItem label="Country" value={branch.location?.country} />
               <DetailItem label="Postal code" value={branch.location?.postalCode} />
               <DetailItem label="Created" value={branch.createdAt ? fDateTime(branch.createdAt) : ''} />

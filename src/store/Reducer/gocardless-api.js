@@ -76,7 +76,6 @@ function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim());
 }
 
-/** Backend return page after GoCardless finishes. It is not the bank-details form. */
 function isGoCardlessReturnUrl(value) {
   try {
     const path = new URL(String(value)).pathname.replace(/\/+$/, '').toLowerCase();
@@ -105,10 +104,7 @@ function objectsIn(value, depth = 0, list = []) {
   return list;
 }
 
-/**
- * Open the GoCardless bank page, not the API return URL.
- * `redirectUrl` is often https://…/gocardless/return (“Done”), while the form lives on authorisationUrl.
- */
+
 function pickSetupUrl(source) {
   const objects = objectsIn(source);
 
@@ -151,19 +147,18 @@ export const gocardlessApi = createApi({
     getGoCardlessMandate: builder.query({
       query: () => ({ url: API_ROUTES.GOCARDLESS_MANDATE, method: 'GET' }),
       transformResponse: (response) => mapGoCardlessMandate(response),
-      providesTags: (result, error, userId) => [
-        { type: 'GoCardlessMandate', id: String(userId || 'CURRENT') },
-      ],
+      serializeQueryArgs: () => 'gocardless-mandate',
+      providesTags: [{ type: 'GoCardlessMandate', id: 'CURRENT' }],
       refetchOnFocus: false,
-      refetchOnMountOrArgChange: 60,
+      refetchOnReconnect: false,
+      refetchOnMountOrArgChange: false,
     }),
 
     setupGoCardlessMandate: builder.mutation({
       query: () => ({ url: API_ROUTES.GOCARDLESS_MANDATE, method: 'POST' }),
       transformResponse: (response) => mapGoCardlessMandate(response),
-      invalidatesTags: (result, error, userId) => [
-        { type: 'GoCardlessMandate', id: String(userId || 'CURRENT') },
-      ],
+      invalidatesTags: (result) =>
+        isUsableCustomerMandate(result) ? [{ type: 'GoCardlessMandate', id: 'CURRENT' }] : [],
     }),
 
     getAdminPayouts: builder.query({
@@ -192,7 +187,6 @@ export const gocardlessApi = createApi({
       invalidatesTags: [{ type: 'AdminPayout', id: 'LIST' }],
     }),
 
-    /** POST /admin/gocardless/payouts/settle — { supplierId, reference } */
     recordAdminPayout: builder.mutation({
       query: ({ supplierId, bookingIds, reference }) => ({
         url: API_ROUTES.ADMIN_PAYOUTS_SETTLE,

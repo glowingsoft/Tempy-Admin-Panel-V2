@@ -19,6 +19,7 @@ export const navDataCareHome = [
           { title: 'Created Jobs', path: paths.dashboard.jobs.created },
           { title: 'Job Bids', countKey: 'jobBids', path: paths.dashboard.jobs.bids },
           { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.jobs.agreedRates },
+          { title: 'Job Types', path: paths.dashboard.jobs.jobTypes },
         ],
       },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.messages, icon: NAV_ICONS.chat },

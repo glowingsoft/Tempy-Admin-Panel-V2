@@ -1,12 +1,13 @@
 import { deriveCityFromLabel, geocodeAddress } from 'src/sections/tempy-home/standalone-address-input';
 
+import { matchUkCounty } from './branches-constants';
 import { isValidLngLat } from './geo-coordinates';
 
 
 export function applyAddressPlaceToForm(
   setValue,
   place,
-  { addressField = 'locationSearch', updateSearchLabel = true } = {}
+  { addressField = 'locationSearch', updateSearchLabel = true, matchCountyEnum = false } = {}
 ) {
   if (!place || typeof setValue !== 'function') return;
 
@@ -30,6 +31,9 @@ export function applyAddressPlaceToForm(
   let state = String(place.state || '').trim();
   if (state && country && state.toLowerCase() === country.toLowerCase()) {
     state = '';
+  }
+  if (matchCountyEnum) {
+    state = matchUkCounty(state);
   }
 
   setValue('city', city, { shouldDirty: true, shouldValidate: true });

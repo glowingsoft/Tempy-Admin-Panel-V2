@@ -11,7 +11,6 @@ import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { isUsableCustomerMandate, useGetGoCardlessMandateQuery } from 'src/store/Reducer/gocardless-api';
 
-// ----------------------------------------------------------------------
 
 const PAYMENTS_PATH_BY_ROLE = {
   careHome: paths.dashboard.payments,
@@ -31,22 +30,20 @@ export function useCustomerMandateBlock(mode) {
     skip: !paymentsPath,
   });
 
+  const usable = isUsableCustomerMandate(data);
+
   useEffect(() => {
-    if (!paymentsPath) return undefined;
+    if (!paymentsPath || usable) return undefined;
 
     const refresh = () => {
       if (document.visibilityState === 'visible') refetch();
     };
 
-    window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
-      window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [paymentsPath, refetch]);
-
-  const usable = isUsableCustomerMandate(data, userId);
+  }, [paymentsPath, refetch, usable]);
   const waiting = Boolean(paymentsPath) && Boolean(userId) && (isLoading || isUninitialized) && !data;
 
   return {
