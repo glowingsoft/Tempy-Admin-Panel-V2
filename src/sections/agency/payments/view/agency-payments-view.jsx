@@ -20,7 +20,13 @@ import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 import { BookingPaymentsList } from 'src/sections/agency/payments/booking-payments-list';
 import { useGetUserByIdQuery, useUpdateUserByIdMutation } from 'src/store/Reducer/users-api';
-import { gocardlessApi, isUsableCustomerMandate, useGetGoCardlessMandateQuery, useSetupGoCardlessMandateMutation } from 'src/store/Reducer/gocardless-api';
+import {
+  gocardlessApi,
+  isGoCardlessBankSetupUrl,
+  isUsableCustomerMandate,
+  useGetGoCardlessMandateQuery,
+  useSetupGoCardlessMandateMutation,
+} from 'src/store/Reducer/gocardless-api';
 
 
 const CUSTOMER_ROLES = new Set(['careHome', 'hospital', 'localAuthority', 'user']);
@@ -100,18 +106,20 @@ function CustomerMandateCard({ userId }) {
     }
   }, []);
 
-  const startMandatePoll = useCallback(() => {
-    stopMandatePoll();
-    const started = Date.now();
-    // Slow poll only while the GoCardless popup may still be open — not a background loop.
-    pollRef.current = window.setInterval(() => {
-      if (Date.now() - started > 60000) {
-        stopMandatePoll();
-        return;
-      }
-      refetch();
-    }, 5000);
-  }, [refetch, stopMandatePoll]);
+  const startMandatePoll = useCallback(
+    (popup) => {
+      stopMandatePoll();
+      const started = Date.now();
+      pollRef.current = window.setInterval(() => {
+        if (popup?.closed || Date.now() - started > 120000) {
+          stopMandatePoll();
+          return;
+        }
+        refetch();
+      }, 8000);
+    },
+    [refetch, stopMandatePoll]
+  );
 
   useEffect(() => {
     if (active) stopMandatePoll();
@@ -123,6 +131,14 @@ function CustomerMandateCard({ userId }) {
     if (active || settingUp) return;
 
     const popup = window.open('about:blank', '_blank');
+    try {
+      if (popup && !popup.closed) {
+        popup.document.write(
+          '<p style="font-family:sans-serif;padding:24px">Opening GoCardless bank setup…</p>'
+        );
+      }
+    } catch {
+    }
 
     try {
       const result = await setupMandate(cacheKey).unwrap();
@@ -136,24 +152,35 @@ function CustomerMandateCard({ userId }) {
         return;
       }
 
-      const setupUrl = String(result?.redirectUrl || '').trim();
-      if (setupUrl) {
-        if (popup && !popup.closed) {
-          try {
-            popup.opener = null;
-          } catch {
-          }
-          popup.location.href = setupUrl;
-        } else {
-          window.location.assign(setupUrl);
-          return;
-        }
-        startMandatePoll();
+      const setupUrl = String(result?.setupUrl || result?.redirectUrl || '').trim();
+
+      if (!isGoCardlessBankSetupUrl(setupUrl)) {
+        if (popup) popup.close();
+        const refused = (result?.refusedReturnUrls || []).join(' | ');
+        const seen = (result?.debugUrls || []).join(' | ');
+        console.warn('[GoCardless setup] refused to open Done/return URL. setupUrl=', setupUrl, {
+          debugUrls: result?.debugUrls,
+          refusedReturnUrls: result?.refusedReturnUrls,
+        });
+        toast.error(
+          refused || seen
+            ? `GoCardless bank form missing. Server sent return/Done link instead of pay.gocardless.com — backend must return authorisationUrl.`
+            : 'GoCardless bank form link missing from POST /gocardless/mandate response.'
+        );
         return;
       }
 
-      if (popup) popup.close();
-      toast.error('Could not open the direct debit page. The bank setup link was missing.');
+      if (popup && !popup.closed) {
+        try {
+          popup.opener = null;
+        } catch {
+        }
+        popup.location.replace(setupUrl);
+        startMandatePoll(popup);
+        return;
+      }
+
+      window.location.assign(setupUrl);
     } catch (err) {
       if (popup) popup.close();
       toast.error(handleApiError(err) || 'Could not set up the direct debit');

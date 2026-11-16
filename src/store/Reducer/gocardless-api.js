@@ -66,33 +66,69 @@ const SETUP_URL_KEYS = [
   'authorization_url',
   'hostedUrl',
   'hosted_url',
+  'hosted_billing_request_url',
+  'hostedBillingRequestUrl',
   'flowUrl',
   'flow_url',
+  'billingRequestFlowUrl',
+  'billing_request_flow_url',
 ];
-
-const FALLBACK_URL_KEYS = ['redirectUrl', 'redirect_url', 'url', 'link'];
 
 function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim());
 }
 
-function isGoCardlessReturnUrl(value) {
+export function isGoCardlessReturnUrl(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return false;
+  if (raw.includes('/gocardless/return') || raw.includes('/gocardless/exit')) return true;
   try {
     const path = new URL(String(value)).pathname.replace(/\/+$/, '').toLowerCase();
     return path.endsWith('/gocardless/return') || path.endsWith('/gocardless/exit');
   } catch {
-    return String(value || '').toLowerCase().includes('/gocardless/return');
+    return false;
   }
 }
 
+function isLikelyGoCardlessHostedForm(url) {
+  try {
+    const host = new URL(String(url)).hostname.toLowerCase();
+    return (
+      host === 'gocardless.com' ||
+      host === 'pay.gocardless.com' ||
+      host.endsWith('.gocardless.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isGoCardlessBankSetupUrl(url) {
+  const text = String(url || '').trim();
+  if (!isHttpUrl(text) || isGoCardlessReturnUrl(text)) return false;
+  return isLikelyGoCardlessHostedForm(text);
+}
+
+function coerceHttpUrl(value) {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return isHttpUrl(text) ? text : '';
+  }
+  if (value && typeof value === 'object') {
+    for (const key of ['href', 'url', 'authorisationUrl', 'authorizationUrl', 'authorisation_url']) {
+      const nested = value[key];
+      if (typeof nested === 'string' && isHttpUrl(nested.trim())) return nested.trim();
+    }
+  }
+  return '';
+}
+
 function readUrl(source, key) {
-  const value = source?.[key];
-  const text = typeof value === 'string' ? value.trim() : '';
-  return isHttpUrl(text) ? text : '';
+  return coerceHttpUrl(source?.[key]);
 }
 
 function objectsIn(value, depth = 0, list = []) {
-  if (!value || typeof value !== 'object' || depth > 5) return list;
+  if (!value || typeof value !== 'object' || depth > 8) return list;
   if (Array.isArray(value)) {
     value.forEach((item) => objectsIn(item, depth + 1, list));
     return list;
@@ -104,22 +140,35 @@ function objectsIn(value, depth = 0, list = []) {
   return list;
 }
 
+function collectHttpUrls(value, depth = 0, out = []) {
+  if (depth > 8 || value == null) return out;
+  if (typeof value === 'string') {
+    const url = coerceHttpUrl(value);
+    if (url) out.push(url);
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectHttpUrls(item, depth + 1, out));
+    return out;
+  }
+  Object.values(value).forEach((item) => collectHttpUrls(item, depth + 1, out));
+  return out;
+}
 
-function pickSetupUrl(source) {
+
+export function pickSetupUrl(source) {
   const objects = objectsIn(source);
 
   for (const key of SETUP_URL_KEYS) {
     for (const object of objects) {
       const url = readUrl(object, key);
-      if (url && !isGoCardlessReturnUrl(url)) return url;
+      if (isGoCardlessBankSetupUrl(url)) return url;
     }
   }
 
-  for (const key of FALLBACK_URL_KEYS) {
-    for (const object of objects) {
-      const url = readUrl(object, key);
-      if (url && !isGoCardlessReturnUrl(url)) return url;
-    }
+  for (const url of collectHttpUrls(source)) {
+    if (isGoCardlessBankSetupUrl(url)) return url;
   }
 
   return '';
@@ -129,12 +178,18 @@ export function mapGoCardlessMandate(response) {
   const root = asObject(response);
   const payload = asObject(root.data ?? root);
   const mandate = findUsableMandate(root) || {};
+  const setupUrl = pickSetupUrl(root);
+  const allUrls = collectHttpUrls(root);
+  const refusedReturnUrls = allUrls.filter((url) => isGoCardlessReturnUrl(url));
 
   return {
     status: isUsableMandateStatus(mandate.status) ? String(mandate.status).trim().toLowerCase() : '',
     id: pickId([mandate.mandateId, mandate.mandate_id, mandate._id, mandate.id]),
     ownerId: pickId([mandate.customer, mandate.customerId, mandate.userId, payload.customer, payload.customerId]),
-    redirectUrl: pickSetupUrl(root),
+    redirectUrl: setupUrl,
+    setupUrl,
+    debugUrls: allUrls.slice(0, 8),
+    refusedReturnUrls: refusedReturnUrls.slice(0, 4),
   };
 }
 

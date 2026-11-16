@@ -28,6 +28,11 @@ import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { EmptyContent } from 'src/components/empty-content';
 import { matchesJobDateFilter } from 'src/components/jobs/job-date-filters';
+import {
+  CustomerMandateNotice,
+  CONFIRM_BOOKING_PAYMENT_MESSAGE,
+  useCustomerMandateBlock,
+} from 'src/sections/agency/payments/customer-mandate-notice';
 
 import {
   useGetCareHomeJobBidsQuery,
@@ -134,6 +139,7 @@ export function JobBidsView({ mode = 'careHome' }) {
   const searchParams = useSearchParams();
   const bidsPath = useMemo(() => getBidsPath(pathname, paths.dashboard.jobs.bids), [pathname]);
   const agreedRatesPath = useMemo(() => getAgreedRatesPath(mode), [mode]);
+  const { blocked: paymentBlocked, paymentsPath } = useCustomerMandateBlock(mode);
   const isHospital = mode === 'hospital';
   const isUser = mode === 'user';
   const isLocalAuthority = mode === 'localAuthority';
@@ -761,6 +767,10 @@ export function JobBidsView({ mode = 'careHome' }) {
         toast.error('Missing bid id');
         throw new Error('Missing bid id');
       }
+      if (paymentBlocked) {
+        toast.error(CONFIRM_BOOKING_PAYMENT_MESSAGE);
+        throw new Error('Payment setup required');
+      }
       if (updatingBidId) {
         toast.warning('Please wait — another bid is still updating');
         throw new Error('Bid update in progress');
@@ -791,7 +801,7 @@ export function JobBidsView({ mode = 'careHome' }) {
         }
       }
     },
-    [refetchBids, updateJobBid, updatingBidId]
+    [paymentBlocked, refetchBids, updateJobBid, updatingBidId]
   );
 
   const selectedJobInfo = useMemo(
@@ -815,6 +825,8 @@ export function JobBidsView({ mode = 'careHome' }) {
       onAccepted={viewOnly ? undefined : handleAccepted}
       onChat={handleChatWithBidder}
       updatingBidId={updatingBidId}
+      paymentBlocked={paymentBlocked}
+      paymentsPath={paymentsPath}
       {...extra}
     />
   );
@@ -936,6 +948,8 @@ export function JobBidsView({ mode = 'careHome' }) {
 
   return (
     <DashboardContent maxWidth="xl">
+      <CustomerMandateNotice mode={mode} variant="confirm" sx={{ mb: 2 }} />
+
       <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
           <Tooltip title="Back to dashboard">

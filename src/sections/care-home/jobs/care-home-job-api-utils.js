@@ -131,7 +131,7 @@ export function pickJobSuccessToast(payload, fallback = '') {
 const JOB_API_ERROR_MESSAGES = {
   requiremandate: 'Set up a direct debit on Payments before posting a job.',
   direct_debit_mandate_required:
-    'There is no usable direct debit, so the booking was not created. The customer needs to set one up on Payments.',
+    'There is no usable payment method, so the booking was not confirmed. Set up a card or bank payment link on Payments first.',
   payment_failed: 'The direct debit could not be collected, so the booking was not kept.',
   invalid_rate: 'Please enter a rate above 0.',
   only_job_creator_can_edit_rate_or_shift_time: 'Only the person who posted this job can change its rate or shift times.',

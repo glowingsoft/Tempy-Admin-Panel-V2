@@ -22,6 +22,11 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import {
+  CustomerMandateNotice,
+  POST_JOB_PAYMENT_MESSAGE,
+  useCustomerMandateBlock,
+} from 'src/sections/agency/payments/customer-mandate-notice';
 
 import { useCreateCareHomeJobMutation } from 'src/store/Reducer/care-home-jobs-api';
 import { useCreateHospitalJobMutation } from 'src/store/Reducer/hospital-jobs-api';
@@ -32,8 +37,6 @@ import { useGetHospitalBranchesQuery } from 'src/store/Reducer/hospital-branches
 import { useGetLocalAuthorityBranchesQuery } from 'src/store/Reducer/local-authority-branches-api';
 import { useGetHomeCareCompanyBranchesQuery } from 'src/store/Reducer/home-care-company-branches-api';
 import { useUserAddressesQuery } from 'src/store/Reducer/user-branches-api';
-
-import { CustomerMandateNotice, useCustomerMandateBlock } from 'src/sections/agency/payments/customer-mandate-notice';
 
 import { JobDraftForm } from '../care-home-job-form';
 import { JobCareDetailsFields } from '../job-care-details-fields';
@@ -175,7 +178,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
 
   const handleSubmit = useCallback(async () => {
     if (mandateBlocked) {
-      toast.error('Set up a direct debit on Payments before posting a job.');
+      toast.error(POST_JOB_PAYMENT_MESSAGE);
       return;
     }
     const error = validateJobDraft(draft);
@@ -260,7 +263,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
         </Typography>
       </Stack>
 
-      <CustomerMandateNotice mode={mode} sx={{ mb: 2 }} />
+      <CustomerMandateNotice mode={mode} variant="postJob" sx={{ mb: 2 }} />
 
       <Card
         sx={{

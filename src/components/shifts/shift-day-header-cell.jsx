@@ -134,13 +134,21 @@ export function ShiftDayHeaderCell({
           aria-label={requestHint}
           onClick={handleRequest}
           sx={{
-            width: 22,
-            height: 22,
+            mt: 0.25,
+            width: 28,
+            height: 28,
             color: 'primary.main',
-            '&:hover': { bgcolor: 'action.selected' },
+            bgcolor: 'primary.lighter',
+            border: '1px solid',
+            borderColor: 'primary.light',
+            '&:hover': {
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              borderColor: 'primary.main',
+            },
           }}
         >
-          <Iconify icon="eva:plus-fill" width={14} />
+          <Iconify icon="eva:plus-fill" width={18} />
         </IconButton>
       ) : null}
     </Box>

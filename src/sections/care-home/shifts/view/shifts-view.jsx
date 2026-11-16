@@ -2219,7 +2219,10 @@ function ShiftCell({
     boxShadow: (theme) =>
       isActive ? `inset 0 0 0 2px ${theme.palette.primary.main}` : 'none',
     '&:hover .empty-plus': {
-      color: 'text.secondary',
+      color: 'primary.main',
+      bgcolor: 'primary.lighter',
+      borderColor: 'primary.main',
+      transform: 'scale(1.06)',
     },
   };
 
@@ -2264,20 +2267,27 @@ function ShiftCell({
           />
         ) : canSelectEmpty || canRequestVacant ? (
           <Tooltip
-            title={canRequestVacant ? 'Request a shift for this date' : 'Click to book a shift'}
+            title={canRequestVacant ? 'Book a shift for this date' : 'Click to book a shift'}
             arrow
           >
             <Box
               className="empty-plus"
-              aria-label={canRequestVacant ? 'Request a shift' : 'Add on this day'}
+              aria-label={canRequestVacant ? 'Book a shift' : 'Book a shift on this day'}
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'text.disabled',
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                color: 'primary.main',
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                transition: 'transform 120ms ease, background-color 120ms ease, border-color 120ms ease',
               }}
             >
-              <Iconify icon="eva:plus-fill" width={14} />
+              <Iconify icon="eva:plus-fill" width={18} />
             </Box>
           </Tooltip>
         ) : null}
@@ -2906,29 +2916,27 @@ function LeftSidebar({
       <Stack spacing={0.5} sx={{ p: 1.5, flexShrink: 0 }}>
         <Button
           fullWidth
-          size="small"
-          startIcon={<Iconify icon="eva:plus-fill" width={14} />}
+          variant="contained"
+          color="primary"
+          startIcon={<Iconify icon="eva:plus-fill" width={20} />}
           onClick={onAddJob}
           style={onAddJob ? undefined : { display: 'none' }}
           sx={{
-            justifyContent: 'flex-start',
-            fontSize: 11.5,
+            justifyContent: 'center',
+            fontSize: 14,
             fontWeight: 700,
-            color: 'primary.main',
-            border: '1px solid',
-            borderColor: '#81c784',
-            bgcolor: rotaSoftSuccessBg,
-            borderRadius: 1,
-            py: 0.65,
+            borderRadius: 1.5,
+            py: 1.15,
+            minHeight: 44,
             textTransform: 'none',
             flexShrink: 0,
-            boxShadow: 'inset 0 0 0 1px rgba(129, 199, 132, 0.35)',
+            boxShadow: (theme) => theme.customShadows?.z8 || theme.shadows[4],
             '&:hover': {
-              bgcolor: rotaSoftSuccess,
+              boxShadow: (theme) => theme.customShadows?.z12 || theme.shadows[8],
             },
           }}
         >
-          Book shift
+          Book a shift
         </Button>
       </Stack>
 
@@ -4067,7 +4075,7 @@ function ShiftsViewContent({
 
   const refuseLocalRotaWrite = useCallback((actionLabel) => {
     toast.info(
-      `${actionLabel} is not saved on this rota. Use Book shift to post a job, or Cancel booking to remove a booked shift.`
+      `${actionLabel} is not saved on this rota. Use Book a shift to post a job, or Cancel booking to remove a booked shift.`
     );
   }, []);
 
@@ -4117,7 +4125,7 @@ function ShiftsViewContent({
       }
 
       toast.info(
-        'Use the shift menu to cancel a booking, or Book shift on an empty cell to post a job.'
+        'Use the shift menu to cancel a booking, or Book a shift on an empty cell to post a job.'
       );
     },
     [handleOpenPostJob, isLocked, isUserApi, location, locations, viewOnly]
@@ -4811,7 +4819,7 @@ function ShiftsViewContent({
                         weatherType={apiWeather?.type || null}
                         dayWeather={apiWeather}
                         onClick={handleDateHeaderClick}
-                        clickHint="Request a shift for this date"
+                        clickHint="Book a shift for this date"
                       />
                     );
                   })}
@@ -4879,10 +4887,10 @@ function ShiftsViewContent({
           >
             <MenuItem onClick={handleCellBookShift}>
               <Iconify icon="solar:calendar-add-bold" width={18} sx={{ mr: 1 }} />
-              Book shift
+              Book a shift
             </MenuItem>
             <Tooltip
-              title="Day off / leave is not available for this role — there is no availability API. Use Book shift or Cancel booking."
+              title="Day off / leave is not available for this role — there is no availability API. Use Book a shift or Cancel booking."
               placement="right"
             >
               <span>
