@@ -7,7 +7,11 @@ import { INVALID_BRANCH_COORDINATES_MESSAGE, isValidLngLat, parseCoordinates, re
 import { isApiReviewed, pickApiReview } from 'src/sections/reviews/reviews-api-utils';
 import { pickApiToastMessage } from 'src/store/handleApiError';
 import { pickStoredMediaValue } from 'src/store/Reducer/upload-api';
-import { resolveJobApiStatus } from './care-home-job-utils';
+import {
+  getCustomJobRoleLabel,
+  isOtherJobTypeSelected,
+  resolveJobApiStatus,
+} from './care-home-job-utils';
 
 export const JOB_RATE_SORT_OPTIONS = [
   { value: '', label: 'Newest first' },
@@ -97,11 +101,43 @@ export function getCreatedJobIdFromApiPayload(payload) {
   return '';
 }
 
-/**
- * Backend sometimes returns an error status after the job was actually saved
- * (e.g. post-create cache invalidation). Only treat that as success when the
- * payload still includes a real job id — never on cache/message text alone.
- */
+
+export async function resolveDraftJobTypeForSubmit(draft, createJobType) {
+  if (!isOtherJobTypeSelected(draft)) return draft;
+
+  const title = getCustomJobRoleLabel(draft);
+  if (!title) {
+    throw new Error('Please enter your specific role');
+  }
+  if (typeof createJobType !== 'function') {
+    throw new Error('Could not save the custom role. Please try again.');
+  }
+
+  const response = await createJobType({
+    department: 'Other',
+    title,
+    description: '',
+  }).unwrap();
+
+  const typeId =
+    getCreatedJobIdFromApiPayload(response) ||
+    getCreatedJobIdFromApiPayload(response?.data) ||
+    '';
+  if (!typeId) {
+    throw new Error('Could not save the custom role. Please try again.');
+  }
+
+  return {
+    ...draft,
+    typeId,
+    type: title,
+    typeTitle: title,
+    name: title,
+    customRole: title,
+  };
+}
+
+
 export function isJobCreateSoftError(err) {
   if (!err) return false;
   return Boolean(
@@ -109,7 +145,6 @@ export function isJobCreateSoftError(err) {
   );
 }
 
-/** Prefer API success text; never surface soft/cache error wording as success. */
 export function pickJobSuccessToast(payload, fallback = '') {
   const message = pickApiToastMessage(payload, '');
   if (!message) return fallback;

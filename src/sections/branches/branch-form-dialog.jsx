@@ -24,21 +24,28 @@ import {
   geocodeAddress,
 } from 'src/sections/tempy-home/standalone-address-input';
 
-import { applyAddressPlaceToForm } from './address-form-utils';
+import {
+  applyAddressPlaceToForm,
+  composeLocationFullAddress,
+  extractAddressLine1,
+} from './address-form-utils';
 import { buildBranchProfilePayload } from './agency-branch-utils';
 import {
   BRANCH_STATUS,
   BRANCH_STATUS_OPTIONS,
   CQC_RATING_OPTIONS,
-  UK_COUNTY_OPTIONS,
   matchUkCounty,
 } from './branches-constants';
 import { isValidLngLat, parseCoordinates, toApiCoordinates } from './geo-coordinates';
+
+const UK_POSTCODE_ONLY =
+  /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
 const ADDRESS_FIELDS = [
   'name',
   'locationName',
   'fullAddress',
+  'addressLine1',
   'city',
   'country',
   'state',
@@ -81,19 +88,18 @@ function buildBranchSchema({
       longitude: zod.coerce.number().optional(),
       latitude: zod.coerce.number().optional(),
       fullAddress: zod.string().trim().min(1, 'Location is required'),
+      addressLine1: zod
+        .string()
+        .trim()
+        .min(1, 'Enter the 1st line of address (house number or name & street)')
+        .refine((value) => !UK_POSTCODE_ONLY.test(value), {
+          message: '1st line must include house number or name & street, not only a postcode',
+        }),
       city: zod.string().trim().min(1, 'City is required'),
       country: zod.string().trim().min(1, 'Country is required'),
       state: hideState
         ? zod.string().trim().optional().default('')
-        : String(stateLabel || '').toLowerCase() === 'county'
-          ? zod
-              .string()
-              .trim()
-              .min(1, `${stateLabel} is required`)
-              .refine((value) => UK_COUNTY_OPTIONS.includes(value), {
-                message: 'Select a county from the list',
-              })
-          : zod.string().trim().min(1, `${stateLabel} is required`),
+        : zod.string().trim().min(1, `${stateLabel} is required`),
       postalCode: zod.string().trim().min(1, 'Postal code is required'),
       status: zod.enum([
         BRANCH_STATUS.ACTIVE,
@@ -104,25 +110,17 @@ function buildBranchSchema({
       bio: zod
         .string()
         .trim()
-        .min(1, 'Bio is required')
-        .max(2000, 'Bio must be under 2000 characters'),
+        .min(1, 'Information is required')
+        .max(2000, 'Information must be under 2000 characters'),
       website: websiteField,
       images: hideImages
         ? zod.array(zod.any()).default([])
         : zod.array(zod.any()).min(1, 'At least one image is required').default([]),
-      certifications: zod
-        .array(zod.any())
-        .min(1, 'At least one certification is required')
-        .default([]),
+      certifications: zod.array(zod.any()).default([]),
       cqcRegistered: zod.boolean().optional(),
       cqcRegistrationNumber: zod.string().optional(),
       cqcRating: zod.string().optional(),
-      insuranceCertificates: hideInsurance
-        ? zod.array(zod.any()).default([])
-        : zod
-          .array(zod.any())
-          .min(1, 'At least one insurance document is required')
-          .default([]),
+      insuranceCertificates: zod.array(zod.any()).default([]),
       insuranceExpiryDate: zod.string().optional(),
     })
     .superRefine((data, ctx) => {
@@ -165,6 +163,10 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
   const locationName = String(data.locationName || '').trim();
   const locationTitle = locationName || branchName;
   const callerUserId = String(userId || data.userId || '').trim();
+  const city = String(data.city || '').trim();
+  const country = String(data.country || '').trim() || DEFAULT_UK_COUNTRY;
+  const state = String(data.state || '').trim();
+  const postalCode = String(data.postalCode || '').trim();
 
   return {
     name: branchName,
@@ -173,11 +175,18 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
       name: locationTitle,
       title: locationTitle,
       coordinates: toApiCoordinates(data.latitude, data.longitude),
-      fullAddress: String(data.fullAddress || '').trim(),
-      city: String(data.city || '').trim(),
-      country: String(data.country || '').trim() || DEFAULT_UK_COUNTRY,
-      state: String(data.state || '').trim(),
-      postalCode: String(data.postalCode || '').trim(),
+      fullAddress: composeLocationFullAddress({
+        addressLine1: data.addressLine1,
+        fullAddress: data.fullAddress,
+        city,
+        state,
+        postalCode,
+        country,
+      }),
+      city,
+      country,
+      state,
+      postalCode,
     },
     status: resolveBranchStatus(data.status),
     ...buildBranchProfilePayload(data),
@@ -211,7 +220,7 @@ export function BranchFormDialog({
   addressOnly = false,
   showComplianceFields = false,
   hideImages = false,
-  hideInsurance = false,
+  hideInsurance = true,
   showWebsite = false,
   hideState = false,
   stateLabel = 'State',
@@ -244,12 +253,11 @@ export function BranchFormDialog({
   );
 
   const profileFields = useMemo(() => {
-    const fields = ['bio', 'certifications'];
+    const fields = ['bio'];
     if (showWebsite) fields.push('website');
     if (!hideImages) fields.push('images');
-    if (!hideInsurance) fields.push('insuranceCertificates');
     return fields;
-  }, [hideImages, hideInsurance, showWebsite]);
+  }, [hideImages, showWebsite]);
 
   const steps = useMemo(() => {
     const list = [
@@ -286,6 +294,11 @@ export function BranchFormDialog({
         locationObj?.fullAddress ||
         (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
         '',
+      addressLine1: extractAddressLine1(
+        locationObj?.fullAddress ||
+          (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
+          ''
+      ),
       city: locationObj?.city || '',
       country: locationObj?.country || DEFAULT_UK_COUNTRY,
       state:
@@ -396,7 +409,7 @@ export function BranchFormDialog({
       if (!hasCoords) {
         setError('fullAddress', {
           type: 'manual',
-          message: 'Pick a suggestion or tap Detect GPS',
+          message: 'Pick a suggestion or tap Find my location',
         });
         return;
       }
@@ -479,9 +492,18 @@ export function BranchFormDialog({
                 labelPlacement="outlined"
                 countryRestriction="gb"
                 error={Boolean(errors.fullAddress)}
+                helperText={errors.fullAddress?.message || undefined}
+              />
+
+              <Field.Text
+                name="addressLine1"
+                label="1st line of address"
+                placeholder="House number or name & street"
+                size="small"
+                InputLabelProps={{ shrink: true }}
                 helperText={
-                  errors.fullAddress?.message ||
-                  'Search an address or tap Detect GPS — latitude and longitude are set automatically'
+                  errors.addressLine1?.message ||
+                  'Required — house number or name and street'
                 }
               />
 
@@ -493,32 +515,7 @@ export function BranchFormDialog({
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-                {hideState ? (
-                  <Field.Text
-                    name="country"
-                    label="Country"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-                ) : stateIsCountyEnum ? (
-                  <Field.Select
-                    name="state"
-                    label={stateLabel}
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  >
-                    <MenuItem value="">
-                      <em>Select county</em>
-                    </MenuItem>
-                    {UK_COUNTY_OPTIONS.map((county) => (
-                      <MenuItem key={county} value={county}>
-                        {county}
-                      </MenuItem>
-                    ))}
-                  </Field.Select>
-                ) : (
+                {!hideState ? (
                   <Field.Text
                     name="state"
                     label={stateLabel}
@@ -526,10 +523,18 @@ export function BranchFormDialog({
                     InputLabelProps={{ shrink: true }}
                     fullWidth
                   />
-                )}
+                ) : null}
               </Stack>
 
-              {hideState ? (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Field.Text
+                  name="country"
+                  label="Country"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  inputProps={{ autoComplete: 'off' }}
+                />
                 <Field.Text
                   name="postalCode"
                   label="Postal code"
@@ -537,24 +542,7 @@ export function BranchFormDialog({
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-              ) : (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <Field.Text
-                    name="country"
-                    label="Country"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-                  <Field.Text
-                    name="postalCode"
-                    label="Postal code"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-                </Stack>
-              )}
+              </Stack>
 
               <Field.Select
                 name="status"
@@ -575,16 +563,12 @@ export function BranchFormDialog({
             <Stack spacing={2.5}>
               <Field.Text
                 name="bio"
-                label="Bio"
+                label="Information"
                 multiline
                 minRows={3}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                placeholder={
-                  isLocationEntity
-                    ? 'Short description of this location'
-                    : 'Short description of this home / location'
-                }
+                placeholder="Describe any relevant information and care requirements."
               />
 
               {showWebsite ? (
@@ -608,7 +592,7 @@ export function BranchFormDialog({
                     multiple
                     thumbnail
                     name="images"
-                    maxSize={5 * 1024 * 1024}
+                    maxSize={10 * 1024 * 1024}
                     onRemove={(inputFile) =>
                       setValue(
                         'images',
@@ -619,19 +603,15 @@ export function BranchFormDialog({
                     onRemoveAll={() =>
                       setValue('images', [], { shouldValidate: true, shouldDirty: true })
                     }
-                    helperText="Upload photos of the premises (max 5 MB each)"
+                    helperText="Upload photos of the premises (max 10 MB each)"
                   />
                 </Box>
               ) : null}
 
               <StaffDocumentUploadRow
                 name="certifications"
-                label="Certifications"
-                helperText={
-                  isLocationEntity
-                    ? 'Upload PDF / DOC certificates for this location'
-                    : 'Upload PDF / DOC certificates for this location'
-                }
+                label="Care related documentation"
+                helperText="Optional — upload PDF / DOC care-related documents for this location"
               />
 
               {!hideInsurance ? (
@@ -639,11 +619,7 @@ export function BranchFormDialog({
                   <StaffDocumentUploadRow
                     name="insuranceCertificates"
                     label="Insurance"
-                    helperText={
-                      isLocationEntity
-                        ? 'Upload insurance documents (PDF / DOC)'
-                        : 'Upload insurance documents for this location (PDF / DOC)'
-                    }
+                    helperText="Upload insurance documents (PDF / DOC)"
                   />
 
                   <Field.Text

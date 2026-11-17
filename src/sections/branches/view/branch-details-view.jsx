@@ -366,13 +366,13 @@ export function BranchDetailsView() {
             </DetailGrid>
           </SectionCard>
 
-          <SectionCard title="About">
+          <SectionCard title="Information">
             <Typography
               variant="body2"
               color={branch.bio ? 'text.primary' : 'text.secondary'}
               sx={{ whiteSpace: 'pre-wrap' }}
             >
-              {branch.bio || 'No bio added yet.'}
+              {branch.bio || 'No information added yet.'}
             </Typography>
           </SectionCard>
 
@@ -392,9 +392,12 @@ export function BranchDetailsView() {
             <Divider sx={{ my: 3, borderStyle: 'dashed' }} />
 
             <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-              Certifications ({certifications.length})
+              Care related documentation ({certifications.length})
             </Typography>
-            <DocumentList files={certifications} emptyText="No certifications uploaded." />
+            <DocumentList
+              files={certifications}
+              emptyText="No care related documentation uploaded."
+            />
 
             {!careHomeMode ? (
               <>

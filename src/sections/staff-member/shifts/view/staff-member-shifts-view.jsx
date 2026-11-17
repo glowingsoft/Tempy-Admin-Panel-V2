@@ -6,6 +6,7 @@ import {
   endOfWeek,
   format,
   isSameMonth,
+  parse,
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
@@ -16,6 +17,8 @@ import { ModuleLoading } from 'src/components/loading-screen';
 import {
   buildAgencyAvailabilityPayload,
 } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import { WeeklyUnavailabilityDialog } from 'src/sections/agency/shifts/weekly-unavailability-dialog';
+import { AvailabilityTimeRangeDialog } from 'src/sections/agency/shifts/availability-time-range-dialog';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -65,6 +68,7 @@ function mapAvailabilityToCalendarEntry(entry = {}) {
   if (!entry?.date) return null;
   const title = availabilityTitleFromApi(entry);
   if (!title) return null;
+  const notes = String(entry.notes || entry.note || entry.raw?.notes || entry.raw?.note || '').trim();
   return {
     id: entry.apiId || entry.id,
     cardKey: `availability-${entry.apiId || entry.id}`,
@@ -73,6 +77,7 @@ function mapAvailabilityToCalendarEntry(entry = {}) {
     shiftStartTime: entry.startTime || '',
     shiftEndTime: entry.endTime || '',
     address: entry.location || '',
+    notes,
     role: title,
     apiStatus: entry.apiStatus || '',
     status: entry.apiStatus || '',
@@ -248,18 +253,35 @@ export function StaffMemberShiftsView() {
     availabilityQuery.error?.error ||
     'Could not load shifts';
 
-  const handleAddOnDay = async (type, day) => {
-    const date = format(day, 'yyyy-MM-dd');
-    const staffId =
+  const [weeklyUnavailOpen, setWeeklyUnavailOpen] = useState(false);
+  const [weeklyUnavailSubmitting, setWeeklyUnavailSubmitting] = useState(false);
+  const [weeklyUnavailStart, setWeeklyUnavailStart] = useState('');
+  const [availTimeDialog, setAvailTimeDialog] = useState({ open: false, kind: 'busy', date: '' });
+  const [availTimeSubmitting, setAvailTimeSubmitting] = useState(false);
+
+  const resolveSelfStaffId = useCallback(
+    () =>
       scopeUserId ||
       getUserIdentityIds(user).find((id) => /^[a-f\d]{24}$/i.test(id)) ||
-      '';
+      '',
+    [scopeUserId, user]
+  );
+
+  const handleAddOnDay = async (type, day) => {
+    const date = format(day, 'yyyy-MM-dd');
+    if (type === 'weekly-unavailability') {
+      setWeeklyUnavailStart(date);
+      setWeeklyUnavailOpen(true);
+      return;
+    }
+    if (type === 'busy' || type === 'day-off' || type === 'add-leave') {
+      setAvailTimeDialog({ open: true, kind: type, date });
+      return;
+    }
+    const staffId = resolveSelfStaffId();
     const meta = {
-      busy: { status: 'busy', startTime: '00:00', endTime: '23:59' },
       'on-call': { status: 'onCall', startTime: '00:00', endTime: '23:59' },
       sleepover: { status: 'sleepover', startTime: '22:00', endTime: '07:00' },
-      'day-off': { status: 'dayOff', startTime: '00:00', endTime: '23:59' },
-      'add-leave': { status: 'leave', startTime: '09:00', endTime: '18:00' },
     }[type];
     if (!meta) return;
     try {
@@ -275,6 +297,85 @@ export function StaffMemberShiftsView() {
       await availabilityQuery.refetch();
     } catch (err) {
       toast.error(err?.data?.message || err?.error || err?.message || 'Could not add on this date');
+    }
+  };
+
+  const handleAvailabilityTimeSubmit = async ({ kind, startTime, endTime, note }) => {
+    const staffId = resolveSelfStaffId();
+    if (!staffId) {
+      toast.error('Could not resolve your staff id — refresh and try again');
+      return;
+    }
+    const date = availTimeDialog.date || format(selectedDay, 'yyyy-MM-dd');
+    const status =
+      kind === 'day-off' ? 'dayOff' : kind === 'add-leave' ? 'leave' : kind === 'busy' ? 'busy' : '';
+    if (!status) return;
+
+    setAvailTimeSubmitting(true);
+    try {
+      const body = buildAgencyAvailabilityPayload({
+        status,
+        date,
+        startTime,
+        endTime,
+        staffId,
+        notes: String(note || '').trim(),
+      });
+      await createAvailability(body).unwrap();
+      toast.success('Added on calendar');
+      setAvailTimeDialog({ open: false, kind: 'busy', date: '' });
+      await availabilityQuery.refetch();
+    } catch (err) {
+      toast.error(err?.data?.message || err?.error || err?.message || 'Could not add on this date');
+    } finally {
+      setAvailTimeSubmitting(false);
+    }
+  };
+
+  const handleWeeklyUnavailabilitySubmit = async ({ slots }) => {
+    const staffId = resolveSelfStaffId();
+    if (!staffId) {
+      toast.error('Could not resolve your staff id — refresh and try again');
+      return;
+    }
+    if (!slots?.length) {
+      toast.error('Select at least one weekly option');
+      return;
+    }
+
+    setWeeklyUnavailSubmitting(true);
+    let saved = 0;
+    let skipped = 0;
+    try {
+      for (const slot of slots) {
+        try {
+          const body = buildAgencyAvailabilityPayload({
+            status: slot.status,
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            staffId,
+            notes: slot.note || '',
+          });
+          await createAvailability(body).unwrap();
+          saved += 1;
+        } catch {
+          skipped += 1;
+        }
+      }
+      if (saved > 0) {
+        toast.success(
+          skipped
+            ? `Weekly unavailability saved (${saved} slots). ${skipped} skipped.`
+            : `Weekly unavailability saved (${saved} slots).`
+        );
+        setWeeklyUnavailOpen(false);
+        await availabilityQuery.refetch();
+      } else {
+        toast.error('Could not save weekly unavailability');
+      }
+    } finally {
+      setWeeklyUnavailSubmitting(false);
     }
   };
 
@@ -364,6 +465,33 @@ export function StaffMemberShiftsView() {
         job={selectedJob}
         onClose={() => setSelectedJob(null)}
         onCancelled={handleJobCancelled}
+      />
+
+      <WeeklyUnavailabilityDialog
+        open={weeklyUnavailOpen}
+        onClose={weeklyUnavailSubmitting ? undefined : () => setWeeklyUnavailOpen(false)}
+        onSubmit={handleWeeklyUnavailabilitySubmit}
+        submitting={weeklyUnavailSubmitting || createAvailabilityState.isLoading}
+        staffName="you"
+        defaultStartDate={weeklyUnavailStart || format(selectedDay, 'yyyy-MM-dd')}
+      />
+
+      <AvailabilityTimeRangeDialog
+        open={Boolean(availTimeDialog.open)}
+        kind={availTimeDialog.kind}
+        staffName="you"
+        dateLabel={
+          availTimeDialog.date
+            ? format(parse(availTimeDialog.date, 'yyyy-MM-dd', new Date()), 'EEE d MMM')
+            : ''
+        }
+        submitting={availTimeSubmitting || createAvailabilityState.isLoading}
+        onClose={
+          availTimeSubmitting
+            ? undefined
+            : () => setAvailTimeDialog({ open: false, kind: 'busy', date: '' })
+        }
+        onSubmit={handleAvailabilityTimeSubmit}
       />
     </DashboardContent>
   );

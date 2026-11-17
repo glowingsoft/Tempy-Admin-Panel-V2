@@ -79,6 +79,7 @@ import { useJobsWithReviews } from 'src/sections/reviews/use-jobs-with-reviews';
 import { usePrepareJobReview } from 'src/sections/reviews/use-prepare-job-review';
 import { useActiveBranch } from 'src/sections/branches/active-branch-context';
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
+import { useRoleJobTypeMutations } from 'src/sections/job-roles/use-role-job-type-mutations';
 import { ALL_SITES_ID, jobMatchesActiveBranch } from 'src/sections/branches/active-branch';
 
 import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
@@ -87,6 +88,7 @@ import {
   buildCareHomeJobPayload,
   isJobCreateSoftError,
   pickJobSuccessToast,
+  resolveDraftJobTypeForSubmit,
 } from '../care-home-job-api-utils';
 import { PostJobDialog } from '../post-job-dialog';
 import { ClosedJobReview } from '../closed-job-review';
@@ -818,6 +820,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       : isHospital
         ? createHospitalJob
         : createCareHomeJob;
+  const { create: createJobType } = useRoleJobTypeMutations(mode);
   const [fetchCareHomeJobById] = useLazyGetCareHomeJobByIdQuery();
   const [fetchHospitalJobById] = useLazyGetHospitalJobByIdQuery();
   const [fetchUserJobById] = useLazyGetUserJobByIdQuery();
@@ -1135,15 +1138,19 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
   const handleSubmitJob = useCallback(
     async (draft) => {
+      const resolvedDraft = editingJob?.id
+        ? draft
+        : await resolveDraftJobTypeForSubmit(draft, createJobType);
+
       const branch =
-        branches.find((item) => item.id === draft.branchId) ||
-        branches.find((item) => item._id === draft.branchId) ||
+        branches.find((item) => item.id === resolvedDraft.branchId) ||
+        branches.find((item) => item._id === resolvedDraft.branchId) ||
         null;
 
-      if (!draft.typeId) {
+      if (!resolvedDraft.typeId) {
         throw new Error('Please select a job type');
       }
-      if (!draft.branchId) {
+      if (!resolvedDraft.branchId) {
         throw new Error(
           isUser || isHomeCareCompany
             ? 'Please select a location'
@@ -1159,24 +1166,27 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
       }
 
       const isDirectRequest = Boolean(
-        draft.requestFromAgency || draft.agencyId || draft.workerId || draft.employeeId
+        resolvedDraft.requestFromAgency ||
+          resolvedDraft.agencyId ||
+          resolvedDraft.workerId ||
+          resolvedDraft.employeeId
       );
       const directId = String(
-        draft.workerId || draft.employeeId || draft.agencyId || ''
+        resolvedDraft.workerId || resolvedDraft.employeeId || resolvedDraft.agencyId || ''
       ).trim();
-      const schedules = (draft.schedules || []).map((entry) => ({
+      const schedules = (resolvedDraft.schedules || []).map((entry) => ({
         ...entry,
         receivingBids: directId ? false : entry.receivingBids,
       }));
 
       const body = buildCareHomeJobPayload(
         {
-          ...draft,
-          workerId: directId || draft.workerId,
-          employeeId: directId || draft.employeeId,
+          ...resolvedDraft,
+          workerId: directId || resolvedDraft.workerId,
+          employeeId: directId || resolvedDraft.employeeId,
           schedules,
-          receivingBids: isDirectRequest && directId ? false : draft.receivingBids,
-          location: branch?.location || draft.location,
+          receivingBids: isDirectRequest && directId ? false : resolvedDraft.receivingBids,
+          location: branch?.location || resolvedDraft.location,
         },
         branch,
         { includeStatus: Boolean(editingJob), isUser }
@@ -1184,7 +1194,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
       if (!body.type) throw new Error('Please select a job type');
       if (!body.name) {
-        body.name = String(draft.typeTitle || draft.type || '').trim();
+        body.name = String(resolvedDraft.typeTitle || resolvedDraft.type || '').trim();
       }
       if (!body.name) throw new Error('Please select a job type');
       if (!(body.branch || body.address))
@@ -1192,9 +1202,6 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
           'Please select a location'
         );
       if (!body.shift?.length) throw new Error('Please add at least one shift');
-      if (!editingJob?.id && !String(draft.image || '').trim()) {
-        throw new Error('Please add a job image');
-      }
 
       if (editingJob?.id) {
         let response;
@@ -1218,7 +1225,7 @@ function CreatedJobsViewContent({ openPostOnMount = false, mode = 'careHome' }) 
 
       toast.success(pickJobSuccessToast(response, 'Job created successfully'));
     },
-    [branches, createJob, editingJob, isHomeCareCompany, isUser, updateJob]
+    [branches, createJob, createJobType, editingJob, isHomeCareCompany, isUser, updateJob]
   );
 
   const handleDeleteRequest = useCallback(

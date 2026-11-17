@@ -920,7 +920,7 @@ export function BranchesView() {
         addressOnly={userMode}
         showComplianceFields={homeCareCompanyMode}
         hideImages={careHomeMode}
-        hideInsurance={careHomeMode}
+        hideInsurance
         stateLabel={careHomeMode ? 'County' : 'State'}
       />
 

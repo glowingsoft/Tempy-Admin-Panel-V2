@@ -3,6 +3,7 @@ import {
   getAgencyBranchMongoId,
   mapAgencyBranchFromApi,
 } from './agency-branch-utils';
+import { composeLocationFullAddress } from './address-form-utils';
 import { toApiCoordinates } from './geo-coordinates';
 
 
@@ -66,13 +67,23 @@ function buildUserAddressLocation(data) {
       : Number.isFinite(Number(postalRaw)) && String(postalRaw).trim() !== ''
         ? Number(postalRaw)
         : String(postalRaw).trim();
+  const city = String(data.city || '').trim();
+  const country = String(data.country || '').trim();
+  const state = String(data.state || '').trim();
 
   return {
     coordinates: toApiCoordinates(Number(data.latitude) || 0, Number(data.longitude) || 0),
-    fullAddress: String(data.fullAddress || '').trim(),
-    city: String(data.city || '').trim(),
-    country: String(data.country || '').trim(),
-    state: String(data.state || '').trim(),
+    fullAddress: composeLocationFullAddress({
+      addressLine1: data.addressLine1,
+      fullAddress: data.fullAddress,
+      city,
+      state,
+      postalCode,
+      country,
+    }),
+    city,
+    country,
+    state,
     postalCode,
   };
 }

@@ -970,7 +970,7 @@ export function AgencyStaffFormDialog({
                           <Field.StandaloneAddress
                             name="locationSearch"
                             label="Map location"
-                            helperText="Search a place or tap Detect GPS for latitude & longitude"
+                            helperText="Search a place or tap Find my location for latitude & longitude"
                           />
                         </Box>
                       ) : null}

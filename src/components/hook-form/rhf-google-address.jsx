@@ -406,7 +406,7 @@ export function RHFGoogleAddress({
             startIcon={<Iconify icon="solar:routing-2-bold" width={16} />}
             onClick={handleDetectGps}
           >
-            Detect GPS
+            Find my location
           </LoadingButton>
         </Stack>
       ) : null}

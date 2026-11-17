@@ -154,7 +154,9 @@ import {
   isJobCreateSoftError,
   mergeUserWithProfile,
   pickJobSuccessToast,
+  resolveDraftJobTypeForSubmit,
 } from '../../jobs/care-home-job-api-utils';
+import { useRoleJobTypeMutations } from 'src/sections/job-roles/use-role-job-type-mutations';
 import { fCurrency } from 'src/utils/format-number';
 import { pickApiReview, resolveJobReviewTarget, resolveReviewSubmitTarget } from 'src/sections/reviews/reviews-api-utils';
 import {
@@ -3255,6 +3257,7 @@ function ShiftsViewContent({
         : isLocalAuthorityApi
           ? createLocalAuthorityJob
           : createCareHomeJob;
+  const { create: createJobType } = useRoleJobTypeMutations(apiRole);
   const updateJob =
     isHospitalApi
       ? updateHospitalJob
@@ -3412,8 +3415,10 @@ function ShiftsViewContent({
         throw new Error(validationError);
       }
 
+      const resolvedDraft = await resolveDraftJobTypeForSubmit(draft, createJobType);
+
       const branchId =
-        String(draft.branchId || '').trim() ||
+        String(resolvedDraft.branchId || '').trim() ||
         (location && location !== ALL_LOCATIONS_ID ? location : '') ||
         String(branches[0]?.id || '');
 
@@ -3422,7 +3427,7 @@ function ShiftsViewContent({
         branches.find((item) => String(item._id) === String(branchId)) ||
         null;
 
-      if (!draft.typeId) {
+      if (!resolvedDraft.typeId) {
         throw new Error('Please select a job type');
       }
       if (!branchId || !branch) {
@@ -3437,27 +3442,27 @@ function ShiftsViewContent({
       const directId =
         resolveDirectRequestTargetId(
           {
-            workerId: draft.workerId,
-            employeeId: draft.employeeId,
-            agencyId: draft.agencyId,
+            workerId: resolvedDraft.workerId,
+            employeeId: resolvedDraft.employeeId,
+            agencyId: resolvedDraft.agencyId,
             staffId: postJobContext?.staffId,
           },
           staff
         ) || '';
 
-      const schedules = (draft.schedules || []).map((entry) => ({
+      const schedules = (resolvedDraft.schedules || []).map((entry) => ({
         ...entry,
         receivingBids: directId ? false : entry.receivingBids,
       }));
 
       const body = buildCareHomeJobPayload(
         {
-          ...draft,
+          ...resolvedDraft,
           branchId,
           workerId: directId,
           employeeId: directId,
           schedules,
-          location: branch.location || draft.location,
+          location: branch.location || resolvedDraft.location,
         },
         branch,
         { isUser: isUserApi }
@@ -3489,7 +3494,7 @@ function ShiftsViewContent({
         allStaff.find((s) => !s.isVacant)?.id ||
         '';
       const { staffId: resolvedStaffId, teamMatched, team: matchedTeam } = resolveStaffIdForJobType(
-        draft.type || draft.typeTitle,
+        resolvedDraft.type || resolvedDraft.typeTitle,
         clickedStaffId,
         teams
       );
@@ -3529,13 +3534,17 @@ function ShiftsViewContent({
           setShowStaffDetail(true);
         }
 
-        const draftJobId = createdJobId || String(draft.id || draft._id || '').trim();
+        const draftJobId = createdJobId || String(resolvedDraft.id || resolvedDraft._id || '').trim();
 
         setShifts((prev) => {
           const next = { ...prev };
           validSchedules.forEach((schedule, index) => {
             const built = buildJobGridShift(
-              { ...draft, id: draftJobId || `local-${schedule.date}-${targetStaffId}`, schedules: validSchedules },
+              {
+                ...resolvedDraft,
+                id: draftJobId || `local-${schedule.date}-${targetStaffId}`,
+                schedules: validSchedules,
+              },
               targetStaffId,
               schedule,
               index,
@@ -3558,7 +3567,8 @@ function ShiftsViewContent({
 
         if (!teamMatched) {
           toast.warning(
-            `No "${draft.type || draft.typeTitle}" row on this rota — showing the request on ${targetMember?.name || 'the selected staff'
+            `No "${resolvedDraft.type || resolvedDraft.typeTitle}" row on this rota — showing the request on ${
+              targetMember?.name || 'the selected staff'
             } for that date.`
           );
         }
@@ -3566,13 +3576,17 @@ function ShiftsViewContent({
 
       if (directId) {
         const sentToAgency =
-          Boolean(draft.agencyId && directId === draft.agencyId) ||
+          Boolean(resolvedDraft.agencyId && directId === resolvedDraft.agencyId) ||
           Boolean(staff?.agencyId && directId === staff.agencyId);
         toast.success(
           pickJobSuccessToast(
             createdPayload,
             sentToAgency
-              ? `Direct request sent${draft.agencyName || staff?.agencyName ? ` to ${draft.agencyName || staff.agencyName}` : ''} — it will show on Agency → Find Jobs`
+              ? `Direct request sent${
+                  resolvedDraft.agencyName || staff?.agencyName
+                    ? ` to ${resolvedDraft.agencyName || staff.agencyName}`
+                    : ''
+                } — it will show on Agency → Find Jobs`
               : 'Request sent to worker (not an agency — will not appear on Agency Find Jobs)'
           )
         );
@@ -3592,6 +3606,8 @@ function ShiftsViewContent({
       selectedStaff,
       resolveDirectRequestTargetId,
       createJob,
+      createJobType,
+      isUserApi,
     ]
   );
   const [shiftForm, setShiftForm] = useState({

@@ -43,6 +43,39 @@ export function applyAddressPlaceToForm(
     shouldDirty: true,
     shouldValidate: true,
   });
+
+  const line1 = String(place.mainText || place.name || '').trim() || extractAddressLine1(place.label);
+  if (line1) {
+    setValue('addressLine1', line1, { shouldDirty: true, shouldValidate: true });
+  }
+}
+
+/** First segment of a comma-separated address (house / street). */
+export function extractAddressLine1(fullAddress) {
+  const raw = String(fullAddress || '').trim();
+  if (!raw) return '';
+  return raw.split(',')[0].trim();
+}
+
+/** Build stored fullAddress with required line 1 first. */
+export function composeLocationFullAddress({
+  addressLine1 = '',
+  fullAddress = '',
+  city = '',
+  state = '',
+  postalCode = '',
+  country = '',
+} = {}) {
+  const line1 = String(addressLine1 || '').trim();
+  const lookup = String(fullAddress || '').trim();
+  if (line1 && lookup) {
+    if (lookup.toLowerCase().startsWith(line1.toLowerCase())) return lookup;
+    return [line1, lookup].join(', ');
+  }
+  if (line1) {
+    return [line1, city, state, postalCode, country].map((part) => String(part || '').trim()).filter(Boolean).join(', ');
+  }
+  return lookup;
 }
 
 export async function ensureFormAddressCoordinates(
@@ -68,6 +101,6 @@ export async function ensureFormAddressCoordinates(
 }
 
 export const ADDRESS_COORDINATES_HELPER =
-  'Search a place or tap Detect GPS — latitude and longitude are set automatically.';
+  'Search a place or tap Find my location — latitude and longitude are set automatically.';
 
 export const FULL_ADDRESS_HELPER = 'Street address for records (separate from map location).';

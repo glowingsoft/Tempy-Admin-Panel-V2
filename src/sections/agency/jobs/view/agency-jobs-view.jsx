@@ -1977,7 +1977,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       } catch (error) {
         const raw = handleApiError(error) || 'Check-in failed. Please try again.';
         const message = /outside allowed radius/i.test(String(raw))
-          ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Detect GPS again.'
+          ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Find my location again.'
           : raw;
         const blockingId = String(error?.data?.data?.bookingId || '').trim();
         if (blockingId) {

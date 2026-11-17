@@ -15,7 +15,11 @@ export const uploadApi = createApi({
     uploadAwsFile: builder.mutation({
       query: (file) => {
         const formData = new FormData();
-        formData.append('files', file);
+        const originalName = String(file?.name || '').trim() || 'file';
+        // Keep the browser filename on the multipart part so storage can use the real name.
+        formData.append('files', file, originalName);
+        formData.append('originalName', originalName);
+        formData.append('fileName', originalName);
 
         return {
           url: API_ROUTES.UPLOAD_AWS,

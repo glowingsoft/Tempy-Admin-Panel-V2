@@ -79,10 +79,15 @@ function entryChipSx(job) {
 }
 
 const DAY_ADD_ACTIONS = [
-  { id: 'busy', label: 'Mark Busy', icon: 'eva:slash-fill' },
+  { id: 'busy', label: 'Mark Busy (time window)', icon: 'eva:slash-fill' },
   { id: 'on-call', label: 'On Call', icon: 'eva:plus-fill' },
   { id: 'sleepover', label: 'Sleepover', icon: 'eva:plus-fill' },
-  { id: 'day-off', label: 'Day off', icon: 'eva:plus-fill' },
+  { id: 'day-off', label: 'Day / night off', icon: 'eva:plus-fill' },
+  {
+    id: 'weekly-unavailability',
+    label: 'Weekly unavailability',
+    icon: 'solar:calendar-mark-bold',
+  },
   { id: 'add-leave', label: 'Add leave', icon: 'eva:plus-fill' },
 ];
 
@@ -375,10 +380,15 @@ export function StaffMemberShiftsCalendar({
                     {job.title}
                   </Typography>
                   {(job.shiftStartTime || job.shiftEndTime) && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" display="block">
                       {[job.shiftStartTime, job.shiftEndTime].filter(Boolean).join(' – ')}
                     </Typography>
                   )}
+                  {job.notes ? (
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                      {job.notes}
+                    </Typography>
+                  ) : null}
                 </Box>
               </Stack>
             ))}

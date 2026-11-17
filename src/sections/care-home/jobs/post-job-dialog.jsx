@@ -33,10 +33,13 @@ import {
   validateJobDraft,
 } from './care-home-job-utils';
 import { useLastJobContactDetails } from './use-last-job-contact';
+import { useCompanyPaysBreaks } from './company-break-settings';
 
 
-function buildOpenDraft({ editingJob, initialDraft }) {
+function buildOpenDraft({ editingJob, initialDraft, breakPaid = true }) {
   if (editingJob) return jobToDraft(editingJob);
+
+  const defaultSchedule = createDefaultSchedule(new Date(), { breakPaid });
 
   if (initialDraft) {
     return {
@@ -51,11 +54,11 @@ function buildOpenDraft({ editingJob, initialDraft }) {
       gender: String(initialDraft.gender || '').trim(),
       schedules: initialDraft.schedules?.length
         ? initialDraft.schedules.map((entry) => ({ ...entry }))
-        : [{ ...createDefaultSchedule() }],
+        : [{ ...defaultSchedule }],
     };
   }
 
-  return { ...EMPTY_JOB_DRAFT, schedules: [{ ...createDefaultSchedule() }] };
+  return { ...EMPTY_JOB_DRAFT, schedules: [{ ...defaultSchedule }] };
 }
 
 export function PostJobDialog({
@@ -70,6 +73,7 @@ export function PostJobDialog({
   intent = 'job',
 }) {
   const { blocked: mandateBlocked } = useCustomerMandateBlock(mode);
+  const { paysBreaks } = useCompanyPaysBreaks();
   const [draft, setDraft] = useState(EMPTY_JOB_DRAFT);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -102,7 +106,7 @@ export function PostJobDialog({
       contactAppliedRef.current = false;
     }
     if (open && !wasOpenRef.current) {
-      const next = buildOpenDraft({ editingJob, initialDraft });
+      const next = buildOpenDraft({ editingJob, initialDraft, breakPaid: paysBreaks });
       setDraft(editingJob ? next : mergeEmptyJobContact(next, lastContact));
       setStep(1);
       setFormError('');
@@ -110,7 +114,7 @@ export function PostJobDialog({
       contactAppliedRef.current = Boolean(!editingJob && lastContact);
     }
     wasOpenRef.current = open;
-  }, [open, editingJob, initialDraft, lastContact]);
+  }, [open, editingJob, initialDraft, lastContact, paysBreaks]);
 
   useEffect(() => {
     if (!open || editingJob || !lastContact || contactAppliedRef.current) return;

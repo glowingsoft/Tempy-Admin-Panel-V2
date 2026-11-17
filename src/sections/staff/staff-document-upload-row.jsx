@@ -33,8 +33,22 @@ function getDocumentIcon(label) {
 
 function getFileName(file) {
   if (!file) return 'file';
-  if (typeof file === 'string') return file.split('/').pop() || file;
-  return file.name || 'file';
+  if (typeof file === 'string') {
+    try {
+      const path = file.split('?')[0];
+      return decodeURIComponent(path.split('/').pop() || file);
+    } catch {
+      return file.split('/').pop() || file;
+    }
+  }
+  return (
+    file.originalName ||
+    file.fileName ||
+    file.name ||
+    (typeof file.file === 'string' && !/^https?:\/\//i.test(file.file) ? file.file : '') ||
+    getFileName(file.fileUrl || file.url || '') ||
+    'file'
+  );
 }
 
 function getFileExt(file) {
@@ -76,14 +90,23 @@ export function StaffDocumentUploadRow({
 
       setUploading(true);
       try {
-        const urls = [];
+        const nextFiles = [];
         for (const file of acceptedFiles) {
+          const originalName = String(file?.name || '').trim() || 'file';
           const result = await uploadAwsFile(file).unwrap();
           const url = result?.fileUrl || result?.file || '';
-          if (url) urls.push(url);
+          if (url) {
+            nextFiles.push({
+              fileUrl: url,
+              url,
+              name: originalName,
+              originalName,
+              fileName: originalName,
+            });
+          }
         }
-        if (urls.length) {
-          setValue(name, [...uploadedFiles, ...urls], { shouldValidate: true });
+        if (nextFiles.length) {
+          setValue(name, [...uploadedFiles, ...nextFiles], { shouldValidate: true });
         }
       } catch (err) {
         toast.error(

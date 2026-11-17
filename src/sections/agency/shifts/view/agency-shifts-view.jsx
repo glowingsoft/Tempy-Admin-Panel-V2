@@ -87,6 +87,8 @@ import {
   flattenTeamsStaff,
   mapAgencyBranchesToLocations,
 } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import { WeeklyUnavailabilityDialog } from 'src/sections/agency/shifts/weekly-unavailability-dialog';
+import { AvailabilityTimeRangeDialog } from 'src/sections/agency/shifts/availability-time-range-dialog';
 import {
   formatCalendarMetaStats,
   getAgencyBranchLatLng,
@@ -140,10 +142,15 @@ import {
 
 const SIDEBAR_ACTIONS = [
   { id: 'add-shift', label: 'Smart Assign', icon: 'eva:person-add-fill' },
-  { id: 'busy', label: 'Mark Busy (block auto-accept)', icon: 'eva:slash-fill' },
+  { id: 'busy', label: 'Mark Busy (time window)', icon: 'eva:slash-fill' },
   { id: 'on-call', label: 'On Call Schedule', icon: 'eva:plus-fill' },
   { id: 'sleepover', label: 'Sleepover Schedule', icon: 'eva:plus-fill' },
-  { id: 'day-off', label: 'Schedule this day off', icon: 'eva:plus-fill' },
+  { id: 'day-off', label: 'Day / night off (time window)', icon: 'eva:plus-fill' },
+  {
+    id: 'weekly-unavailability',
+    label: 'Weekly unavailability',
+    icon: 'solar:calendar-mark-bold',
+  },
   { id: 'not-scheduled', label: 'Not Scheduled', icon: 'eva:plus-fill' },
   { id: 'add-leave', label: 'Add Leave', icon: 'eva:plus-fill' },
 ];
@@ -1459,6 +1466,7 @@ function AgencyShiftDetailsDialog({
           </Box>
           <AgencyShiftDetailField label="Location" value={shift.location} />
           <AgencyShiftDetailField label="Job type" value={shift.manualJobType} />
+          <AgencyShiftDetailField label="Note" value={shift.notes || shift.note || ''} />
 
           {showList && (
             <Box>
@@ -1544,9 +1552,11 @@ function ShiftCell({
     ? dayShiftsProp
     : normalizeCellShifts(shift);
   const timedShifts = dayShifts.filter(isTimedWorkShift);
-  const statusShift = dayShifts.find(isStatusBlock) || null;
-  const multi = timedShifts.length > 1;
-  const rowMinH = multi ? Math.max(ROW_H, timedShifts.length * 26 + 10) : ROW_H;
+  const statusBlocks = dayShifts.filter(isStatusBlock);
+  const statusShift = statusBlocks[0] || null;
+  const tileCount = statusBlocks.length + timedShifts.length;
+  const multi = tileCount > 1;
+  const rowMinH = multi ? Math.max(ROW_H, tileCount * 28 + 10) : ROW_H;
 
   const cellSx = {
     width: dayColWidth,
@@ -1631,44 +1641,8 @@ function ShiftCell({
     </Menu>
   );
 
-  if (statusShift && getShiftStyle(statusShift)?.label) {
-    const statusStyle = getShiftStyle(statusShift);
-    return (
-      <>
-        <Box
-          sx={cellSx}
-          data-shift-cell={cellKey}
-          onClick={(e) => onClick(e.currentTarget, statusShift, { openActions: true })}
-          onContextMenu={handleContextMenu}
-        >
-          <Tooltip
-            title={
-              statusShift?.busy || statusShift?.blocksAutoAccept
-                ? 'Busy / unavailable — blocked from auto-accept'
-                : statusStyle.label
-            }
-            arrow
-          >
-            <Box
-              sx={{
-                ...blockBase,
-                height: '88%',
-                bgcolor: statusStyle.bg,
-                border: `1px solid ${statusStyle.border}`,
-              }}
-            >
-              <Typography sx={{ fontSize: 10, fontWeight: 600, color: statusStyle.color }}>
-                {statusStyle.label}
-              </Typography>
-            </Box>
-          </Tooltip>
-        </Box>
-        {contextMenuNode}
-      </>
-    );
-  }
-
-  if (timedShifts.length) {
+  if (statusBlocks.length || timedShifts.length) {
+    const primaryClickTarget = statusShift || timedShifts[0];
     return (
       <>
         <Box
@@ -1676,11 +1650,97 @@ function ShiftCell({
           data-shift-cell={cellKey}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              onClick(e.currentTarget, timedShifts[0], { addAnother: multi });
+              onClick(e.currentTarget, primaryClickTarget, {
+                openActions: Boolean(statusShift),
+                addAnother: timedShifts.length > 0 && multi,
+              });
             }
           }}
           onContextMenu={handleContextMenu}
         >
+          {statusBlocks.map((entry) => {
+            const entryStyle = getShiftStyle(entry) || style;
+            const entryNote = String(entry.notes || entry.note || '').trim();
+            const timeLabel =
+              entry.startTime && entry.endTime
+                ? `${formatShiftTime(entry.startTime)}–${formatShiftTime(entry.endTime)}`
+                : '';
+            const tooltipParts = [
+              entryStyle.label,
+              timeLabel,
+              entryNote ||
+                (entry.busy || entry.blocksAutoAccept
+                  ? 'Busy / unavailable — blocked from auto-accept'
+                  : ''),
+            ].filter(Boolean);
+            return (
+              <Tooltip key={entry.id || entry.apiId || `${entry.date}-${entry.startTime}`} title={tooltipParts.join(' · ')} arrow>
+                <Box
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClick(e.currentTarget, entry, { openActions: true });
+                  }}
+                  sx={{
+                    ...blockBase,
+                    width: '100%',
+                    minHeight: multi ? 28 : undefined,
+                    flex: multi ? '0 0 auto' : 1,
+                    height: multi ? 'auto' : '88%',
+                    py: 0.35,
+                    px: 0.35,
+                    bgcolor: entryStyle.bg,
+                    border: `1px solid ${entryStyle.border}`,
+                    cursor: 'pointer',
+                    '&:hover': { filter: 'brightness(0.97)' },
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: entryStyle.color,
+                      textAlign: 'center',
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    {entryStyle.label}
+                  </Typography>
+                  {timeLabel ? (
+                    <Typography
+                      sx={{
+                        fontSize: 8,
+                        fontWeight: 600,
+                        color: entryStyle.color,
+                        opacity: 0.9,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {timeLabel}
+                    </Typography>
+                  ) : null}
+                  {entryNote ? (
+                    <Typography
+                      sx={{
+                        fontSize: 8,
+                        fontWeight: 500,
+                        color: entryStyle.color,
+                        opacity: 0.85,
+                        textAlign: 'center',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        px: 0.25,
+                      }}
+                    >
+                      {entryNote}
+                    </Typography>
+                  ) : null}
+                </Box>
+              </Tooltip>
+            );
+          })}
+
           {timedShifts.map((entry) => {
             const entryStyle = getShiftStyle(entry) || style;
             const badge =
@@ -2644,6 +2704,15 @@ export function AgencyShiftsView({
   const [activeSidebarAction, setActiveSidebarAction] = useState(() =>
     ''
   );
+  const [weeklyUnavailOpen, setWeeklyUnavailOpen] = useState(false);
+  const [weeklyUnavailSubmitting, setWeeklyUnavailSubmitting] = useState(false);
+  const [availTimeDialog, setAvailTimeDialog] = useState({
+    open: false,
+    kind: 'busy',
+    staff: null,
+    date: '',
+  });
+  const [availTimeSubmitting, setAvailTimeSubmitting] = useState(false);
   const [copiedShift, setCopiedShift] = useState(null);
   const [cellActionMenu, setCellActionMenu] = useState(null);
   const [shiftForm, setShiftForm] = useState({
@@ -3704,6 +3773,16 @@ export function AgencyShiftsView({
       setFocusedShiftDate(date);
       setShowStaffDetail(true);
 
+      if (type === 'weekly-unavailability') {
+        if (staff?.isVacant || staff?.isPlaceholder) {
+          toast.info('Select a staff member first');
+          return;
+        }
+        setActiveSidebarAction(type);
+        setWeeklyUnavailOpen(true);
+        return;
+      }
+
       if (type === 'not-scheduled') {
         const datesToClear = [date];
         if (useCalendarApi) {
@@ -3748,71 +3827,29 @@ export function AgencyShiftsView({
         return;
       }
 
+      // Part-day / night windows — open time picker (day-off all-day alone is not enough for night care).
+      if (type === 'busy' || type === 'day-off' || type === 'add-leave') {
+        if (staff?.isVacant || staff?.isPlaceholder) {
+          toast.info('Select a staff member first');
+          return;
+        }
+        setActiveSidebarAction(type);
+        setFormPreview(null);
+        setAvailTimeDialog({ open: true, kind: type, staff, date });
+        return;
+      }
+
       const meta = {
-        busy: {
-          busy: true,
-          blocksAutoAccept: true,
-          startTime: '00:00',
-          endTime: '23:59',
-          note: 'Staff marked busy — blocked from auto-accept',
-        },
         'on-call': { onCall: true, startTime: '00:00', endTime: '23:59' },
         sleepover: { sleepover: true, startTime: '22:00', endTime: '07:00' },
-        'day-off': {
-          dayOff: true,
-          blocksAutoAccept: true,
-          startTime: '00:00',
-          endTime: '23:59',
-          note: 'Day off requested — blocked from auto-accept',
-        },
-        'add-leave': {
-          leave: true,
-          blocksAutoAccept: true,
-          startTime: '09:00',
-          endTime: '18:00',
-          note: 'Leave requested — blocked from auto-accept',
-        },
       }[type];
 
       if (!meta) return;
 
-
-      const isDayFreeForAvailability = (dateKey, { allowExistingBlock = false } = {}) => {
-        if (getTimedDayShifts(shifts, staff.id, dateKey).length > 0) return false;
-        const block = getDayShifts(shifts, staff.id, dateKey).find(
-          (entry) =>
-            entry?.busy ||
-            entry?.dayOff ||
-            entry?.leave ||
-            entry?.blocksAutoAccept ||
-            entry?.onCall ||
-            entry?.sleepover
-        );
-        if (!block) return true;
-        return Boolean(allowExistingBlock && block.apiId);
-      };
-
-      let targetDate = date;
-      if (!isDayFreeForAvailability(targetDate, { allowExistingBlock: true })) {
-        toast.warning('This day already has a booking');
-        return;
-      }
-
-      const targetKey = `${staff.id}-${targetDate}`;
+      const targetDate = date;
       setFocusedShiftDate(targetDate);
 
-      const existingBlock = getDayShifts(shifts, staff.id, targetDate).find(
-        (entry) =>
-          entry?.busy ||
-          entry?.dayOff ||
-          entry?.leave ||
-          entry?.blocksAutoAccept ||
-          entry?.onCall ||
-          entry?.sleepover
-      );
-      const editingApiId = existingBlock?.apiId || null;
-
-      let apiId = editingApiId;
+      let apiId = null;
       let apiSuccessMessage = '';
       if (useCalendarApi) {
         try {
@@ -3827,22 +3864,16 @@ export function AgencyShiftsView({
             startTime: meta.startTime,
             endTime: meta.endTime,
             staffId: apiStaffId,
-            notes: meta.note || '',
+            notes: '',
           });
-          if (editingApiId) {
-            const updated = await updateAvailability({ id: editingApiId, ...body }).unwrap();
-            apiId = editingApiId;
-            apiSuccessMessage = String(updated?.message || '').trim();
-          } else {
-            const created = await createAvailability(body).unwrap();
-            apiId =
-              created?.data?._id ||
-              created?.data?.id ||
-              created?._id ||
-              created?.id ||
-              null;
-            apiSuccessMessage = String(created?.message || '').trim();
-          }
+          const created = await createAvailability(body).unwrap();
+          apiId =
+            created?.data?._id ||
+            created?.data?.id ||
+            created?._id ||
+            created?.id ||
+            null;
+          apiSuccessMessage = String(created?.message || '').trim();
         } catch (err) {
           const apiMessage = err?.data?.message || err?.error || err?.message || '';
           if (/overlap/i.test(String(apiMessage))) {
@@ -3854,33 +3885,24 @@ export function AgencyShiftsView({
         }
       }
 
-      if (!useCalendarApi && (type === 'busy' || type === 'day-off' || type === 'add-leave')) {
-        upsertAvailabilityBlock({
-          staffId: staff.id,
-          date: targetDate,
-          type: type === 'add-leave' ? 'leave' : type === 'day-off' ? 'dayOff' : 'busy',
-          note: meta.note,
-        });
-      }
-
       const shortLabels = {
-        busy: 'Marked busy',
         'on-call': 'On call scheduled',
         sleepover: 'Sleepover scheduled',
-        'day-off': 'Day off scheduled',
-        'add-leave': 'Leave added',
       };
 
-      setShifts((prev) => ({
-        ...prev,
-        [targetKey]: {
-          id: apiId || targetKey,
-          apiId: apiId || undefined,
-          staffId: staff.id,
-          date: targetDate,
-          ...meta,
-        },
-      }));
+      setShifts((prev) => {
+        const existing = getDayShifts(prev, staff.id, targetDate);
+        return writeDayShifts(prev, staff.id, targetDate, [
+          ...existing,
+          {
+            id: apiId || `${staff.id}-${targetDate}-${type}`,
+            apiId: apiId || undefined,
+            staffId: staff.id,
+            date: targetDate,
+            ...meta,
+          },
+        ]);
+      });
 
       toast.success(apiSuccessMessage || shortLabels[type] || 'Saved');
 
@@ -3898,11 +3920,204 @@ export function AgencyShiftsView({
       isLocked,
       resolveApiStaffId,
       selectedStaff,
-      shifts,
-      updateAvailability,
       useCalendarApi,
       refetchCalendar,
     ]
+  );
+
+  const handleAvailabilityTimeSubmit = useCallback(
+    async ({ kind, startTime, endTime, presetId, note: noteFromDialog }) => {
+      const staff = availTimeDialog.staff || selectedStaff;
+      const targetDate = availTimeDialog.date || focusedShiftDate;
+      if (!staff?.id || staff.isVacant || staff.isPlaceholder) {
+        toast.error('Select a staff member first');
+        return;
+      }
+      if (!targetDate || !startTime || !endTime) {
+        toast.error('Pick a date and time range');
+        return;
+      }
+
+      const isAllDay = presetId === 'all-day' || (startTime === '00:00' && endTime === '23:59');
+      if (isAllDay && getTimedDayShifts(shifts, staff.id, targetDate).length > 0) {
+        toast.warning(
+          'This day already has a timed shift — pick Morning / Afternoon / Night / Custom instead of All day'
+        );
+        return;
+      }
+
+      const savedNote = String(noteFromDialog || '').trim();
+      const flagsByKind = {
+        busy: { busy: true, blocksAutoAccept: true },
+        'day-off': { dayOff: true, blocksAutoAccept: true },
+        'add-leave': { leave: true, blocksAutoAccept: true },
+      };
+      const flags = flagsByKind[kind];
+      if (!flags) return;
+
+      setAvailTimeSubmitting(true);
+      let apiId = null;
+      let apiSuccessMessage = '';
+
+      try {
+        if (useCalendarApi) {
+          const apiStaffId = resolveApiStaffId(staff.id);
+          if (!apiStaffId) {
+            toast.error('Could not resolve staff id for availability — refresh and try again');
+            return;
+          }
+          const body = buildAgencyAvailabilityPayload({
+            status: kind,
+            date: targetDate,
+            startTime,
+            endTime,
+            staffId: apiStaffId,
+            notes: savedNote,
+          });
+          const created = await createAvailability(body).unwrap();
+          apiId =
+            created?.data?._id ||
+            created?.data?.id ||
+            created?._id ||
+            created?.id ||
+            null;
+          apiSuccessMessage = String(created?.message || '').trim();
+        } else if (kind === 'busy' || kind === 'day-off' || kind === 'add-leave') {
+          upsertAvailabilityBlock({
+            staffId: staff.id,
+            date: targetDate,
+            type: kind === 'add-leave' ? 'leave' : kind === 'day-off' ? 'dayOff' : 'busy',
+            note: savedNote,
+            startTime,
+            endTime,
+          });
+        }
+
+        setShifts((prev) => {
+          const existing = getDayShifts(prev, staff.id, targetDate);
+          return writeDayShifts(prev, staff.id, targetDate, [
+            ...existing,
+            {
+              id: apiId || `${staff.id}-${targetDate}-${kind}-${startTime}`,
+              apiId: apiId || undefined,
+              staffId: staff.id,
+              date: targetDate,
+              startTime,
+              endTime,
+              note: savedNote,
+              notes: savedNote,
+              ...flags,
+            },
+          ]);
+        });
+
+        const shortLabels = {
+          busy: 'Marked busy',
+          'day-off': 'Day / night off scheduled',
+          'add-leave': 'Leave added',
+        };
+        toast.success(apiSuccessMessage || shortLabels[kind] || 'Saved');
+        setAvailTimeDialog({ open: false, kind: 'busy', staff: null, date: '' });
+        setFocusedShiftDate(targetDate);
+        setActiveSidebarAction(kind);
+        setFormPreview(null);
+        refetchCalendar?.();
+      } catch (err) {
+        const apiMessage = err?.data?.message || err?.error || err?.message || '';
+        if (/overlap/i.test(String(apiMessage))) {
+          toast.warning(apiMessage || 'Time overlaps an existing shift or leave');
+        } else {
+          toast.error(apiMessage || 'Could not save availability');
+        }
+      } finally {
+        setAvailTimeSubmitting(false);
+      }
+    },
+    [
+      availTimeDialog.date,
+      availTimeDialog.staff,
+      createAvailability,
+      focusedShiftDate,
+      refetchCalendar,
+      resolveApiStaffId,
+      selectedStaff,
+      shifts,
+      useCalendarApi,
+    ]
+  );
+
+  const handleWeeklyUnavailabilitySubmit = useCallback(
+    async ({ slots }) => {
+      const staff = selectedStaff;
+      if (!staff?.id || staff.isVacant || staff.isPlaceholder) {
+        toast.error('Select a staff member first');
+        return;
+      }
+      if (!slots?.length) {
+        toast.error('Select at least one weekly option');
+        return;
+      }
+
+      setWeeklyUnavailSubmitting(true);
+      let saved = 0;
+      let skipped = 0;
+
+      try {
+        const apiStaffId = useCalendarApi ? resolveApiStaffId(staff.id) : '';
+        if (useCalendarApi && !apiStaffId) {
+          toast.error('Could not resolve staff id for availability — refresh and try again');
+          return;
+        }
+
+        for (const slot of slots) {
+          try {
+            if (useCalendarApi) {
+              const body = buildAgencyAvailabilityPayload({
+                status: slot.status,
+                date: slot.date,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                staffId: apiStaffId,
+                notes: slot.note || '',
+              });
+              await createAvailability(body).unwrap();
+            } else {
+              upsertAvailabilityBlock({
+                staffId: staff.id,
+                date: slot.date,
+                type: slot.status === 'busy' ? 'busy' : 'dayOff',
+                note: slot.note,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+              });
+            }
+            saved += 1;
+          } catch (err) {
+            const message = String(err?.data?.message || err?.error || err?.message || '');
+            if (/overlap/i.test(message)) {
+              skipped += 1;
+            } else {
+              skipped += 1;
+            }
+          }
+        }
+
+        if (saved > 0) {
+          toast.success(
+            skipped
+              ? `Weekly unavailability saved (${saved} slots). ${skipped} skipped (already booked or overlap).`
+              : `Weekly unavailability saved (${saved} slots).`
+          );
+          setWeeklyUnavailOpen(false);
+          refetchCalendar?.();
+        } else {
+          toast.error('Could not save weekly unavailability — check for overlaps or try again');
+        }
+      } finally {
+        setWeeklyUnavailSubmitting(false);
+      }
+    },
+    [createAvailability, refetchCalendar, resolveApiStaffId, selectedStaff, useCalendarApi]
   );
 
   const handleStaffSelect = useCallback((member) => {
@@ -4285,6 +4500,35 @@ export function AgencyShiftsView({
         onClose={closeShiftForm}
         formProps={shiftFormCardProps}
         excludeLeft={isMobile ? 0 : SIDEBAR_W}
+      />
+
+      <WeeklyUnavailabilityDialog
+        open={weeklyUnavailOpen}
+        onClose={weeklyUnavailSubmitting ? undefined : () => setWeeklyUnavailOpen(false)}
+        onSubmit={handleWeeklyUnavailabilitySubmit}
+        submitting={weeklyUnavailSubmitting}
+        staffName={selectedStaff?.name || ''}
+        defaultStartDate={
+          focusedShiftDate || (days[0] ? format(days[0], 'yyyy-MM-dd') : '')
+        }
+      />
+
+      <AvailabilityTimeRangeDialog
+        open={Boolean(availTimeDialog.open)}
+        kind={availTimeDialog.kind}
+        staffName={availTimeDialog.staff?.name || selectedStaff?.name || ''}
+        dateLabel={
+          availTimeDialog.date
+            ? format(parse(availTimeDialog.date, 'yyyy-MM-dd', new Date()), 'EEE d MMM')
+            : ''
+        }
+        submitting={availTimeSubmitting}
+        onClose={
+          availTimeSubmitting
+            ? undefined
+            : () => setAvailTimeDialog({ open: false, kind: 'busy', staff: null, date: '' })
+        }
+        onSubmit={handleAvailabilityTimeSubmit}
       />
 
       <AgencyShiftDetailsDialog

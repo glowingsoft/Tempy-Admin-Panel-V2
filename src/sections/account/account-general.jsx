@@ -9,7 +9,9 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import LoadingButton from '@mui/lab/LoadingButton';
 import Grid from '@mui/material/Unstable_Grid2';
 
@@ -46,6 +48,7 @@ import { resolveProfileAssetUrl, resolveUploadedAssetUrl } from 'src/store/Reduc
 import { getDashboardRootPath } from 'src/auth/utils/dashboard-path-utils';
 import { isValidLngLat } from 'src/sections/branches/geo-coordinates';
 import { geocodeAddress } from 'src/sections/tempy-home/standalone-address-input';
+import { useCompanyPaysBreaks } from 'src/sections/care-home/jobs/company-break-settings';
 
 
 export const UpdateUserSchema = zod.object({
@@ -121,6 +124,7 @@ export function AccountGeneral() {
 
   const userId = getProfileUserId(user);
   const staffProfile = isStaffMemberAccount(user);
+  const { canConfigure: canConfigureBreaks, paysBreaks, setPaysBreaks } = useCompanyPaysBreaks();
   const [personalSummary, setPersonalSummary] = useState('');
 
   const {
@@ -386,6 +390,34 @@ export function AccountGeneral() {
                 </LoadingButton>
               </Stack>
             </Card>
+
+            {canConfigureBreaks && !viewOnly ? (
+              <Card sx={{ p: 3, mt: 3 }}>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  Breaks
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Standard for new shift requests. You can still change paid / unpaid / no break on
+                  each shift.
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={paysBreaks}
+                      onChange={(event) => {
+                        setPaysBreaks(event.target.checked);
+                        toast.success(
+                          event.target.checked
+                            ? 'New shifts default to paid break'
+                            : 'New shifts default to unpaid break'
+                        );
+                      }}
+                    />
+                  }
+                  label="Company pays breaks by default"
+                />
+              </Card>
+            ) : null}
 
             <Card
               sx={{ p: 3, mt: 3, borderColor: 'error.main', display: viewOnly ? 'none' : 'block' }}
