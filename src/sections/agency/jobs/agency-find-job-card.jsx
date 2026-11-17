@@ -1093,7 +1093,12 @@ export function AgencyFindJobCard({
                       size="small"
                       variant="outlined"
                       icon={<Iconify icon="solar:calendar-bold" width={12} />}
-                      label={dateParts.hasDate ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}` : 'Date TBC'}
+                      label={
+                        dateParts.hasDate
+                          ? dateParts.shortLabel ||
+                            `${dateParts.weekday} ${dateParts.day} ${dateParts.month}`
+                          : 'Date TBC'
+                      }
                       sx={{ ...shiftDateChipSx, height: 22, '& .MuiChip-icon': { color: 'inherit', ml: 0.5 } }}
                     />
                     {dateParts.time ? (
@@ -1312,7 +1317,8 @@ export function AgencyFindJobCard({
                     icon={<Iconify icon="solar:calendar-bold" width={14} />}
                     label={
                       dateParts.hasDate
-                        ? `${dateParts.weekday} ${dateParts.day} ${dateParts.month}`
+                        ? dateParts.shortLabel ||
+                          `${dateParts.weekday} ${dateParts.day} ${dateParts.month}`
                         : 'Date TBC'
                     }
                     sx={{

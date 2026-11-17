@@ -46,6 +46,7 @@ const ADDRESS_FIELDS = [
   'locationName',
   'fullAddress',
   'addressLine1',
+  'addressLine2',
   'city',
   'country',
   'state',
@@ -91,16 +92,16 @@ function buildBranchSchema({
       addressLine1: zod
         .string()
         .trim()
-        .min(1, 'Enter the 1st line of address (house number or name & street)')
+        .min(1, 'Enter Address Line 1')
         .refine((value) => !UK_POSTCODE_ONLY.test(value), {
-          message: '1st line must include house number or name & street, not only a postcode',
+          message: 'Address Line 1 must include house number or name & street, not only a postcode',
         }),
-      city: zod.string().trim().min(1, 'City is required'),
+      addressLine2: zod.string().trim().optional().default(''),
+      city: zod.string().trim().min(1, 'Postal Town / City is required'),
       country: zod.string().trim().min(1, 'Country is required'),
-      state: hideState
-        ? zod.string().trim().optional().default('')
-        : zod.string().trim().min(1, `${stateLabel} is required`),
-      postalCode: zod.string().trim().min(1, 'Postal code is required'),
+      // County is optional on all addresses (client standard).
+      state: zod.string().trim().optional().default(''),
+      postalCode: zod.string().trim().min(1, 'Post Code is required'),
       status: zod.enum([
         BRANCH_STATUS.ACTIVE,
         BRANCH_STATUS.PENDING,
@@ -167,6 +168,7 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
   const country = String(data.country || '').trim() || DEFAULT_UK_COUNTRY;
   const state = String(data.state || '').trim();
   const postalCode = String(data.postalCode || '').trim();
+  const addressLine2 = String(data.addressLine2 || '').trim();
 
   return {
     name: branchName,
@@ -177,12 +179,15 @@ export function buildAgencyBranchPayload(data, { userId } = {}) {
       coordinates: toApiCoordinates(data.latitude, data.longitude),
       fullAddress: composeLocationFullAddress({
         addressLine1: data.addressLine1,
+        addressLine2,
         fullAddress: data.fullAddress,
         city,
         state,
         postalCode,
         country,
       }),
+      addressLine1: String(data.addressLine1 || '').trim(),
+      addressLine2,
       city,
       country,
       state,
@@ -223,7 +228,7 @@ export function BranchFormDialog({
   hideInsurance = true,
   showWebsite = false,
   hideState = false,
-  stateLabel = 'State',
+  stateLabel = 'County',
   sx,
 }) {
   const isEdit = Boolean(currentBranch);
@@ -294,17 +299,17 @@ export function BranchFormDialog({
         locationObj?.fullAddress ||
         (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
         '',
-      addressLine1: extractAddressLine1(
-        locationObj?.fullAddress ||
-          (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
-          ''
-      ),
+      addressLine1:
+        String(locationObj?.addressLine1 || '').trim() ||
+        extractAddressLine1(
+          locationObj?.fullAddress ||
+            (typeof currentBranch?.location === 'string' ? currentBranch.location : '') ||
+            ''
+        ),
+      addressLine2: String(locationObj?.addressLine2 || '').trim(),
       city: locationObj?.city || '',
       country: locationObj?.country || DEFAULT_UK_COUNTRY,
-      state:
-        String(stateLabel || '').toLowerCase() === 'county'
-          ? matchUkCounty(locationObj?.state || '')
-          : locationObj?.state || '',
+      state: matchUkCounty(locationObj?.state || '') || String(locationObj?.state || '').trim(),
       postalCode:
         locationObj?.postalCode != null && locationObj?.postalCode !== ''
           ? String(locationObj.postalCode)
@@ -381,7 +386,7 @@ export function BranchFormDialog({
       if (hideState) {
         setValue('state', String(place.state || '').trim(), { shouldDirty: true });
       }
-      clearErrors('fullAddress');
+      clearErrors(['fullAddress', 'addressLine1', 'city', 'postalCode', 'country']);
     },
     [clearErrors, hideState, setValue, stateIsCountyEnum]
   );
@@ -497,20 +502,24 @@ export function BranchFormDialog({
 
               <Field.Text
                 name="addressLine1"
-                label="1st line of address"
+                label="Address Line 1"
                 placeholder="House number or name & street"
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                helperText={
-                  errors.addressLine1?.message ||
-                  'Required — house number or name and street'
-                }
+                helperText={errors.addressLine1?.message || 'Required'}
+              />
+
+              <Field.Text
+                name="addressLine2"
+                label="Line 2 (optional)"
+                size="small"
+                InputLabelProps={{ shrink: true }}
               />
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Field.Text
                   name="city"
-                  label="City"
+                  label="Postal Town / City"
                   size="small"
                   InputLabelProps={{ shrink: true }}
                   fullWidth
@@ -518,7 +527,7 @@ export function BranchFormDialog({
                 {!hideState ? (
                   <Field.Text
                     name="state"
-                    label={stateLabel}
+                    label={`${stateLabel || 'County'} (optional)`}
                     size="small"
                     InputLabelProps={{ shrink: true }}
                     fullWidth
@@ -528,19 +537,19 @@ export function BranchFormDialog({
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <Field.Text
+                  name="postalCode"
+                  label="Post Code"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <Field.Text
                   name="country"
                   label="Country"
                   size="small"
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                   inputProps={{ autoComplete: 'off' }}
-                />
-                <Field.Text
-                  name="postalCode"
-                  label="Postal code"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
                 />
               </Stack>
 
@@ -611,7 +620,7 @@ export function BranchFormDialog({
               <StaffDocumentUploadRow
                 name="certifications"
                 label="Care related documentation"
-                helperText="Optional — upload PDF / DOC care-related documents for this location"
+                helperText="Optional — upload PDF / DOC. Original file names are kept on the document list."
               />
 
               {!hideInsurance ? (

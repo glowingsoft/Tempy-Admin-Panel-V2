@@ -1,4 +1,3 @@
-// ----------------------------------------------------------------------
 
 const STORAGE_KEY = 'agency-staff-availability-blocks';
 
@@ -48,5 +47,5 @@ export function getAvailabilityBlock(staffId, date) {
 export function isStaffBusyOnDate(staffId, date) {
   const block = getAvailabilityBlock(staffId, date);
   if (!block) return false;
-  return ['busy', 'dayOff', 'leave'].includes(block.type);
+  return ['busy', 'dayOff', 'leave', 'other'].includes(block.type);
 }

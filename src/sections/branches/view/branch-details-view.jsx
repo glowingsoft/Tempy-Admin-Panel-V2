@@ -66,8 +66,40 @@ function fileNameFromUrl(url) {
   }
 }
 
+function fileDisplayName(file) {
+  if (!file) return 'Document';
+  if (typeof file === 'object') {
+    const named = String(file.originalName || file.fileName || file.name || '').trim();
+    if (named) return named;
+    return fileNameFromUrl(file.fileUrl || file.url || '');
+  }
+  return fileNameFromUrl(file);
+}
+
+function fileHref(file) {
+  if (!file) return '';
+  if (typeof file === 'object') return file.fileUrl || file.url || '';
+  return file;
+}
+
 function uniqueFiles(...lists) {
-  return [...new Set(lists.flat().map((item) => String(item || '').trim()).filter(Boolean))];
+  const seen = new Set();
+  const out = [];
+  lists.flat().forEach((item) => {
+    if (!item) return;
+    if (typeof item === 'object') {
+      const key = String(item.fileUrl || item.url || item.name || '').trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(item);
+      return;
+    }
+    const url = String(item).trim();
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push(url);
+  });
+  return out;
 }
 
 function DetailItem({ label, value }) {
@@ -120,11 +152,12 @@ function DocumentList({ files, emptyText }) {
 
   return (
     <Stack spacing={1}>
-      {files.map((file) => {
-        const url = resolveProfileAssetUrl(file);
+      {files.map((file, index) => {
+        const href = fileHref(file);
+        const url = resolveProfileAssetUrl(href);
         return (
           <Stack
-            key={file}
+            key={href || fileDisplayName(file) || index}
             direction="row"
             spacing={1.5}
             alignItems="center"
@@ -132,7 +165,7 @@ function DocumentList({ files, emptyText }) {
           >
             <Iconify icon="solar:document-bold" width={22} sx={{ color: 'text.secondary', flexShrink: 0 }} />
             <Typography variant="body2" noWrap sx={{ flexGrow: 1, minWidth: 0 }}>
-              {fileNameFromUrl(file)}
+              {fileDisplayName(file)}
             </Typography>
             {url ? (
               <Button
@@ -354,13 +387,12 @@ export function BranchDetailsView() {
               <Box sx={{ gridColumn: { sm: 'span 2', md: 'span 3' } }}>
                 <DetailItem label="Full address" value={branch.location?.fullAddress} />
               </Box>
-              <DetailItem label="City" value={branch.location?.city} />
-              <DetailItem
-                label={careHomeMode ? 'County' : 'State'}
-                value={branch.location?.state}
-              />
+              <DetailItem label="Address Line 1" value={branch.location?.addressLine1} />
+              <DetailItem label="Line 2" value={branch.location?.addressLine2} />
+              <DetailItem label="Postal Town / City" value={branch.location?.city} />
+              <DetailItem label="County" value={branch.location?.state} />
+              <DetailItem label="Post Code" value={branch.location?.postalCode} />
               <DetailItem label="Country" value={branch.location?.country} />
-              <DetailItem label="Postal code" value={branch.location?.postalCode} />
               <DetailItem label="Created" value={branch.createdAt ? fDateTime(branch.createdAt) : ''} />
               <DetailItem label="Last updated" value={branch.updatedAt ? fDateTime(branch.updatedAt) : ''} />
             </DetailGrid>

@@ -127,9 +127,13 @@ function toApiDate(value) {
 export function buildBranchProfilePayload(data = {}) {
   const images = normalizeUploadUrls(data.images);
   const certificationDocs = normalizeUploadDocuments(data.certifications);
+  // Keep original upload names for display (client: document naming).
   const certifications = certificationDocs.length
-    ? certificationDocs.map((doc) => doc.fileUrl)
-    : normalizeUploadUrls(data.certifications);
+    ? certificationDocs
+    : normalizeUploadUrls(data.certifications).map((url) => ({
+        fileUrl: url,
+        name: String(url).split('/').pop() || 'file',
+      }));
   const insuranceCertificates = normalizeUploadUrls(data.insuranceCertificates);
 
   const profileIcon = firstUploadUrl(data.profileIcon, images);
@@ -236,9 +240,15 @@ export function mapAgencyBranchFromApi(item) {
     bio: item?.bio || profile.bio || '',
     website: String(item?.website || profile.website || location.website || '').trim(),
     images: asStringList(item?.images || profile.images),
-    certifications: asStringList(
-      item?.certifications || profile.certifications || cqcCertificate
-    ),
+    certifications: (() => {
+      const raw = item?.certifications || profile.certifications || cqcCertificate || [];
+      const docs = normalizeUploadDocuments(raw);
+      if (docs.length) return docs;
+      return asStringList(raw).map((url) => ({
+        fileUrl: url,
+        name: String(url).split('/').pop() || 'file',
+      }));
+    })(),
     profileIcon: item?.profileIcon || profile.profileIcon || '',
     cqc: rawCqc,
     insurance: rawInsurance,
@@ -270,6 +280,8 @@ export function mapAgencyBranchFromApi(item) {
       locationName,
       coordinates: Array.isArray(location.coordinates) ? location.coordinates : [0, 0],
       fullAddress: location.fullAddress || '',
+      addressLine1: location.addressLine1 || '',
+      addressLine2: location.addressLine2 || '',
       city: location.city || '',
       country: location.country || '',
       state: location.state || '',

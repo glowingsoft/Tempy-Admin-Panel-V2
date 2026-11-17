@@ -116,6 +116,7 @@ export function resolveAgencyAvailabilityStatus({ kind = 'available', formStatus
   if (raw === 'addleave' || raw === 'leave') return 'leave';
   if (raw === 'dayoff' || raw === 'notscheduled' || raw === 'unscheduled') return 'dayOff';
   if (raw === 'busy' || raw === 'unavailable' || raw === 'block') return 'busy';
+  if (raw === 'other' || raw === 'custom' || raw === 'misc') return 'other';
   if (raw === 'oncall') return 'onCall';
   if (raw === 'sleepover') return 'sleepover';
   if (
@@ -246,9 +247,10 @@ export function mapAgencyAvailabilityFromApi(item = {}) {
     status === 'unscheduled' ||
     Boolean(item.dayOff);
   const isBusy = status === 'busy' || status === 'unavailable' || Boolean(item.busy);
+  const isOther = status === 'other' || status === 'custom' || status === 'misc' || Boolean(item.other);
   const isOnCall = status === 'oncall' || Boolean(item.onCall);
   const isSleepover = status === 'sleepover' || Boolean(item.sleepover);
-  const isBlock = isLeave || isDayOff || isBusy;
+  const isBlock = isLeave || isDayOff || isBusy || isOther;
 
   return {
     id: id || `${staffId || 'row'}-${date}-${startTime}`,
@@ -268,6 +270,7 @@ export function mapAgencyAvailabilityFromApi(item = {}) {
     leave: isLeave,
     dayOff: isDayOff,
     busy: isBusy,
+    other: isOther,
     onCall: isOnCall,
     sleepover: isSleepover,
     blocksAutoAccept: isBlock,

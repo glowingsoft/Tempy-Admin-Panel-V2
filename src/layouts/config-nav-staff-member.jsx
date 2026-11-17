@@ -12,8 +12,7 @@ export const navDataStaffMember = [
       { title: 'Jobs', countKey: 'jobs', path: paths.dashboard.staffMember.jobs, icon: NAV_ICONS.job },
       { title: 'Bids', countKey: 'bids', path: paths.dashboard.staffMember.bids, icon: NAV_ICONS.order },
       { title: 'Agreed rates', countKey: 'agreedRates', path: paths.dashboard.staffMember.agreedRates, icon: NAV_ICONS.contract },
-      { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.staffMember.contracts, icon: NAV_ICONS.contract },
-      { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.staffMember.permanentHires, icon: NAV_ICONS.user },
+      { title: 'Hiring and Onboarding', countKey: 'permanentHires', path: paths.dashboard.staffMember.permanentHires, icon: NAV_ICONS.user },
       { title: 'Reviews', countKey: 'reviews', path: paths.dashboard.staffMember.reviews, icon: NAV_ICONS.star },
       { title: 'Earnings', path: paths.dashboard.staffMember.earnings, icon: NAV_ICONS.analytics },
       {

@@ -80,13 +80,13 @@ export function PermanentHiresView() {
   return (
     <DashboardContent maxWidth={false}>
       <CustomBreadcrumbs
-        heading="Permanent hires"
+        heading="Hiring and Onboarding"
         links={[
           {
             name: 'Dashboard',
             href: getDashboardRootPath(user?.permission, user?.accountState?.accountType),
           },
-          { name: 'Permanent hires' },
+          { name: 'Hiring and Onboarding' },
         ]}
         action={
           isCareHome && !viewOnly && (
@@ -95,7 +95,7 @@ export function PermanentHiresView() {
               startIcon={<Iconify icon="mingcute:add-line" />}
               onClick={() => setHireOpen(true)}
             >
-              Hire permanently
+              Request staff member
             </Button>
           )
         }
@@ -103,14 +103,30 @@ export function PermanentHiresView() {
       />
 
       <Alert severity="info" sx={{ mb: 2.5 }}>
-        {isCareHome ? 'You can' : 'A care home can'} request permanent status for agency or home
-        care company staff after <strong>{settings?.minShifts ?? '—'}</strong> completed shifts.
-        The worker accepts or rejects. They can be permanent with only one customer at a time.
+        {isCareHome ? (
+          <>
+            You can request a worker to become your staff member after{' '}
+            <strong>{settings?.minShifts ?? 1}</strong> completed shift
+            {Number(settings?.minShifts) === 1 || settings?.minShifts == null ? '' : 's'}. They can
+            accept or reject. This works on an agreement that they complete{' '}
+            <strong>12 weeks</strong> of shifts with you through Tempy, and after this period they
+            become an employee of your company.
+          </>
+        ) : (
+          <>
+            A care home can request you to become their staff member after{' '}
+            <strong>{settings?.minShifts ?? 1}</strong> completed shift
+            {Number(settings?.minShifts) === 1 || settings?.minShifts == null ? '' : 's'}. You are
+            welcome to accept or reject this offer. This would work on an agreement that you
+            complete <strong>12 weeks</strong> of shifts with them through Tempy, and after this
+            period you will become an employee of this company.
+          </>
+        )}
       </Alert>
 
       {isError && (
         <Alert severity="error" sx={{ mb: 2.5 }}>
-          {handleApiError(error) || 'Could not load permanent hires.'}
+          {handleApiError(error) || 'Could not load hiring and onboarding requests.'}
         </Alert>
       )}
 
@@ -195,7 +211,7 @@ export function PermanentHiresView() {
               {!isLoading && !rows.length && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 5, color: 'text.secondary' }}>
-                    No permanent hire requests yet
+                    No hiring and onboarding requests yet
                   </TableCell>
                 </TableRow>
               )}
@@ -250,7 +266,7 @@ function HireDialog({ base, settings, onClose }) {
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Hire permanently</DialogTitle>
+      <DialogTitle>Request staff member</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField
@@ -260,7 +276,7 @@ function HireDialog({ base, settings, onClose }) {
             onChange={(e) => setSelectedId(e.target.value)}
             helperText={
               workers.length
-                ? `Staff need at least ${minShifts} completed shifts with you.`
+                ? `Staff need at least ${minShifts} completed shift${minShifts === 1 ? '' : 's'} with you.`
                 : 'No agency or home care company staff have completed enough shifts with you yet.'
             }
           >
@@ -273,9 +289,9 @@ function HireDialog({ base, settings, onClose }) {
 
           {selected && (
             <Alert severity="info">
-              {selected.worker.name} can accept or reject this request. Permanent status is a tag
-              with your organisation only, and they cannot be permanent with another customer at
-              the same time.
+              {selected.worker.name} can accept or reject this offer. This works on an agreement
+              that they complete 12 weeks of shifts with you through Tempy, and after this period
+              they become an employee of your company.
             </Alert>
           )}
         </Stack>

@@ -70,17 +70,22 @@ function buildUserAddressLocation(data) {
   const city = String(data.city || '').trim();
   const country = String(data.country || '').trim();
   const state = String(data.state || '').trim();
+  const addressLine1 = String(data.addressLine1 || '').trim();
+  const addressLine2 = String(data.addressLine2 || '').trim();
 
   return {
     coordinates: toApiCoordinates(Number(data.latitude) || 0, Number(data.longitude) || 0),
     fullAddress: composeLocationFullAddress({
-      addressLine1: data.addressLine1,
+      addressLine1,
+      addressLine2,
       fullAddress: data.fullAddress,
       city,
       state,
       postalCode,
       country,
     }),
+    addressLine1,
+    addressLine2,
     city,
     country,
     state,

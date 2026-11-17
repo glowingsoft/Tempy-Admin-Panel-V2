@@ -1,44 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import ToggleButton from '@mui/material/ToggleButton';
 import LoadingButton from '@mui/lab/LoadingButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-
-/** Part-day / night windows — day-off all-day is fine for day care, not night care. */
-export const AVAILABILITY_TIME_PRESETS = [
-  { id: 'all-day', label: 'All day', helper: 'Day care', startTime: '00:00', endTime: '23:59' },
-  { id: 'morning', label: 'Morning', helper: '00:00 – 12:00', startTime: '00:00', endTime: '12:00' },
-  {
-    id: 'afternoon',
-    label: 'Afternoon',
-    helper: '12:00 – 18:00',
-    startTime: '12:00',
-    endTime: '18:00',
-  },
-  { id: 'evening', label: 'Evening', helper: '18:00 – 23:59', startTime: '18:00', endTime: '23:59' },
-  {
-    id: 'night',
-    label: 'Night',
-    helper: '22:00 – 07:00 (next day)',
-    startTime: '22:00',
-    endTime: '07:00',
-  },
-  { id: 'custom', label: 'Custom', helper: 'Pick times', startTime: '', endTime: '' },
-];
 
 const TITLE_BY_KIND = {
-  busy: 'Mark busy',
-  'day-off': 'Schedule day / night off',
+  busy: 'Mark as busy',
+  'day-off': 'Day Off',
   'add-leave': 'Add leave',
+  other: 'Other',
 };
 
 function normalizeTime(value) {
@@ -49,6 +24,12 @@ function normalizeTime(value) {
   return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
 }
 
+function defaultTimesForKind(kind) {
+  if (kind === 'add-leave') return { startTime: '09:00', endTime: '18:00' };
+  if (kind === 'busy' || kind === 'other') return { startTime: '00:00', endTime: '12:00' };
+  return { startTime: '00:00', endTime: '23:59' };
+}
+
 export function AvailabilityTimeRangeDialog({
   open,
   onClose,
@@ -57,55 +38,35 @@ export function AvailabilityTimeRangeDialog({
   kind = 'busy',
   staffName = '',
   dateLabel = '',
-  defaultPresetId,
 }) {
-  const initialPreset =
-    defaultPresetId ||
-    (kind === 'busy' ? 'morning' : kind === 'add-leave' ? 'afternoon' : 'all-day');
+  const noteRequired = kind === 'other' || kind === 'busy';
+  const defaults = defaultTimesForKind(kind);
 
-  const [presetId, setPresetId] = useState(initialPreset);
-  const [startTime, setStartTime] = useState('00:00');
-  const [endTime, setEndTime] = useState('12:00');
+  const [startTime, setStartTime] = useState(defaults.startTime);
+  const [endTime, setEndTime] = useState(defaults.endTime);
   const [note, setNote] = useState('');
 
   useEffect(() => {
     if (!open) return;
-    const preset =
-      AVAILABILITY_TIME_PRESETS.find((item) => item.id === initialPreset) ||
-      AVAILABILITY_TIME_PRESETS[0];
-    setPresetId(preset.id);
-    setStartTime(preset.startTime || (kind === 'add-leave' ? '09:00' : '00:00'));
-    setEndTime(preset.endTime || (kind === 'add-leave' ? '18:00' : '23:59'));
+    const next = defaultTimesForKind(kind);
+    setStartTime(next.startTime);
+    setEndTime(next.endTime);
     setNote('');
-  }, [open, initialPreset, kind]);
-
-  const activePreset = useMemo(
-    () => AVAILABILITY_TIME_PRESETS.find((item) => item.id === presetId),
-    [presetId]
-  );
-
-  const handlePreset = (_, next) => {
-    if (!next) return;
-    setPresetId(next);
-    const preset = AVAILABILITY_TIME_PRESETS.find((item) => item.id === next);
-    if (!preset || next === 'custom') return;
-    setStartTime(preset.startTime);
-    setEndTime(preset.endTime);
-  };
+  }, [open, kind]);
 
   const resolvedStart = normalizeTime(startTime);
   const resolvedEnd = normalizeTime(endTime);
-  const canSave = Boolean(resolvedStart && resolvedEnd);
+  const noteText = String(note || '').trim();
+  const canSave = Boolean(resolvedStart && resolvedEnd && (!noteRequired || noteText));
 
   const handleSave = async () => {
     if (!canSave) return;
     await onSubmit?.({
       kind,
-      presetId,
       startTime: resolvedStart,
       endTime: resolvedEnd,
       overnight: resolvedEnd <= resolvedStart,
-      note: String(note || '').trim(),
+      note: noteText,
     });
   };
 
@@ -114,57 +75,13 @@ export function AvailabilityTimeRangeDialog({
       <DialogTitle>{TITLE_BY_KIND[kind] || 'Availability'}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2.5}>
-          <Typography variant="body2" color="text.secondary">
-            {staffName ? (
-              <>
-                Choose when <strong>{staffName}</strong> is unavailable
-                {dateLabel ? ` on ${dateLabel}` : ''}. Use a part of the day (e.g. morning busy,
-                afternoon free), or Night for night care — all-day is for day care only.
-              </>
-            ) : (
-              <>
-                Choose a time window. Part-day busy leaves the rest of the day free; Night covers
-                overnight care.
-              </>
-            )}
-          </Typography>
-
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={presetId}
-            onChange={handlePreset}
-            disabled={submitting}
-            sx={{ flexWrap: 'wrap', gap: 1 }}
-          >
-            {AVAILABILITY_TIME_PRESETS.map((preset) => (
-              <ToggleButton
-                key={preset.id}
-                value={preset.id}
-                sx={{ textTransform: 'none', px: 1.25, py: 0.75, borderRadius: 1 }}
-              >
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {preset.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    {preset.helper}
-                  </Typography>
-                </Box>
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               label="From"
               type="time"
               size="small"
               value={resolvedStart || ''}
-              onChange={(event) => {
-                setPresetId('custom');
-                setStartTime(event.target.value);
-              }}
+              onChange={(event) => setStartTime(event.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               disabled={submitting}
@@ -174,29 +91,26 @@ export function AvailabilityTimeRangeDialog({
               type="time"
               size="small"
               value={resolvedEnd || ''}
-              onChange={(event) => {
-                setPresetId('custom');
-                setEndTime(event.target.value);
-              }}
+              onChange={(event) => setEndTime(event.target.value)}
               InputLabelProps={{ shrink: true }}
               fullWidth
               disabled={submitting}
               helperText={
                 resolvedStart && resolvedEnd && resolvedEnd <= resolvedStart
-                  ? 'Ends next day (overnight / night care)'
-                  : activePreset?.id === 'all-day'
-                    ? 'Blocks the whole calendar day'
-                    : ' '
+                  ? 'Ends next day'
+                  : ' '
               }
             />
           </Stack>
 
           <TextField
-            label="Note"
+            label={kind === 'other' ? 'Description' : 'Note'}
             placeholder={
-              kind === 'busy'
-                ? 'Where are they working / what are they busy with?'
-                : 'Optional note for this tile'
+              kind === 'other'
+                ? 'Add description'
+                : kind === 'busy'
+                  ? 'Busy doing what?'
+                  : 'Note (optional)'
             }
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -204,12 +118,9 @@ export function AvailabilityTimeRangeDialog({
             size="small"
             multiline
             minRows={2}
+            required={noteRequired}
             disabled={submitting}
-            helperText={
-              kind === 'busy'
-                ? 'Type the real place or reason — that text shows on the Busy tile'
-                : 'Shows on the rota tile'
-            }
+            error={noteRequired && open && !noteText}
           />
         </Stack>
       </DialogContent>

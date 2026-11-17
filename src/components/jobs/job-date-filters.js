@@ -12,7 +12,7 @@ import {
 } from 'date-fns';
 
 export const JOB_DATE_FILTERS = [
-  { value: 'all', label: 'Date order' },
+  { value: 'all', label: 'All dates' },
   { value: 'next24Hours', label: 'Urgent · Next 24h' },
   { value: 'thisWeek', label: 'This week' },
   { value: 'nextWeek', label: 'Next week' },
@@ -138,6 +138,20 @@ export function compareJobsNewestFirst(a, b) {
   );
 }
 
+/** Soonest shift first — clearer default for find-jobs tile / list order. */
+export function compareJobsByShiftSoonest(a, b) {
+  return compareByShiftDate(
+    {
+      shiftDate: a?.shiftDate || a?.shiftRows?.[0]?.date,
+      shiftStartTime: a?.shiftStartTime || a?.shiftRows?.[0]?.startTime,
+    },
+    {
+      shiftDate: b?.shiftDate || b?.shiftRows?.[0]?.date,
+      shiftStartTime: b?.shiftStartTime || b?.shiftRows?.[0]?.startTime,
+    }
+  );
+}
+
 function formatClock(time) {
   if (!time) return '';
   try {
@@ -160,6 +174,7 @@ export function getJobDateParts(job = {}) {
       weekday: '',
       day: '—',
       month: '',
+      shortLabel: '',
       time,
       label: job.schedule || 'Date TBC',
       hasDate: false,
@@ -171,8 +186,10 @@ export function getJobDateParts(job = {}) {
     weekday: format(parsed, 'EEE'),
     day: format(parsed, 'd'),
     month: format(parsed, 'MMM'),
+    /** Clearer tile date, e.g. Sat 7 November */
+    shortLabel: format(parsed, 'EEE d MMMM'),
     time,
-    label: `${format(parsed, 'EEE d MMM yyyy')}${time ? ` · ${time}` : ''}`,
+    label: `${format(parsed, 'EEEE d MMMM yyyy')}${time ? ` · ${time}` : ''}`,
     hasDate: true,
     iso: format(parsed, 'yyyy-MM-dd'),
   };

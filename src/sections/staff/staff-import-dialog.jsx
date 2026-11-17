@@ -26,12 +26,13 @@ import {
 // ----------------------------------------------------------------------
 
 /**
- * Client: staff import including roles / teams — each company defines its own rota groups.
+ * Staff CSV import preview.
  *
  * The chosen CSV is parsed locally for the preview and handed to `onImport` as
  * the raw File, so callers can post it to their own import endpoint.
- * `onDownloadTemplate` does the same for the template button; without it the
- * built-in sample CSV is used.
+ * Prefer the server template via `onDownloadTemplate`.
+ *
+ * `onImport` should return `true` when the dialog may clear the chosen file.
  */
 export function StaffImportDialog({
   open,
@@ -93,18 +94,19 @@ export function StaffImportDialog({
 
   const handleImport = async () => {
     if (!rows.length || importing) return;
-    await onImport?.(rows, file);
-    reset();
+    const ok = await onImport?.(rows, file);
+    if (ok) reset();
   };
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
-      <DialogTitle>Import staff (roles & teams)</DialogTitle>
+      <DialogTitle>Import staff</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            Each company has its own roles. Import staff with a <strong>role</strong> and{' '}
-            <strong>team</strong> so Shifts is built from your roster — not a pre-filled role list.
+            Download the template, fill one staff member per row, then upload the CSV. Use the
+            portal template so columns match what the server expects — the preview below is only a
+            check before upload.
           </Typography>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -149,9 +151,12 @@ export function StaffImportDialog({
           {rows.length > 0 ? (
             <>
               <Typography variant="subtitle2">
-                {rows.length} staff · {roleSummary.length} team
-                {roleSummary.length === 1 ? '' : 's'}: {roleSummary.slice(0, 6).join(', ')}
-                {roleSummary.length > 6 ? '…' : ''}
+                {rows.length} staff
+                {roleSummary.length
+                  ? ` · ${roleSummary.length} team${roleSummary.length === 1 ? '' : 's'}: ${roleSummary
+                      .slice(0, 6)
+                      .join(', ')}${roleSummary.length > 6 ? '…' : ''}`
+                  : ''}
               </Typography>
               <Scrollbar sx={{ maxHeight: 320 }}>
                 <Table size="small">
@@ -170,8 +175,8 @@ export function StaffImportDialog({
                         <TableCell>{row.name}</TableCell>
                         <TableCell>{row.email || '—'}</TableCell>
                         <TableCell>{row.phone || '—'}</TableCell>
-                        <TableCell>{row.role}</TableCell>
-                        <TableCell>{row.team}</TableCell>
+                        <TableCell>{row.role || '—'}</TableCell>
+                        <TableCell>{row.team || '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -180,7 +185,8 @@ export function StaffImportDialog({
             </>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              CSV columns: name, email, phone, role, team
+              Typical columns: name (or first name + last name), email, phone, role / specialty,
+              team. Always prefer the downloaded server template.
             </Typography>
           )}
         </Stack>

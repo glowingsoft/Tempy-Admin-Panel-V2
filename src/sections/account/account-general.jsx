@@ -367,11 +367,11 @@ export function AccountGeneral() {
                 <Field.Text name="displayName" label="Name" />
                 <Field.Text name="email" label="Email address" disabled />
                 <Field.Phone name="phoneNumber" label="Phone number (optional)" />
-                <Field.GoogleAddress name="address" label="Address" />
+                <Field.GoogleAddress name="address" label="Address Line 1" />
                 <Field.Text name="country" label="Country" />
-                <Field.Text name="state" label="State/region" />
-                <Field.Text name="city" label="City" />
-                <Field.Text name="zipCode" label="Zip/code" />
+                <Field.Text name="state" label="County (optional)" />
+                <Field.Text name="city" label="Postal Town / City" />
+                <Field.Text name="zipCode" label="Post Code" />
                 {staffProfile ? (
                   <StaffMemberPersonalSummaryField
                     value={personalSummary}

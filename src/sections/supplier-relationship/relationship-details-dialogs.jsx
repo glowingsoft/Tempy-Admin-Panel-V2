@@ -180,7 +180,7 @@ export function PermanentHireDetailsDialog({ row, onClose }) {
   const isAgencyWorker = row.supplierType !== 'nurse';
 
   return (
-    <DetailsDialog title="Permanent hire details" onClose={onClose}>
+    <DetailsDialog title="Hiring and onboarding details" onClose={onClose}>
       <PartyCard title="Worker" party={row.worker} />
 
       <Divider />
@@ -197,8 +197,8 @@ export function PermanentHireDetailsDialog({ row, onClose }) {
       </Stack>
 
       <Typography variant="caption" color="text.secondary">
-        Permanent status is a tag with this customer. The worker can hold it with only one
-        customer at a time.
+        After 12 weeks of shifts through Tempy, the worker becomes an employee of this company.
+        Accept or reject is up to the worker.
       </Typography>
     </DetailsDialog>
   );

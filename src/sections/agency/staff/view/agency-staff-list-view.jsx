@@ -47,7 +47,11 @@ import { AgencyStaffFormDialog } from '../agency-staff-form-dialog';
 import { AgencyStaffDetailsDialog } from '../agency-staff-details-dialog';
 import { StaffTableToolbar } from 'src/sections/staff/staff-table-toolbar';
 import { StaffImportDialog } from 'src/sections/staff/staff-import-dialog';
-import { saveTemplateResponse } from 'src/sections/staff/staff-import-utils';
+import {
+  downloadStaffImportTemplate,
+  saveTemplateResponse,
+  summarizeStaffImportResponse,
+} from 'src/sections/staff/staff-import-utils';
 import { AGENCY_STAFF_TABLE_HEAD, STAFF_TABLE_SX } from 'src/sections/staff/staff-table-styles';
 
 import { AgencyStaffTableRow } from '../agency-staff-table-row';
@@ -254,37 +258,74 @@ export function AgencyStaffListView() {
     async (rows, file) => {
       if (!file) {
         toast.error('Choose a CSV file first');
-        return;
+        return false;
       }
 
       setImporting(true);
       try {
         const response = await importAgencyStaff(file).unwrap();
-        toast.success(pickApiToastMessage(response, `Imported ${rows.length} staff`));
+        const summary = summarizeStaffImportResponse(response);
+
+        // Show new rows even if they land as Pending under a filtered tab.
+        filters.setState({ name: '', status: 'all' });
+        table.onResetPage();
+
+        if (summary.hasExplicitCounts && (summary.imported ?? 0) === 0) {
+          const detail =
+            summary.errors[0] ||
+            summary.message ||
+            'No staff were created. Check the CSV columns match the downloaded template.';
+          toast.error(detail);
+          return false;
+        }
+
+        if (summary.imported != null) {
+          const failedBit =
+            summary.failed > 0 ? ` · ${summary.failed} failed` : '';
+          toast.success(
+            summary.message || `Imported ${summary.imported} staff${failedBit}`
+          );
+        } else {
+          toast.success(
+            pickApiToastMessage(
+              response,
+              `Import finished for ${rows.length} row${rows.length === 1 ? '' : 's'}. Check Staff including Pending.`
+            )
+          );
+        }
+
+        if (summary.errors.length && (summary.imported ?? 0) > 0) {
+          toast.warning(summary.errors[0]);
+        }
+
         importDialog.onFalse();
-        // List refreshes once via invalidatesTags — do not call refetch() again.
+        return true;
       } catch (error) {
         toast.error(handleApiError(error) || 'Failed to import staff');
+        return false;
       } finally {
         setImporting(false);
       }
     },
-    [importAgencyStaff, importDialog]
+    [filters, importAgencyStaff, importDialog, table]
   );
 
   const handleDownloadTemplate = useCallback(async () => {
     try {
       const response = await fetchImportTemplate().unwrap();
-      if (!saveTemplateResponse(response, 'agency-staff-import-template.csv')) {
-        toast.error('Template download returned no file');
-      }
+      if (saveTemplateResponse(response, 'agency-staff-import-template.csv')) return;
+
+      downloadStaffImportTemplate('agency-staff-import-template.csv');
+      toast.warning(
+        'Server template was empty — downloaded a sample CSV. Prefer the live template when available.'
+      );
     } catch (error) {
-      // The file responseHandler nests an error body under `json`.
-      toast.error(
+      downloadStaffImportTemplate('agency-staff-import-template.csv');
+      toast.warning(
         error?.data?.json?.message ||
-        error?.data?.message ||
-        error?.error ||
-        'Failed to download template'
+          error?.data?.message ||
+          error?.error ||
+          'Could not download the server template — using the sample CSV instead.'
       );
     }
   }, [fetchImportTemplate]);

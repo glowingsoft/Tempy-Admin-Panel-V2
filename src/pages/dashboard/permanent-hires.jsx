@@ -6,7 +6,7 @@ import { PermanentHiresView } from 'src/sections/supplier-relationship/view/perm
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `Permanent hires | Dashboard - ${CONFIG.site.name}` };
+const metadata = { title: `Hiring and Onboarding | Dashboard - ${CONFIG.site.name}` };
 
 export default function PermanentHiresPage() {
   return (

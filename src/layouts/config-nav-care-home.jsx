@@ -24,7 +24,7 @@ export const navDataCareHome = [
       },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.messages, icon: NAV_ICONS.chat },
       { title: 'Contracts', countKey: 'contracts', path: paths.dashboard.contracts, icon: NAV_ICONS.contract },
-      { title: 'Permanent hires', countKey: 'permanentHires', path: paths.dashboard.permanentHires, icon: NAV_ICONS.user },
+      { title: 'Hiring and Onboarding', countKey: 'permanentHires', path: paths.dashboard.permanentHires, icon: NAV_ICONS.user },
       { title: 'Compliance', path: paths.dashboard.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.payments, icon: NAV_ICONS.banking },
       {
