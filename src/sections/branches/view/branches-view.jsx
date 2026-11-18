@@ -920,7 +920,6 @@ export function BranchesView() {
         addressOnly={userMode}
         showComplianceFields={homeCareCompanyMode}
         hideImages={careHomeMode}
-        hideInsurance
         stateLabel="County"
       />
 

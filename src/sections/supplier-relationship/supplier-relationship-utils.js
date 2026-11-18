@@ -4,16 +4,24 @@ import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 
 import { resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
-// ----------------------------------------------------------------------
 
-/** Suppliers: agency, home care company, solo nurse. Customers: care home, individual. */
 export const SUPPLIER_ROLES = ['agency', 'homeCareCompany', 'nurse'];
-export const CUSTOMER_ROLES = ['careHome', 'user'];
+export const CUSTOMER_ROLES = ['careHome', 'user', 'localAuthority'];
 
 export const CUSTOMER_TYPE_OPTIONS = [
   { value: 'careHome', label: 'Care home' },
   { value: 'user', label: 'Individual' },
 ];
+
+export const HOME_CARE_COMPANY_CUSTOMER_TYPE_OPTIONS = [
+  { value: 'localAuthority', label: 'Local authority' },
+  { value: 'user', label: 'Individual' },
+];
+
+export function getAgreedRateCustomerTypeOptions(supplierRole) {
+  if (supplierRole === 'homeCareCompany') return HOME_CARE_COMPANY_CUSTOMER_TYPE_OPTIONS;
+  return CUSTOMER_TYPE_OPTIONS;
+}
 
 const ROLE_API_PREFIX = {
   agency: 'agency',
@@ -23,7 +31,6 @@ const ROLE_API_PREFIX = {
   user: 'user',
 };
 
-/** e.g. /web/agency — contracts, agreed rates and permanent hires live under each role's router. */
 export function getRoleApiBase(user) {
   const prefix = ROLE_API_PREFIX[resolveDashboardRole(user)];
   return prefix ? `/web/${prefix}` : '';
@@ -72,7 +79,6 @@ function mapParty(party) {
   };
 }
 
-/** GET /contracts item → table row */
 export function mapRelationshipFromApi(item = {}) {
   const contract = item.contract || {};
   return {
@@ -90,7 +96,6 @@ export function mapRelationshipFromApi(item = {}) {
   };
 }
 
-/** GET users?userType= item → { id, name, email } option */
 export function mapUserOption(item = {}) {
   const basic = item.basicInfo || item;
   return {
@@ -100,7 +105,6 @@ export function mapUserOption(item = {}) {
   };
 }
 
-// ----------------------------------------------------------------------
 
 export const RATE_STATUS = {
   pending: { label: 'Waiting for customer', color: 'warning' },
@@ -110,7 +114,6 @@ export const RATE_STATUS = {
   withdrawn: { label: 'Withdrawn', color: 'default' },
 };
 
-/** Supplier can still change or withdraw it; customer can still respond. */
 export const OPEN_RATE_STATUSES = ['pending', 'reviewRequested'];
 
 export const RATE_SLOTS = [
@@ -119,7 +122,6 @@ export const RATE_SLOTS = [
   { key: 'weekend', label: 'Weekend' },
 ];
 
-/** Supplier-named extra days (Christmas, …) with their own hourly rate. */
 function mapSpecialDays(list) {
   return (Array.isArray(list) ? list : [])
     .map((item) => ({
@@ -131,6 +133,122 @@ function mapSpecialDays(list) {
     .filter((item) => item.name && item.date);
 }
 
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function toYmd(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function nextFixedCalendarDate(month, day, from = new Date()) {
+  const today = startOfLocalDay(from);
+  let candidate = new Date(today.getFullYear(), month - 1, day);
+  if (candidate < today) {
+    candidate = new Date(today.getFullYear() + 1, month - 1, day);
+  }
+  return toYmd(candidate);
+}
+
+export function easterSundayDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+export function nextEasterOffsetDate(offsetDays, from = new Date()) {
+  const today = startOfLocalDay(from);
+  let year = today.getFullYear();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const easter = easterSundayDate(year);
+    const target = new Date(easter);
+    target.setDate(easter.getDate() + offsetDays);
+    if (startOfLocalDay(target) >= today) return toYmd(target);
+    year += 1;
+  }
+  return toYmd(today);
+}
+
+
+export const DEFAULT_SPECIAL_DAY_PRESETS = [
+  {
+    id: 'christmas-day',
+    name: 'Christmas Day',
+    multiplier: 2,
+    repeatsYearly: true,
+    resolveDate: () => nextFixedCalendarDate(12, 25),
+  },
+  {
+    id: 'boxing-day',
+    name: 'Boxing Day',
+    multiplier: 1.5,
+    repeatsYearly: true,
+    resolveDate: () => nextFixedCalendarDate(12, 26),
+  },
+  {
+    id: 'new-years-day',
+    name: "New Year's Day",
+    multiplier: 1.5,
+    repeatsYearly: true,
+    resolveDate: () => nextFixedCalendarDate(1, 1),
+  },
+  {
+    id: 'good-friday',
+    name: 'Good Friday',
+    multiplier: 1.5,
+    repeatsYearly: false,
+    resolveDate: () => nextEasterOffsetDate(-2),
+  },
+  {
+    id: 'easter-monday',
+    name: 'Easter Monday',
+    multiplier: 1.5,
+    repeatsYearly: false,
+    resolveDate: () => nextEasterOffsetDate(1),
+  },
+];
+
+export function formatMultiplierLabel(multiplier) {
+  if (multiplier === 2) return 'double basic rate';
+  if (multiplier === 1.5) return '1½ × basic rate';
+  return `${multiplier} × basic rate`;
+}
+
+export function rateFromBasicMultiplier(basicRate, multiplier) {
+  const basic = Number(basicRate);
+  const factor = Number(multiplier);
+  if (!(basic > 0) || !(factor > 0)) return '';
+  return String(Math.round(basic * factor * 100) / 100);
+}
+
+export function buildDefaultSpecialDayPresets(basicRate = '') {
+  return DEFAULT_SPECIAL_DAY_PRESETS.map((preset) => ({
+    presetId: preset.id,
+    name: preset.name,
+    date: preset.resolveDate(),
+    repeatsYearly: preset.repeatsYearly,
+    multiplier: preset.multiplier,
+    rate: rateFromBasicMultiplier(basicRate, preset.multiplier),
+    autoRate: true,
+  }));
+}
+
 function mapRates(rates = {}) {
   return {
     day: Number(rates.day) || 0,
@@ -140,7 +258,6 @@ function mapRates(rates = {}) {
   };
 }
 
-/** "25 Dec, every year" or "3 Jan 2027". */
 export function formatSpecialDayDate(specialDay) {
   const date = new Date(`${specialDay.date}T00:00:00`);
   if (!isValid(date)) return specialDay.date;
@@ -181,10 +298,6 @@ function readRateAmount(value) {
   return Number(value);
 }
 
-/**
- * GET /agreed-rates/current → dropdown options for the bid form.
- * One agreement can expose day, night, weekend and special-day rates.
- */
 export function mapCurrentAgreedRateOptions(response) {
   const records = unwrapCurrentAgreedRate(response);
   const options = [];
@@ -239,7 +352,6 @@ export function mapCurrentAgreedRateOptions(response) {
   return options;
 }
 
-/** GET /agreed-rates item → table row */
 export function mapAgreedRateFromApi(item = {}) {
   const jobType = item.jobType && typeof item.jobType === 'object' ? item.jobType : {};
   const review = item.review || {};
@@ -261,7 +373,6 @@ export function mapAgreedRateFromApi(item = {}) {
   };
 }
 
-// ----------------------------------------------------------------------
 
 export const HIRE_STATUS = {
   pending: { label: 'Waiting for supplier', color: 'warning' },
@@ -270,7 +381,6 @@ export const HIRE_STATUS = {
   cancelled: { label: 'Cancelled', color: 'default' },
 };
 
-/** GET /permanent-hires/eligible item → worker the care home could hire */
 export function mapEligibleWorkerFromApi(item = {}) {
   const worker = mapParty(item.worker);
   const supplier = item.supplier ? mapParty(item.supplier) : null;
@@ -283,7 +393,6 @@ export function mapEligibleWorkerFromApi(item = {}) {
   };
 }
 
-/** GET /permanent-hires item → table row */
 export function mapPermanentHireFromApi(item = {}) {
   const source = item && typeof item === 'object' ? item : {};
   const status = String(source.status || 'pending').toLowerCase();

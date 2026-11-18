@@ -14,7 +14,6 @@ import DialogContent from '@mui/material/DialogContent';
 
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
-// ----------------------------------------------------------------------
 
 export const NewAddressSchema = zod.object({
   city: zod.string().min(1, { message: 'City is required!' }),
@@ -26,7 +25,6 @@ export const NewAddressSchema = zod.object({
   country: schemaHelper.objectOrNull({
     message: { required_error: 'Country is required!' },
   }),
-  // Not required
   primary: zod.boolean(),
   addressType: zod.string(),
 });
@@ -97,7 +95,7 @@ export function AddressNewForm({ open, onClose, onCreate }) {
             >
               <Field.Text name="name" label="Full name" />
 
-              <Field.Phone name="phoneNumber" label="Phone number" />
+              <Field.Phone name="phoneNumber" label="Phone number" country="GB" />
             </Box>
 
             <Field.Text name="address" label="Address" />

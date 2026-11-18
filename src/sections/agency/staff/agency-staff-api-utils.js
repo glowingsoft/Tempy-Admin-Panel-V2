@@ -232,21 +232,21 @@ export function parseFlexiblePhoneForApi(phoneValue) {
   const digits = raw.replace(/\D/g, '');
 
   if (/^0\d{10}$/.test(digits)) {
-    return { code: '+92', number: digits.slice(1) };
+    return { code: '+44', number: digits.slice(1) };
   }
 
-  if (/^92\d{10}$/.test(digits)) {
-    return { code: '+92', number: digits.slice(2) };
+  if (/^44\d{9,10}$/.test(digits)) {
+    return { code: '+44', number: digits.slice(2) };
   }
 
-  if (/^3\d{9}$/.test(digits)) {
-    return { code: '+92', number: digits };
+  if (/^7\d{9}$/.test(digits)) {
+    return { code: '+44', number: digits };
   }
 
   const candidates = [raw.startsWith('+') ? raw : null, digits ? `+${digits}` : null].filter(Boolean);
 
   for (const candidate of candidates) {
-    const parsed = parsePhoneNumber(candidate);
+    const parsed = parsePhoneNumber(candidate) || parsePhoneNumber(raw, 'GB');
     if (parsed) {
       return {
         code: `+${parsed.countryCallingCode}`,
@@ -255,8 +255,16 @@ export function parseFlexiblePhoneForApi(phoneValue) {
     }
   }
 
+  const asUk = parsePhoneNumber(raw, 'GB') || (digits ? parsePhoneNumber(digits, 'GB') : null);
+  if (asUk) {
+    return {
+      code: `+${asUk.countryCallingCode}`,
+      number: asUk.nationalNumber,
+    };
+  }
+
   if (digits.length >= 10) {
-    return { code: '+92', number: digits.replace(/^0+/, '') || digits };
+    return { code: '+44', number: digits.replace(/^0+/, '') || digits };
   }
 
   return { code: '', number: digits };

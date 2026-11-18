@@ -1,10 +1,10 @@
 import { parsePhoneNumber } from 'react-phone-number-input';
 
 import { parseCoordinates, readApiLate, readApiLong, toApiCoordinates } from 'src/sections/branches/geo-coordinates';
+import { extractAddressLine1 } from 'src/sections/branches/address-form-utils';
 import { getDeviceId } from 'src/sections/auth/jwt/care-home-register-utils';
 import { toApiUploadedFileName, resolveProfileAssetUrl } from 'src/store/Reducer/upload-api';
 
-// ----------------------------------------------------------------------
 
 function getFileName(file) {
   return toApiUploadedFileName(file, '');
@@ -22,7 +22,8 @@ function formatPhoneLabel(phone) {
 }
 
 function parsePhoneForApi(phoneValue) {
-  const parsed = parsePhoneNumber(phoneValue || '');
+  const raw = String(phoneValue || '').trim();
+  const parsed = raw ? parsePhoneNumber(raw) || parsePhoneNumber(raw, 'GB') : null;
 
   if (parsed) {
     return {
@@ -31,10 +32,10 @@ function parsePhoneForApi(phoneValue) {
     };
   }
 
-  const digits = String(phoneValue || '').replace(/\D/g, '');
+  const digits = raw.replace(/\D/g, '');
   return {
-    code: '',
-    number: digits,
+    code: digits ? '+44' : '',
+    number: digits.replace(/^0+/, '') || digits,
   };
 }
 
@@ -63,6 +64,17 @@ export function mapUserProfileFromApi(raw = {}) {
   const longitude = Number(readApiLong(location) ?? readApiLong(raw) ?? longitudeFromCoords) || 0;
   const latitude = Number(readApiLate(location) ?? readApiLate(raw) ?? latitudeFromCoords) || 0;
 
+  const fullAddress = String(location.fullAddress || '').trim();
+  const addressLine1 =
+    String(location.addressLine1 || '').trim() ||
+    extractAddressLine1(fullAddress) ||
+    fullAddress;
+  const addressLine2 = String(location.addressLine2 || '').trim();
+  const postalCode =
+    location.postalCode != null && location.postalCode !== ''
+      ? String(location.postalCode)
+      : '';
+
   return {
     id,
     _id: id,
@@ -75,21 +87,17 @@ export function mapUserProfileFromApi(raw = {}) {
     location,
     longitude,
     latitude,
-    fullAddress: location.fullAddress || '',
+    fullAddress,
+    addressLine1,
+    addressLine2,
     city: location.city || '',
     state: location.state || '',
     country: location.country || '',
-    postalCode:
-      location.postalCode != null && location.postalCode !== ''
-        ? String(location.postalCode)
-        : '',
+    postalCode,
     displayName: name,
     photoURL: profileIconUrl || profileIcon,
-    address: location.fullAddress || '',
-    zipCode:
-      location.postalCode != null && location.postalCode !== ''
-        ? String(location.postalCode)
-        : '',
+    address: addressLine1 || fullAddress,
+    zipCode: postalCode,
     about: raw.about || data.about || raw.bio || data.bio || '',
     bio: raw.bio || data.bio || raw.about || data.about || '',
     instructions: raw.instructions || raw.notes || data.instructions || '',
@@ -105,12 +113,20 @@ export function buildUpdateProfilePayload(data) {
       ? data.country?.label || data.country?.code || ''
       : String(data.country || '').trim();
 
+  const addressLine1 = String(data.addressLine1 || data.address || '').trim();
+  const addressLine2 = String(data.addressLine2 || '').trim();
+  const fullAddress =
+    String(data.fullAddress || '').trim() ||
+    [addressLine1, addressLine2].filter(Boolean).join(', ');
+
   const payload = {
     profileIcon: getFileName(data.photoURL) || getFileName(data.profileIcon) || 'default.png',
     name: String(data.displayName || data.name || '').trim(),
     location: {
       coordinates: toApiCoordinates(data.latitude, data.longitude),
-      fullAddress: String(data.address || data.fullAddress || '').trim(),
+      fullAddress,
+      addressLine1,
+      addressLine2,
       country: countryValue,
       city: String(data.city || '').trim(),
       state: String(data.state || '').trim(),

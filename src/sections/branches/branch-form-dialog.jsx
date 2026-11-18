@@ -225,7 +225,7 @@ export function BranchFormDialog({
   addressOnly = false,
   showComplianceFields = false,
   hideImages = false,
-  hideInsurance = true,
+  hideInsurance = false,
   showWebsite = false,
   hideState = false,
   stateLabel = 'County',
@@ -627,13 +627,13 @@ export function BranchFormDialog({
                 <>
                   <StaffDocumentUploadRow
                     name="insuranceCertificates"
-                    label="Insurance"
-                    helperText="Upload insurance documents (PDF / DOC)"
+                    label="Insurance (optional)"
+                    helperText="Not required, but helpful — upload PDF / DOC if you have cover for this location"
                   />
 
                   <Field.Text
                     name="insuranceExpiryDate"
-                    label="Insurance expiry date"
+                    label="Insurance expiry date (optional)"
                     type="date"
                     size="small"
                     InputLabelProps={{ shrink: true }}

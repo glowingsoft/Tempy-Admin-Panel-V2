@@ -22,7 +22,6 @@ export const CARE_HOME_TYPE_OPTIONS = [
   { label: 'Mental Health Home', value: 'mentalHealthHome' },
 ];
 
-/** Agency / home-care company business type — must match backend enum exactly. */
 export const SUPPLIER_BUSINESS_TYPE_OPTIONS = [
   { label: 'Ltd', value: 'ltd' },
   { label: 'LLC', value: 'llc' },
@@ -51,7 +50,6 @@ export function resolveSupplierBusinessType(value) {
 
 export const SUPPORTED_CARE_HOME_API_TYPES = ['residentialCareHome'];
 
-/** Home care company has no type picker — it always registers as a residential care home. */
 export const HOME_CARE_COMPANY_API_TYPE = 'residentialCareHome';
 
 const DEVICE_ID_KEY = 'tempy-device-id';
@@ -78,7 +76,6 @@ export function getCareHomeTypeError(careHomeType) {
   return `"${option.label}" is not supported by the server yet. Please select Residential Care Home.`;
 }
 
-// ----------------------------------------------------------------------
 
 function getFileName(file) {
   if (!file) return '';
@@ -103,7 +100,8 @@ export function getDeviceId() {
 }
 
 export function parsePhoneForApi(phoneValue) {
-  const parsed = parsePhoneNumber(phoneValue || '');
+  const raw = String(phoneValue || '').trim();
+  const parsed = raw ? parsePhoneNumber(raw) || parsePhoneNumber(raw, 'GB') : null;
 
   if (parsed) {
     return {
@@ -112,11 +110,11 @@ export function parsePhoneForApi(phoneValue) {
     };
   }
 
-  const digits = (phoneValue || '').replace(/\D/g, '');
+  const digits = raw.replace(/\D/g, '');
 
   return {
-    code: '',
-    number: digits,
+    code: digits ? '+44' : '',
+    number: digits.replace(/^0+/, '') || digits,
   };
 }
 
@@ -234,7 +232,6 @@ export function buildIndividualHomeCareRegisterPayload(
   return payload;
 }
 
-/** Individual staff member (nurse) registration — taxNumber is required by the API. */
 export function buildNurseRegisterPayload(data, { userType = 'nurse', socialAuth } = {}) {
   const phoneNumber = parsePhoneForApi(data.phoneNumber);
   const dob = formatDob(data.dob);

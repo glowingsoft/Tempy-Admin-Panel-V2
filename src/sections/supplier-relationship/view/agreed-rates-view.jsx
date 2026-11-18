@@ -54,15 +54,17 @@ import {
   getRoleApiBase,
   OPEN_RATE_STATUSES,
   getRelationshipSide,
-  CUSTOMER_TYPE_OPTIONS,
   formatSpecialDayDate,
+  formatMultiplierLabel,
+  rateFromBasicMultiplier,
+  buildDefaultSpecialDayPresets,
+  getAgreedRateCustomerTypeOptions,
 } from '../supplier-relationship-utils';
 import { RowActionButton } from '../row-action-button';
 import { AgreedRateDetailsDialog } from '../relationship-details-dialogs';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
 
-/** Rate changes usually start on 1 April. */
 function nextFirstOfApril() {
   const now = new Date();
   const year = now.getMonth() >= 3 ? now.getFullYear() + 1 : now.getFullYear();
@@ -85,14 +87,16 @@ function newSpecialDay(day = {}) {
   specialDayKey += 1;
   return {
     key: specialDayKey,
+    presetId: day.presetId || '',
     name: day.name || '',
     date: day.date || '',
     repeatsYearly: day.repeatsYearly ?? true,
+    multiplier: day.multiplier || null,
     rate: day.rate ? String(day.rate) : '',
+    autoRate: day.autoRate === true,
   };
 }
 
-/** Two entries on the same day clash; a yearly one clashes on month-day with any other. */
 function findDuplicateSpecialDays(days) {
   const clashes = new Set();
   days.forEach((a, i) =>
@@ -331,8 +335,10 @@ export function SupplierAgreedRatesView() {
 function RateFormDialog({ base, user, form, onClose }) {
   const { row, change } = form;
   const isEdit = Boolean(row && !change);
+  const supplierRole = resolveDashboardRole(user);
+  const customerTypeOptions = getAgreedRateCustomerTypeOptions(supplierRole);
 
-  const [customerType, setCustomerType] = useState('careHome');
+  const [customerType, setCustomerType] = useState(customerTypeOptions[0]?.value || 'careHome');
   const [customer, setCustomer] = useState(row?.customer.id || '');
   const [jobType, setJobType] = useState(row?.jobTypeId || '');
   const [rates, setRates] = useState({
@@ -340,9 +346,13 @@ function RateFormDialog({ base, user, form, onClose }) {
     night: row ? String(row.rates.night) : '',
     weekend: row ? String(row.rates.weekend) : '',
   });
-  const [specialDays, setSpecialDays] = useState(() =>
-    (row?.rates.specialDays || []).map((day) => newSpecialDay(day))
-  );
+  const [specialDays, setSpecialDays] = useState(() => {
+    if (row?.rates.specialDays?.length) {
+      return row.rates.specialDays.map((day) => newSpecialDay(day));
+    }
+    if (row) return [];
+    return buildDefaultSpecialDayPresets('').map((day) => newSpecialDay(day));
+  });
   const [effectiveFrom, setEffectiveFrom] = useState(
     change ? nextFirstOfApril() : String(row?.effectiveFrom || '').slice(0, 10)
   );
@@ -350,11 +360,21 @@ function RateFormDialog({ base, user, form, onClose }) {
   const updateSpecialDay = (key, changes) =>
     setSpecialDays((prev) => prev.map((day) => (day.key === key ? { ...day, ...changes } : day)));
 
+  const handleDayRateChange = (value) => {
+    setRates((prev) => ({ ...prev, day: value }));
+    setSpecialDays((prev) =>
+      prev.map((day) => {
+        if (!day.autoRate || !(day.multiplier > 0)) return day;
+        return { ...day, rate: rateFromBasicMultiplier(value, day.multiplier) };
+      })
+    );
+  };
+
   const { data: customers } = useGetCustomerOptionsQuery(
     { base, userType: customerType },
     { skip: Boolean(row) }
   );
-  const { data: jobTypes } = useRoleJobTypes(resolveDashboardRole(user), { skip: Boolean(row) });
+  const { data: jobTypes } = useRoleJobTypes(supplierRole, { skip: Boolean(row) });
 
   const [createRate, { isLoading: isCreating }] = useCreateAgreedRateMutation();
   const [updateRate, { isLoading: isUpdating }] = useUpdateAgreedRateMutation();
@@ -418,7 +438,7 @@ function RateFormDialog({ base, user, form, onClose }) {
                   setCustomer('');
                 }}
               >
-                {CUSTOMER_TYPE_OPTIONS.map((option) => (
+                {customerTypeOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
                   </MenuItem>
@@ -460,7 +480,11 @@ function RateFormDialog({ base, user, form, onClose }) {
                 key={slot.key}
                 label={`${slot.label} (£/h)`}
                 value={rates[slot.key]}
-                onChange={(e) => setRates((prev) => ({ ...prev, [slot.key]: e.target.value }))}
+                onChange={(e) =>
+                  slot.key === 'day'
+                    ? handleDayRateChange(e.target.value)
+                    : setRates((prev) => ({ ...prev, [slot.key]: e.target.value }))
+                }
                 inputProps={{ inputMode: 'decimal' }}
                 fullWidth
               />
@@ -470,8 +494,11 @@ function RateFormDialog({ base, user, form, onClose }) {
           <Stack spacing={1.5}>
             <div>
               <Typography variant="subtitle2">Special days</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Optional. Agree a separate hourly rate for particular days, e.g. Christmas Day.
+              <Typography variant="caption" color="text.secondary" component="div">
+                Pre-set from the day (basic) rate — edit any name, date or amount if needed.
+              </Typography>
+              <Typography variant="caption" color="text.secondary" component="div">
+                Premium payments run from midnight to midnight on the holiday.
               </Typography>
             </div>
 
@@ -503,8 +530,15 @@ function RateFormDialog({ base, user, form, onClose }) {
                 <TextField
                   label="Rate (£/h)"
                   value={day.rate}
-                  onChange={(e) => updateSpecialDay(day.key, { rate: e.target.value })}
+                  onChange={(e) =>
+                    updateSpecialDay(day.key, { rate: e.target.value, autoRate: false })
+                  }
                   inputProps={{ inputMode: 'decimal' }}
+                  helperText={
+                    day.multiplier
+                      ? formatMultiplierLabel(day.multiplier)
+                      : undefined
+                  }
                   sx={{ flex: 0.8 }}
                 />
                 <FormControlLabel

@@ -9,7 +9,7 @@ export const JOB_ALERT_DEFAULT_CODE = '+44';
 
 export const EMPTY_JOB_ALERT = {
   enabled: false,
-  phoneNumber: { code: '', number: '' },
+  phoneNumber: { code: '+44', number: '' },
   hoursBefore: 0,
   minutesBefore: 0,
 };

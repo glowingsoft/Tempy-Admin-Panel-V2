@@ -197,7 +197,7 @@ const AgencyStaffFormSchema = zod
       if (phone && !isValidFlexiblePhone(phone)) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Use 03004785384 or +923004785384',
+          message: 'Use 07123456789 or +447123456789',
           path: ['phoneNumber'],
         });
       }
@@ -226,7 +226,7 @@ const AgencyStaffFormSchema = zod
     } else if (!isValidFlexiblePhone(phone)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Use 03004785384 or +923004785384',
+        message: 'Use 07123456789 or +447123456789',
         path: ['phoneNumber'],
       });
     }
@@ -903,11 +903,12 @@ export function AgencyStaffFormDialog({
                   {!isExistingMode || isEdit ? (
                     <>
                       <Field.Text name="name" label="Name *" disabled={isRegistryLocked} />
-                      <Field.Text
+                      <Field.Phone
                         name="phoneNumber"
                         label="Phone Number *"
                         disabled={isRegistryLocked}
-                        placeholder="03004785384 or +923004785384"
+                        country="GB"
+                        placeholder="07123 456789"
                       />
                       <Field.Text
                         name="email"

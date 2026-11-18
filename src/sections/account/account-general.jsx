@@ -60,7 +60,8 @@ export const UpdateUserSchema = zod.object({
   photoURL: zod.any().optional().nullable(),
   phoneNumber: zod.string().optional().nullable(),
   country: zod.string().optional().nullable(),
-  address: zod.string().min(1, { message: 'Address is required!' }),
+  address: zod.string().min(1, { message: 'Address Line 1 is required!' }),
+  addressLine2: zod.string().optional().nullable(),
   state: zod.string().optional().nullable(),
   city: zod.string().optional().nullable(),
   zipCode: zod.string().optional().nullable(),
@@ -97,6 +98,11 @@ function resolveProfilePhotoValue(profile, fallbackUser) {
 }
 
 function buildDefaults(profile, fallbackUser) {
+  const fallbackLocation =
+    (fallbackUser?.location && typeof fallbackUser.location === 'object'
+      ? fallbackUser.location
+      : null) || {};
+
   return {
     displayName: profile?.name || fallbackUser?.basicInfo?.name || fallbackUser?.displayName || '',
     email: profile?.email || fallbackUser?.email || '',
@@ -105,11 +111,22 @@ function buildDefaults(profile, fallbackUser) {
       profile?.phoneLabel ||
       (typeof fallbackUser?.phoneNumber === 'string' ? fallbackUser.phoneNumber : '') ||
       '',
-    country: profile?.country || '',
-    address: profile?.fullAddress || profile?.address || '',
-    state: profile?.state || '',
-    city: profile?.city || '',
-    zipCode: profile?.postalCode || profile?.zipCode || '',
+    country: profile?.country || fallbackLocation.country || '',
+    address:
+      profile?.address ||
+      profile?.addressLine1 ||
+      profile?.fullAddress ||
+      fallbackLocation.addressLine1 ||
+      fallbackLocation.fullAddress ||
+      '',
+    addressLine2: profile?.addressLine2 || fallbackLocation.addressLine2 || '',
+    state: profile?.state || fallbackLocation.state || '',
+    city: profile?.city || fallbackLocation.city || '',
+    zipCode:
+      profile?.postalCode ||
+      profile?.zipCode ||
+      (fallbackLocation.postalCode != null ? String(fallbackLocation.postalCode) : '') ||
+      '',
     longitude: profile?.longitude ?? 0,
     latitude: profile?.latitude ?? 0,
   };
@@ -364,14 +381,32 @@ export function AccountGeneral() {
                 display="grid"
                 gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)' }}
               >
-                <Field.Text name="displayName" label="Name" />
-                <Field.Text name="email" label="Email address" disabled />
-                <Field.Phone name="phoneNumber" label="Phone number (optional)" />
+                <Field.Text name="displayName" label="Name" InputLabelProps={{ shrink: true }} />
+                <Field.Text
+                  name="email"
+                  label="Email address"
+                  disabled
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Field.Phone name="phoneNumber" label="Phone number (optional)" country="GB" />
                 <Field.GoogleAddress name="address" label="Address Line 1" />
-                <Field.Text name="country" label="Country" />
-                <Field.Text name="state" label="County (optional)" />
-                <Field.Text name="city" label="Postal Town / City" />
-                <Field.Text name="zipCode" label="Post Code" />
+                <Field.Text
+                  name="addressLine2"
+                  label="Address Line 2 (optional)"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Field.Text name="country" label="Country" InputLabelProps={{ shrink: true }} />
+                <Field.Text
+                  name="state"
+                  label="County (optional)"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Field.Text
+                  name="city"
+                  label="Postal Town / City"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Field.Text name="zipCode" label="Post Code" InputLabelProps={{ shrink: true }} />
                 {staffProfile ? (
                   <StaffMemberPersonalSummaryField
                     value={personalSummary}
@@ -419,20 +454,30 @@ export function AccountGeneral() {
               </Card>
             ) : null}
 
-            <Card
-              sx={{ p: 3, mt: 3, borderColor: 'error.main', display: viewOnly ? 'none' : 'block' }}
-              variant="outlined"
-            >
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                Delete account
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Permanently delete your account and all associated data. This cannot be undone.
-              </Typography>
-              <Button color="error" variant="soft" onClick={deleteConfirm.onTrue}>
-                Delete account
-              </Button>
-            </Card>
+            {!viewOnly ? (
+              <Box
+                sx={{
+                  mt: 3,
+                  pt: 2,
+                  borderTop: '1px dashed',
+                  borderColor: 'divider',
+                  textAlign: 'right',
+                }}
+              >
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={deleteConfirm.onTrue}
+                  sx={{
+                    color: 'text.disabled',
+                    typography: 'caption',
+                    '&:hover': { color: 'error.main', bgcolor: 'transparent' },
+                  }}
+                >
+                  Delete account
+                </Button>
+              </Box>
+            ) : null}
           </Grid>
         </Grid>
       </Form>

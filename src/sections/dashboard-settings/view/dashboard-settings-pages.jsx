@@ -4,6 +4,10 @@ import { useSelector } from 'react-redux';
 import { getDashboardRootPath } from 'src/auth/utils/dashboard-path-utils';
 
 import { resolveSettingsAccountKey } from 'src/sections/dashboard-settings/dashboard-settings-api-utils';
+import {
+  hasLocalDraftTerms,
+  resolveTermsForAccount,
+} from 'src/sections/dashboard-settings/resolve-terms-content';
 import { DashboardCmsContentView } from 'src/sections/dashboard-settings/view/dashboard-cms-content-view';
 
 import {
@@ -27,16 +31,21 @@ function useSettingsPageContext() {
 export function DashboardTermsView() {
   const { accountKey, dashboardRoot } = useSettingsPageContext();
   const query = useGetTermsConditionsQuery({ accountKey }, { skip: !accountKey });
+  const termsData = useMemo(
+    () => resolveTermsForAccount(accountKey, query.data),
+    [accountKey, query.data]
+  );
+  const hasLocalTerms = hasLocalDraftTerms(accountKey);
 
   return (
     <DashboardCmsContentView
       contentType="terms"
       accountKey={accountKey}
       dashboardRoot={dashboardRoot}
-      data={query.data}
-      isLoading={query.isLoading}
-      isFetching={query.isFetching}
-      isError={query.isError}
+      data={termsData}
+      isLoading={query.isLoading && !hasLocalTerms}
+      isFetching={query.isFetching && !hasLocalTerms}
+      isError={query.isError && !hasLocalTerms}
       errorMessage={query.error?.data?.message || query.error?.error || ''}
       onRetry={query.refetch}
     />

@@ -21,18 +21,6 @@ const CONTENT_SX = {
   typography: 'body1',
   color: 'text.primary',
   lineHeight: 1.8,
-  '& p': { mb: 2, color: 'text.secondary' },
-  '& h1, & h2, & h3, & h4, & h5, & h6': {
-    mt: 3,
-    mb: 1.25,
-    fontWeight: 700,
-    color: 'text.primary',
-  },
-  '& h1': { typography: 'h4' },
-  '& h2': { typography: 'h5' },
-  '& h3': { typography: 'h6' },
-  '& ul, & ol': { pl: 3, mb: 2, color: 'text.secondary' },
-  '& li': { mb: 0.75 },
   '& a': { color: 'primary.main', fontWeight: 600 },
   '& strong, & b': { color: 'text.primary', fontWeight: 700 },
   '& blockquote': {

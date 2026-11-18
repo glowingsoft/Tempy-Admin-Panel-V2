@@ -19,7 +19,6 @@ import { USER_STATUS_OPTIONS } from 'src/_mock';
 import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
-// ----------------------------------------------------------------------
 
 export const UserQuickEditSchema = zod.object({
   name: zod.string().min(1, { message: 'Name is required!' }),
@@ -37,11 +36,9 @@ export const UserQuickEditSchema = zod.object({
   zipCode: zod.string().min(1, { message: 'Zip code is required!' }),
   company: zod.string().min(1, { message: 'Company is required!' }),
   role: zod.string().min(1, { message: 'Role is required!' }),
-  // Not required
   status: zod.string(),
 });
 
-// ----------------------------------------------------------------------
 
 export function UserQuickEditForm({ currentUser, open, onClose }) {
   const defaultValues = useMemo(
@@ -128,7 +125,7 @@ export function UserQuickEditForm({ currentUser, open, onClose }) {
 
             <Field.Text name="name" label="Full name" />
             <Field.Text name="email" label="Email address" />
-            <Field.Phone name="phoneNumber" label="Phone number" />
+            <Field.Phone name="phoneNumber" label="Phone number" country="GB" />
 
             <Field.CountrySelect
               fullWidth
