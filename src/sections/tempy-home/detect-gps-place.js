@@ -2,13 +2,13 @@
 export function formatGeolocationError(error) {
   const code = Number(error?.code);
   if (code === 1) {
-    return 'Location permission is blocked. Click the lock / location icon in the address bar → allow Location for this site, then tap Detect GPS again.';
+    return 'Location permission is blocked. Click the lock / location icon in the address bar → allow Location for this site, then tap Find my location again.';
   }
   if (code === 2) {
-    return 'GPS position unavailable. Turn on device location / Wi‑Fi and try Detect GPS again.';
+    return 'GPS position unavailable. Turn on device location / Wi‑Fi and try Find my location again.';
   }
   if (code === 3) {
-    return 'GPS timed out. Move somewhere with a clearer signal and try Detect GPS again.';
+    return 'GPS timed out. Move somewhere with a clearer signal and try Find my location again.';
   }
   const message = String(error?.message || '').trim();
   if (message) return message;

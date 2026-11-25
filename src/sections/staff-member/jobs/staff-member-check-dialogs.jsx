@@ -196,7 +196,7 @@ function LocationField({
           startIcon={<Iconify icon="solar:routing-2-bold" width={16} />}
           onClick={onDetect}
         >
-          Detect GPS
+          Find my location
         </LoadingButton>
       </Stack>
     </Box>
@@ -230,7 +230,7 @@ export function StaffMemberCheckInDialog({ open, job, onClose, onConfirm, mode =
       if (failed) {
         const message =
           next?.error ||
-          'Unable to read GPS. Allow location for this site, then tap Detect GPS again.';
+          'Unable to read GPS. Allow location for this site, then tap Find my location again.';
         setLocationError(message);
         if (notify) toast.error(message);
       }

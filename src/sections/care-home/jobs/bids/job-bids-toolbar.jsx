@@ -14,9 +14,11 @@ import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 import ListSubheader from '@mui/material/ListSubheader';
 import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
 import { JobMediaThumb } from 'src/components/jobs/job-image';
+import { getBranchDisplayName } from 'src/sections/branches/active-branch';
 
 import { DATE_FILTERS, BID_SORT_OPTIONS, BID_STATUS_FILTERS, getJobFilterLabel } from './job-bid-utils';
 
@@ -26,11 +28,59 @@ const JOB_FILTER_MENU_MAX_HEIGHT = 360;
 
 const FIELD_SX = { minWidth: 0, flex: { xs: '1 1 100%', sm: '1 1 180px', lg: '0 0 220px' } };
 
-function JobFilterSelect({ jobs, value, onChange }) {
-  const [search, setSearch] = useState('');
+function PickerSearchHeader({ placeholder, value, onChange, ariaLabel }) {
+  return (
+    <ListSubheader
+      sx={{
+        bgcolor: 'background.paper',
+        lineHeight: 'normal',
+        py: 1,
+        px: 1.5,
+        position: 'sticky',
+        top: 0,
+        zIndex: 2,
+        borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}`,
+      }}
+    >
+      <TextField
+        size="small"
+        fullWidth
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+        inputProps={{ 'aria-label': ariaLabel }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
+    </ListSubheader>
+  );
+}
+
+function JobFilterSelect({
+  jobs,
+  value,
+  onChange,
+  search = '',
+  onSearchChange,
+  loading = false,
+  loadingMore = false,
+  hasMore = false,
+  onLoadMore,
+}) {
+  const [localSearch, setLocalSearch] = useState('');
+  const serverDriven = typeof onSearchChange === 'function';
+  const searchValue = serverDriven ? search : localSearch;
 
   const filteredJobs = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    if (serverDriven) return jobs;
+    const query = localSearch.trim().toLowerCase();
     if (!query) return jobs;
 
     return jobs.filter((job) => {
@@ -39,9 +89,14 @@ function JobFilterSelect({ jobs, value, onChange }) {
       const id = String(job.id || '').toLowerCase();
       return label.includes(query) || address.includes(query) || id.includes(query);
     });
-  }, [jobs, search]);
+  }, [jobs, localSearch, serverDriven]);
 
   const selectedJob = jobs.find((job) => job.id === value);
+
+  const handleSearch = (next) => {
+    if (serverDriven) onSearchChange(next);
+    else setLocalSearch(next);
+  };
 
   return (
     <FormControl size="small" sx={FIELD_SX}>
@@ -51,7 +106,7 @@ function JobFilterSelect({ jobs, value, onChange }) {
         value={value}
         label="Job"
         onChange={(event) => onChange(event.target.value)}
-        onClose={() => setSearch('')}
+        onClose={() => handleSearch('')}
         renderValue={(selected) => {
           if (selected === 'all' || !selectedJob) return 'All jobs';
           return (
@@ -68,36 +123,12 @@ function JobFilterSelect({ jobs, value, onChange }) {
           PaperProps: { sx: { width: 360, maxWidth: '92vw', maxHeight: JOB_FILTER_MENU_MAX_HEIGHT } },
         }}
       >
-        <ListSubheader
-          sx={{
-            bgcolor: 'background.paper',
-            lineHeight: 'normal',
-            py: 1,
-            px: 1.5,
-            position: 'sticky',
-            top: 0,
-            zIndex: 2,
-            borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}`,
-          }}
-        >
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search jobs..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
-            inputProps={{ 'aria-label': 'Search jobs' }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </ListSubheader>
+        <PickerSearchHeader
+          placeholder="Search jobs..."
+          value={searchValue}
+          onChange={handleSearch}
+          ariaLabel="Search jobs"
+        />
 
         <MenuItem value="all">All jobs</MenuItem>
 
@@ -107,7 +138,16 @@ function JobFilterSelect({ jobs, value, onChange }) {
           </MenuItem>
         )}
 
-        {filteredJobs.length === 0 ? (
+        {loading && !filteredJobs.length ? (
+          <MenuItem disabled dense>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <CircularProgress size={14} />
+              <Typography variant="body2" color="text.secondary">
+                Loading jobs…
+              </Typography>
+            </Stack>
+          </MenuItem>
+        ) : filteredJobs.length === 0 ? (
           <MenuItem disabled dense>
             <Typography variant="body2" color="text.secondary">
               No jobs found
@@ -128,6 +168,145 @@ function JobFilterSelect({ jobs, value, onChange }) {
             </MenuItem>
           ))
         )}
+
+        {hasMore && typeof onLoadMore === 'function' ? (
+          <ListSubheader
+            sx={{
+              bgcolor: 'background.paper',
+              lineHeight: 'normal',
+              py: 1,
+              px: 1.5,
+              borderTop: (theme) => `1px solid ${theme.vars.palette.divider}`,
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <Button
+              fullWidth
+              size="small"
+              disabled={loadingMore}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onLoadMore();
+              }}
+              startIcon={loadingMore ? <CircularProgress size={14} color="inherit" /> : null}
+            >
+              {loadingMore ? 'Loading…' : 'Load more jobs'}
+            </Button>
+          </ListSubheader>
+        ) : null}
+      </Select>
+    </FormControl>
+  );
+}
+
+function BranchFilterSelect({
+  branches,
+  value,
+  onChange,
+  search = '',
+  onSearchChange,
+  loading = false,
+  loadingMore = false,
+  hasMore = false,
+  onLoadMore,
+  disabled = false,
+}) {
+  const selectedBranch = branches.find((branch) => String(branch.id) === String(value));
+
+  return (
+    <FormControl size="small" sx={FIELD_SX} disabled={disabled}>
+      <InputLabel id="bids-branch-filter-label">Location</InputLabel>
+      <Select
+        labelId="bids-branch-filter-label"
+        value={value}
+        label="Location"
+        onChange={(event) => onChange(event.target.value)}
+        onClose={() => onSearchChange?.('')}
+        renderValue={(selected) => {
+          if (selected === 'all' || !selectedBranch) return 'All locations';
+          return getBranchDisplayName(selectedBranch) || 'Location';
+        }}
+        MenuProps={{
+          autoFocus: false,
+          PaperProps: { sx: { width: 320, maxWidth: '92vw', maxHeight: JOB_FILTER_MENU_MAX_HEIGHT } },
+        }}
+      >
+        <PickerSearchHeader
+          placeholder="Search locations..."
+          value={search}
+          onChange={(next) => onSearchChange?.(next)}
+          ariaLabel="Search locations"
+        />
+
+        <MenuItem value="all">All locations</MenuItem>
+
+        {value !== 'all' && selectedBranch && !branches.some((branch) => String(branch.id) === String(value)) && (
+          <MenuItem value={value} sx={{ display: 'none' }}>
+            {getBranchDisplayName(selectedBranch)}
+          </MenuItem>
+        )}
+
+        {loading && !branches.length ? (
+          <MenuItem disabled dense>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <CircularProgress size={14} />
+              <Typography variant="body2" color="text.secondary">
+                Loading locations…
+              </Typography>
+            </Stack>
+          </MenuItem>
+        ) : branches.length === 0 ? (
+          <MenuItem disabled dense>
+            <Typography variant="body2" color="text.secondary">
+              No locations found
+            </Typography>
+          </MenuItem>
+        ) : (
+          branches.map((branch) => (
+            <MenuItem key={branch.id} value={branch.id}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" noWrap>
+                  {getBranchDisplayName(branch) || 'Location'}
+                </Typography>
+                {branch.address || branch.location?.fullAddress ? (
+                  <Typography variant="caption" color="text.secondary" noWrap component="p">
+                    {branch.address || branch.location?.fullAddress}
+                  </Typography>
+                ) : null}
+              </Box>
+            </MenuItem>
+          ))
+        )}
+
+        {hasMore && typeof onLoadMore === 'function' ? (
+          <ListSubheader
+            sx={{
+              bgcolor: 'background.paper',
+              lineHeight: 'normal',
+              py: 1,
+              px: 1.5,
+              borderTop: (theme) => `1px solid ${theme.vars.palette.divider}`,
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <Button
+              fullWidth
+              size="small"
+              disabled={loadingMore}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onLoadMore();
+              }}
+              startIcon={loadingMore ? <CircularProgress size={14} color="inherit" /> : null}
+            >
+              {loadingMore ? 'Loading…' : 'Load more locations'}
+            </Button>
+          </ListSubheader>
+        ) : null}
       </Select>
     </FormControl>
   );
@@ -179,10 +358,26 @@ function SortSelect({ value, onChange }) {
 export function JobBidsToolbar({
   jobs,
   showJobFilter = true,
+  showBranchFilter = false,
+  branches = [],
+  branchFilter = 'all',
+  onBranchFilterChange,
+  branchSearch = '',
+  onBranchSearchChange,
+  branchesLoading = false,
+  branchesLoadingMore = false,
+  branchesHasMore = false,
+  onLoadMoreBranches,
   search,
   onSearchChange,
   jobFilter,
   onJobFilterChange,
+  jobSearch = '',
+  onJobSearchChange,
+  jobsLoading = false,
+  jobsLoadingMore = false,
+  jobsHasMore = false,
+  onLoadMoreJobs,
   statusFilter,
   onStatusFilterChange,
   statusCounts,
@@ -220,7 +415,32 @@ export function JobBidsToolbar({
             ) : null,
           }}
         />
-        {showJobFilter ? <JobFilterSelect jobs={jobs} value={jobFilter} onChange={onJobFilterChange} /> : null}
+        {showJobFilter ? (
+          <JobFilterSelect
+            jobs={jobs}
+            value={jobFilter}
+            onChange={onJobFilterChange}
+            search={jobSearch}
+            onSearchChange={onJobSearchChange}
+            loading={jobsLoading}
+            loadingMore={jobsLoadingMore}
+            hasMore={jobsHasMore}
+            onLoadMore={onLoadMoreJobs}
+          />
+        ) : null}
+        {showBranchFilter ? (
+          <BranchFilterSelect
+            branches={branches}
+            value={branchFilter}
+            onChange={onBranchFilterChange}
+            search={branchSearch}
+            onSearchChange={onBranchSearchChange}
+            loading={branchesLoading}
+            loadingMore={branchesLoadingMore}
+            hasMore={branchesHasMore}
+            onLoadMore={onLoadMoreBranches}
+          />
+        ) : null}
         <StatusFilterSelect value={statusFilter} onChange={onStatusFilterChange} counts={statusCounts} />
         <SortSelect value={sortBy} onChange={onSortChange} />
       </Stack>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import Box from '@mui/material/Box';
@@ -26,6 +26,7 @@ import { getRelationshipSide } from 'src/sections/supplier-relationship/supplier
 
 import { RICH_TEXT_SX } from './rich-text-sx';
 import { resolveSettingsAccountKey } from './dashboard-settings-api-utils';
+import { resolveTermsForAccount } from './resolve-terms-content';
 
 export function TermsAcceptanceDialog({ open: openProp, onClose, onAccepted }) {
   const { user } = useSelector((state) => state.user);
@@ -43,7 +44,11 @@ export function TermsAcceptanceDialog({ open: openProp, onClose, onAccepted }) {
   const readOnly = alreadyAccepted || viewOnly;
 
   const accountKey = resolveSettingsAccountKey(user);
-  const { data: terms } = useGetTermsConditionsQuery({ accountKey }, { skip: !open });
+  const { data: apiTerms } = useGetTermsConditionsQuery({ accountKey }, { skip: !open });
+  const terms = useMemo(
+    () => resolveTermsForAccount(accountKey, apiTerms),
+    [accountKey, apiTerms]
+  );
 
   const [acceptTerms, { isLoading }] = useAcceptTermsMutation();
 
@@ -86,7 +91,12 @@ export function TermsAcceptanceDialog({ open: openProp, onClose, onAccepted }) {
 
         {terms?.isHtml ? (
           <Box
-            sx={{ typography: 'body2', ...RICH_TEXT_SX }}
+            sx={{
+              typography: 'body2',
+              ...RICH_TEXT_SX,
+              '& .terms-title': { typography: 'h5', fontWeight: 800 },
+              '& .terms-key-heading': { typography: 'subtitle1', fontWeight: 700 },
+            }}
             dangerouslySetInnerHTML={{ __html: terms.content }}
           />
         ) : (

@@ -22,6 +22,11 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import {
+  CustomerMandateNotice,
+  POST_JOB_PAYMENT_MESSAGE,
+  useCustomerMandateBlock,
+} from 'src/sections/agency/payments/customer-mandate-notice';
 
 import { useCreateCareHomeJobMutation } from 'src/store/Reducer/care-home-jobs-api';
 import { useCreateHospitalJobMutation } from 'src/store/Reducer/hospital-jobs-api';
@@ -33,8 +38,6 @@ import { useGetLocalAuthorityBranchesQuery } from 'src/store/Reducer/local-autho
 import { useGetHomeCareCompanyBranchesQuery } from 'src/store/Reducer/home-care-company-branches-api';
 import { useUserAddressesQuery } from 'src/store/Reducer/user-branches-api';
 
-import { CustomerMandateNotice, useCustomerMandateBlock } from 'src/sections/agency/payments/customer-mandate-notice';
-
 import { JobDraftForm } from '../care-home-job-form';
 import { JobCareDetailsFields } from '../job-care-details-fields';
 import {
@@ -42,6 +45,7 @@ import {
   getJobApiErrorMessage,
   isJobCreateSoftError,
   pickJobSuccessToast,
+  resolveDraftJobTypeForSubmit,
 } from '../care-home-job-api-utils';
 import {
   EMPTY_JOB_DRAFT,
@@ -51,6 +55,8 @@ import {
   validateJobDraft,
 } from '../care-home-job-utils';
 import { useLastJobContactDetails } from '../use-last-job-contact';
+import { getCompanyPaysBreaks } from '../company-break-settings';
+import { useRoleJobTypeMutations } from 'src/sections/job-roles/use-role-job-type-mutations';
 
 
 export function AddJobView({
@@ -142,10 +148,17 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
   );
 
   const { blocked: mandateBlocked } = useCustomerMandateBlock(mode);
-  const [draft, setDraft] = useState({
+  const { create: createJobType } = useRoleJobTypeMutations(mode);
+  const [draft, setDraft] = useState(() => ({
     ...EMPTY_JOB_DRAFT,
-    schedules: [{ ...createDefaultSchedule() }],
-  });
+    schedules: [
+      {
+        ...createDefaultSchedule(new Date(), {
+          breakPaid: getCompanyPaysBreaks(),
+        }),
+      },
+    ],
+  }));
   const [submitting, setSubmitting] = useState(false);
   const lastContact = useLastJobContactDetails(mode, true);
   const contactAppliedRef = useRef(false);
@@ -175,7 +188,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
 
   const handleSubmit = useCallback(async () => {
     if (mandateBlocked) {
-      toast.error('Set up a direct debit on Payments before posting a job.');
+      toast.error(POST_JOB_PAYMENT_MESSAGE);
       return;
     }
     const error = validateJobDraft(draft);
@@ -210,24 +223,28 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
     setSubmitting(true);
 
     try {
+      const resolvedDraft = await resolveDraftJobTypeForSubmit(draft, createJobType);
       const isDirectRequest = Boolean(
-        draft.requestFromAgency || draft.agencyId || draft.workerId || draft.employeeId
+        resolvedDraft.requestFromAgency ||
+          resolvedDraft.agencyId ||
+          resolvedDraft.workerId ||
+          resolvedDraft.employeeId
       );
       const directId = String(
-        draft.workerId || draft.employeeId || draft.agencyId || ''
+        resolvedDraft.workerId || resolvedDraft.employeeId || resolvedDraft.agencyId || ''
       ).trim();
-      const schedules = (draft.schedules || []).map((entry) => ({
+      const schedules = (resolvedDraft.schedules || []).map((entry) => ({
         ...entry,
         receivingBids: directId ? false : entry.receivingBids,
       }));
 
       const body = buildCareHomeJobPayload(
         {
-          ...draft,
-          workerId: directId || draft.workerId,
-          employeeId: directId || draft.employeeId,
+          ...resolvedDraft,
+          workerId: directId || resolvedDraft.workerId,
+          employeeId: directId || resolvedDraft.employeeId,
           schedules,
-          receivingBids: isDirectRequest && directId ? false : draft.receivingBids,
+          receivingBids: isDirectRequest && directId ? false : resolvedDraft.receivingBids,
         },
         branch,
         { isUser }
@@ -247,7 +264,17 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
     } finally {
       setSubmitting(false);
     }
-  }, [branches, createJob, draft, isHomeCareCompany, isUser, mandateBlocked, redirectPath, router]);
+  }, [
+    branches,
+    createJob,
+    createJobType,
+    draft,
+    isHomeCareCompany,
+    isUser,
+    mandateBlocked,
+    redirectPath,
+    router,
+  ]);
 
   return (
     <DashboardContent maxWidth="xl">
@@ -260,7 +287,7 @@ function AddJobViewContent({ redirectPath, mode = 'careHome' }) {
         </Typography>
       </Stack>
 
-      <CustomerMandateNotice mode={mode} sx={{ mb: 2 }} />
+      <CustomerMandateNotice mode={mode} variant="postJob" sx={{ mb: 2 }} />
 
       <Card
         sx={{

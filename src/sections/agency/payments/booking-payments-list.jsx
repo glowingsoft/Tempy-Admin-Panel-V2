@@ -53,6 +53,36 @@ const SUMMARY_CARDS = [
   { key: 'refunded', label: 'Refunded' },
 ];
 
+const CUSTOMER_TABLE_HEAD = [
+  { id: 'reference', label: 'Reference' },
+  { id: 'jobName', label: 'Job' },
+  { id: 'worker', label: 'Worker' },
+  { id: 'shift', label: 'Shift' },
+  { id: 'hours', label: 'Hours', align: 'center' },
+  { id: 'amount', label: 'Amount', align: 'right' },
+  { id: 'status', label: 'Payment status' },
+  { id: 'bookingStatus', label: 'Booking status' },
+  { id: 'gateway', label: 'Gateway' },
+  { id: 'paidAt', label: 'Paid at' },
+  { id: 'invoice', label: 'Invoice', align: 'right' },
+];
+
+const SUPPLIER_TABLE_HEAD = [
+  { id: 'reference', label: 'Reference' },
+  { id: 'jobName', label: 'Job' },
+  { id: 'customer', label: 'Customer' },
+  { id: 'worker', label: 'Worker' },
+  { id: 'shift', label: 'Shift' },
+  { id: 'hours', label: 'Hours', align: 'center' },
+  { id: 'amount', label: 'Amount', align: 'right' },
+  { id: 'platformFee', label: 'Platform fee', align: 'right' },
+  { id: 'status', label: 'Status' },
+  { id: 'bookingStatus', label: 'Booking status' },
+  { id: 'gateway', label: 'Gateway' },
+  { id: 'paidAt', label: 'Paid at' },
+  { id: 'invoice', label: 'Invoice', align: 'right' },
+];
+
 function moneyLabel(money) {
   if (money?.formatted) return money.formatted;
   return fCurrency(money?.amount || 0);
@@ -109,23 +139,7 @@ function PersonCell({ person }) {
   );
 }
 
-const TABLE_HEAD = [
-  { id: 'reference', label: 'Reference' },
-  { id: 'jobName', label: 'Job' },
-  { id: 'customer', label: 'Customer' },
-  { id: 'worker', label: 'Worker' },
-  { id: 'shift', label: 'Shift' },
-  { id: 'hours', label: 'Hours', align: 'center' },
-  { id: 'amount', label: 'Amount', align: 'right' },
-  { id: 'platformFee', label: 'Platform fee', align: 'right' },
-  { id: 'status', label: 'Status' },
-  { id: 'bookingStatus', label: 'Booking status' },
-  { id: 'gateway', label: 'Gateway' },
-  { id: 'paidAt', label: 'Paid at' },
-  { id: 'invoice', label: 'Invoice', align: 'right' },
-];
-
-export function BookingPaymentsList({ role = 'care-home' }) {
+export function BookingPaymentsList({ role = 'care-home', isCustomer = false }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [from, setFrom] = useState('');
@@ -134,11 +148,13 @@ export function BookingPaymentsList({ role = 'care-home' }) {
   const [downloadingId, setDownloadingId] = useState('');
   const [downloadInvoice] = useDownloadBookingPaymentInvoiceMutation();
 
+  const tableHead = isCustomer ? CUSTOMER_TABLE_HEAD : SUPPLIER_TABLE_HEAD;
+
   const { data, isLoading, isError, error } = useGetBookingPaymentsQuery({
     role,
     from,
     paymentStatus,
-    payoutStatus,
+    ...(isCustomer ? {} : { payoutStatus }),
     page: page + 1,
     limit: rowsPerPage,
   });
@@ -189,12 +205,16 @@ export function BookingPaymentsList({ role = 'care-home' }) {
     />
   );
 
+  const hasFilters = Boolean(paymentStatus || (!isCustomer && payoutStatus) || from);
+
   return (
     <Card sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 3, pt: 3, pb: 2 }}>
         <Typography variant="h6">Payment history</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Bookings and the amount collected or owed on each one.
+          {isCustomer
+            ? 'Bookings and the amount charged on each one via direct debit.'
+            : 'Bookings and the amount collected or owed on each one.'}
         </Typography>
       </Box>
 
@@ -216,23 +236,25 @@ export function BookingPaymentsList({ role = 'care-home' }) {
             </MenuItem>
           ))}
         </TextField>
-        <TextField
-          select
-          size="small"
-          label="Payout status"
-          value={payoutStatus}
-          onChange={(event) => {
-            setPayoutStatus(event.target.value);
-            resetPage();
-          }}
-          sx={{ width: { xs: 1, md: 'auto' }, minWidth: { xs: 0, md: 180 } }}
-        >
-          {PAYOUT_STATUS_OPTIONS.map((option) => (
-            <MenuItem key={option.value || 'all-payout'} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
+        {!isCustomer ? (
+          <TextField
+            select
+            size="small"
+            label="Payout status"
+            value={payoutStatus}
+            onChange={(event) => {
+              setPayoutStatus(event.target.value);
+              resetPage();
+            }}
+            sx={{ width: { xs: 1, md: 'auto' }, minWidth: { xs: 0, md: 180 } }}
+          >
+            {PAYOUT_STATUS_OPTIONS.map((option) => (
+              <MenuItem key={option.value || 'all-payout'} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        ) : null}
         <TextField
           size="small"
           type="date"
@@ -284,8 +306,8 @@ export function BookingPaymentsList({ role = 'care-home' }) {
       ) : visiblePayments.length ? (
         <>
           <Scrollbar>
-            <Table size="small" sx={{ minWidth: 1280 }}>
-              <TableHeadCustom headLabel={TABLE_HEAD} />
+            <Table size="small" sx={{ minWidth: isCustomer ? 1100 : 1280 }}>
+              <TableHeadCustom headLabel={tableHead} />
               <TableBody>
                 {visiblePayments.map((row) => (
                   <TableRow key={row.id || row.reference} hover>
@@ -303,13 +325,15 @@ export function BookingPaymentsList({ role = 'care-home' }) {
                       </Typography>
                       {row.employer?.name ? (
                         <Typography variant="caption" noWrap display="block" sx={{ color: 'text.secondary', maxWidth: 160 }}>
-                          Employer: {row.employer.name}
+                          {isCustomer ? 'Supplier' : 'Employer'}: {row.employer.name}
                         </Typography>
                       ) : null}
                     </TableCell>
-                    <TableCell>
-                      <PersonCell person={row.customer} />
-                    </TableCell>
+                    {!isCustomer ? (
+                      <TableCell>
+                        <PersonCell person={row.customer} />
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       <PersonCell person={row.worker} />
                     </TableCell>
@@ -328,7 +352,9 @@ export function BookingPaymentsList({ role = 'care-home' }) {
                     <TableCell align="right">
                       <Typography variant="subtitle2">{row.formatted || fCurrency(row.amount)}</Typography>
                     </TableCell>
-                    <TableCell align="right">{fCurrency(row.platformFee)}</TableCell>
+                    {!isCustomer ? (
+                      <TableCell align="right">{fCurrency(row.platformFee)}</TableCell>
+                    ) : null}
                     <TableCell>
                       <Label variant="soft" color={statusColor(row.status)}>
                         {humanizeStatus(row.status)}
@@ -363,7 +389,7 @@ export function BookingPaymentsList({ role = 'care-home' }) {
         <>
           <DashboardEmptyState
             message="No payments yet"
-            hint={paymentStatus || payoutStatus || from ? 'Nothing matches these filters.' : 'Payments appear here once a booking is created.'}
+            hint={hasFilters ? 'Nothing matches these filters.' : 'Payments appear here once a booking is created.'}
             minHeight={220}
           />
           {pagination}

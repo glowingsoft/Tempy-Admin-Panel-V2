@@ -16,6 +16,7 @@ import { ModuleLoading } from 'src/components/loading-screen';
 import {
   buildAgencyAvailabilityPayload,
 } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import { AvailabilityTimeRangeDialog } from 'src/sections/agency/shifts/availability-time-range-dialog';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -40,9 +41,7 @@ import {
   SHIFT_PERIOD_FILTERS,
 } from '../staff-member-shifts-utils';
 
-// ----------------------------------------------------------------------
 
-/** Label from API `status` / title only — no invented copy. */
 function availabilityTitleFromApi(entry = {}) {
   const raw =
     entry.displayLabel ||
@@ -54,6 +53,7 @@ function availabilityTitleFromApi(entry = {}) {
   if (!text) return '';
   const key = text.toLowerCase().replace(/[\s_-]+/g, '');
   if (key === 'busy' || key === 'unavailable') return 'Busy';
+  if (key === 'other' || key === 'custom' || key === 'misc') return 'Other';
   if (key === 'oncall') return 'On Call';
   if (key === 'sleepover') return 'Sleepover';
   if (key === 'dayoff' || key === 'notscheduled' || key === 'unscheduled') return 'Day off';
@@ -65,6 +65,7 @@ function mapAvailabilityToCalendarEntry(entry = {}) {
   if (!entry?.date) return null;
   const title = availabilityTitleFromApi(entry);
   if (!title) return null;
+  const notes = String(entry.notes || entry.note || entry.raw?.notes || entry.raw?.note || '').trim();
   return {
     id: entry.apiId || entry.id,
     cardKey: `availability-${entry.apiId || entry.id}`,
@@ -73,12 +74,14 @@ function mapAvailabilityToCalendarEntry(entry = {}) {
     shiftStartTime: entry.startTime || '',
     shiftEndTime: entry.endTime || '',
     address: entry.location || '',
+    notes,
     role: title,
     apiStatus: entry.apiStatus || '',
     status: entry.apiStatus || '',
     entryKind: 'availability',
     staffId: entry.staffId || '',
     busy: Boolean(entry.busy),
+    other: Boolean(entry.other) || String(entry.apiStatus || '').toLowerCase() === 'other',
     onCall: Boolean(entry.onCall),
     sleepover: Boolean(entry.sleepover),
     dayOff: Boolean(entry.dayOff),
@@ -87,10 +90,7 @@ function mapAvailabilityToCalendarEntry(entry = {}) {
   };
 }
 
-/**
- * Own availability only.
- * Under admin impersonation (`requireOwner`), drop rows without a matching staffId.
- */
+
 function filterAvailabilityForUser(entries = [], identityIds, { requireOwner = false } = {}) {
   const allowed = identityIds instanceof Set ? identityIds : new Set(identityIds || []);
   if (!allowed.size) return requireOwner ? [] : entries;
@@ -109,7 +109,6 @@ function filterAvailabilityForUser(entries = [], identityIds, { requireOwner = f
   return requireOwner ? [] : entries;
 }
 
-/** Map GET /web/nurse/booking rows → calendar job chips (this nurse only). */
 function mapBookingsToCalendarJobs(bookings = []) {
   return (bookings || [])
     .filter((row) => row?.shiftDate && row?.shiftStartTime && row?.shiftEndTime)
@@ -165,7 +164,6 @@ function mergeCalendarJobs(...lists) {
 }
 
 export function StaffMemberShiftsView() {
-  // Admin viewing this account: the calendar is read-only.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const scopeUserId = useScopedUserId();
@@ -198,7 +196,6 @@ export function StaffMemberShiftsView() {
       ...(scopeUserId
         ? {
           userId: scopeUserId,
-          // Only under admin impersonation — direct nurse login trusts JWT scoping.
           requireOwner: isImpersonating,
         }
         : {}),
@@ -248,33 +245,70 @@ export function StaffMemberShiftsView() {
     availabilityQuery.error?.error ||
     'Could not load shifts';
 
-  const handleAddOnDay = async (type, day) => {
-    const date = format(day, 'yyyy-MM-dd');
-    const staffId =
+  const [availTimeDialog, setAvailTimeDialog] = useState({ open: false, kind: 'busy', date: '' });
+  const [availTimeSubmitting, setAvailTimeSubmitting] = useState(false);
+
+  const resolveSelfStaffId = useCallback(
+    () =>
       scopeUserId ||
       getUserIdentityIds(user).find((id) => /^[a-f\d]{24}$/i.test(id)) ||
-      '';
-    const meta = {
-      busy: { status: 'busy', startTime: '00:00', endTime: '23:59' },
-      'on-call': { status: 'onCall', startTime: '00:00', endTime: '23:59' },
-      sleepover: { status: 'sleepover', startTime: '22:00', endTime: '07:00' },
-      'day-off': { status: 'dayOff', startTime: '00:00', endTime: '23:59' },
-      'add-leave': { status: 'leave', startTime: '09:00', endTime: '18:00' },
-    }[type];
-    if (!meta) return;
+      '',
+    [scopeUserId, user]
+  );
+
+  const handleAddOnDay = async (type, day) => {
+    const date = format(day, 'yyyy-MM-dd');
+    if (type === 'busy' || type === 'day-off' || type === 'add-leave' || type === 'other') {
+      setAvailTimeDialog({ open: true, kind: type, date });
+    }
+  };
+
+  const handleAvailabilityTimeSubmit = async ({ kind, startTime, endTime, note }) => {
+    const staffId = resolveSelfStaffId();
+    if (!staffId) {
+      toast.error('Could not resolve your staff id — refresh and try again');
+      return;
+    }
+    const date = availTimeDialog.date || format(selectedDay, 'yyyy-MM-dd');
+    const status =
+      kind === 'day-off'
+        ? 'dayOff'
+        : kind === 'add-leave'
+          ? 'leave'
+          : kind === 'busy'
+            ? 'busy'
+            : kind === 'other'
+              ? 'other'
+              : '';
+    if (!status) return;
+    const savedNote = String(note || '').trim();
+    if (kind === 'other' && !savedNote) {
+      toast.error('Please add a description');
+      return;
+    }
+    if (kind === 'busy' && !savedNote) {
+      toast.error('Please add a note');
+      return;
+    }
+
+    setAvailTimeSubmitting(true);
     try {
       const body = buildAgencyAvailabilityPayload({
-        status: meta.status,
+        status,
         date,
-        startTime: meta.startTime,
-        endTime: meta.endTime,
+        startTime,
+        endTime,
         staffId,
+        notes: savedNote,
       });
       await createAvailability(body).unwrap();
       toast.success('Added on calendar');
+      setAvailTimeDialog({ open: false, kind: 'busy', date: '' });
       await availabilityQuery.refetch();
     } catch (err) {
       toast.error(err?.data?.message || err?.error || err?.message || 'Could not add on this date');
+    } finally {
+      setAvailTimeSubmitting(false);
     }
   };
 
@@ -364,6 +398,18 @@ export function StaffMemberShiftsView() {
         job={selectedJob}
         onClose={() => setSelectedJob(null)}
         onCancelled={handleJobCancelled}
+      />
+
+      <AvailabilityTimeRangeDialog
+        open={Boolean(availTimeDialog.open)}
+        kind={availTimeDialog.kind}
+        submitting={availTimeSubmitting || createAvailabilityState.isLoading}
+        onClose={
+          availTimeSubmitting
+            ? undefined
+            : () => setAvailTimeDialog({ open: false, kind: 'busy', date: '' })
+        }
+        onSubmit={handleAvailabilityTimeSubmit}
       />
     </DashboardContent>
   );

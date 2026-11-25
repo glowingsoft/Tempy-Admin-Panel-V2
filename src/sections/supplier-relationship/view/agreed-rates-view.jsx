@@ -35,10 +35,11 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { rowInPage, TablePaginationCustom, useTable } from 'src/components/table';
+import { TablePaginationCustom, useTable } from 'src/components/table';
 
 import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import {
   useGetAgreedRatesQuery,
   useCreateAgreedRateMutation,
@@ -53,16 +54,17 @@ import {
   getRoleApiBase,
   OPEN_RATE_STATUSES,
   getRelationshipSide,
-  CUSTOMER_TYPE_OPTIONS,
   formatSpecialDayDate,
+  formatMultiplierLabel,
+  rateFromBasicMultiplier,
+  buildDefaultSpecialDayPresets,
+  getAgreedRateCustomerTypeOptions,
 } from '../supplier-relationship-utils';
 import { RowActionButton } from '../row-action-button';
 import { AgreedRateDetailsDialog } from '../relationship-details-dialogs';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
-/** Rate changes usually start on 1 April. */
 function nextFirstOfApril() {
   const now = new Date();
   const year = now.getMonth() >= 3 ? now.getFullYear() + 1 : now.getFullYear();
@@ -85,14 +87,16 @@ function newSpecialDay(day = {}) {
   specialDayKey += 1;
   return {
     key: specialDayKey,
+    presetId: day.presetId || '',
     name: day.name || '',
     date: day.date || '',
     repeatsYearly: day.repeatsYearly ?? true,
+    multiplier: day.multiplier || null,
     rate: day.rate ? String(day.rate) : '',
+    autoRate: day.autoRate === true,
   };
 }
 
-/** Two entries on the same day clash; a yearly one clashes on month-day with any other. */
 function findDuplicateSpecialDays(days) {
   const clashes = new Set();
   days.forEach((a, i) =>
@@ -109,35 +113,41 @@ function findDuplicateSpecialDays(days) {
   return clashes;
 }
 
-// ----------------------------------------------------------------------
 
 export function SupplierAgreedRatesView() {
-  // Admin viewing this account: rates can be viewed, not offered, changed or answered.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const isSupplier = getRelationshipSide(user) === 'supplier';
   const base = getRoleApiBase(user);
 
-  // null = closed; {} = new offer; { row } = edit; { row, change: true } = propose a change
   const [form, setForm] = useState(null);
   const [reviewing, setReviewing] = useState(null);
   const [viewing, setViewing] = useState(null);
 
-  const { data, isLoading, isError } = useGetAgreedRatesQuery({ base }, { skip: !base });
+  const table = useTable({ defaultRowsPerPage: 10 });
+  const { data, isLoading, isError } = useGetAgreedRatesQuery(
+    { base, page: table.page, limit: table.rowsPerPage },
+    { skip: !base }
+  );
   const [respond, { isLoading: isResponding }] = useRespondToAgreedRateMutation();
 
   const rows = data?.data || [];
-  const table = useTable({ defaultRowsPerPage: 10 });
-  const pageCount = Math.max(1, Math.ceil(rows.length / table.rowsPerPage));
-  const safePage = Math.min(table.page, pageCount - 1);
-  const pageRows = rowInPage(rows, safePage, table.rowsPerPage);
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
 
   const handleAction = async (row, action) => {
+    const fallback =
+      action === 'withdraw'
+        ? 'Rate withdrawn'
+        : action === 'accept'
+          ? 'Rate accepted'
+          : action === 'reject'
+            ? 'Rate rejected'
+            : 'Rate updated';
     try {
-      await respond({ base, id: row.id, action }).unwrap();
-      toast.success(`Rate ${action === 'withdraw' ? 'withdrawn' : `${action}ed`}`);
+      const response = await respond({ base, id: row.id, action }).unwrap();
+      toast.success(pickApiToastMessage(response, fallback));
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not update the rate.');
+      toast.error(handleApiError(err) || 'Could not update the rate.');
     }
   };
 
@@ -194,7 +204,7 @@ export function SupplierAgreedRatesView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageRows.map((row) => {
+              {rows.map((row) => {
                 const party = isSupplier ? row.customer : row.supplier;
                 const status = RATE_STATUS[row.status] || RATE_STATUS.pending;
                 const isOpen = OPEN_RATE_STATUSES.includes(row.status);
@@ -300,8 +310,8 @@ export function SupplierAgreedRatesView() {
           </Table>
         </Scrollbar>
         <TablePaginationCustom
-          page={safePage}
-          count={rows.length}
+          page={table.page}
+          count={totalCount}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           onRowsPerPageChange={table.onChangeRowsPerPage}
@@ -321,13 +331,14 @@ export function SupplierAgreedRatesView() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function RateFormDialog({ base, user, form, onClose }) {
   const { row, change } = form;
   const isEdit = Boolean(row && !change);
+  const supplierRole = resolveDashboardRole(user);
+  const customerTypeOptions = getAgreedRateCustomerTypeOptions(supplierRole);
 
-  const [customerType, setCustomerType] = useState('careHome');
+  const [customerType, setCustomerType] = useState(customerTypeOptions[0]?.value || 'careHome');
   const [customer, setCustomer] = useState(row?.customer.id || '');
   const [jobType, setJobType] = useState(row?.jobTypeId || '');
   const [rates, setRates] = useState({
@@ -335,9 +346,13 @@ function RateFormDialog({ base, user, form, onClose }) {
     night: row ? String(row.rates.night) : '',
     weekend: row ? String(row.rates.weekend) : '',
   });
-  const [specialDays, setSpecialDays] = useState(() =>
-    (row?.rates.specialDays || []).map((day) => newSpecialDay(day))
-  );
+  const [specialDays, setSpecialDays] = useState(() => {
+    if (row?.rates.specialDays?.length) {
+      return row.rates.specialDays.map((day) => newSpecialDay(day));
+    }
+    if (row) return [];
+    return buildDefaultSpecialDayPresets('').map((day) => newSpecialDay(day));
+  });
   const [effectiveFrom, setEffectiveFrom] = useState(
     change ? nextFirstOfApril() : String(row?.effectiveFrom || '').slice(0, 10)
   );
@@ -345,11 +360,21 @@ function RateFormDialog({ base, user, form, onClose }) {
   const updateSpecialDay = (key, changes) =>
     setSpecialDays((prev) => prev.map((day) => (day.key === key ? { ...day, ...changes } : day)));
 
+  const handleDayRateChange = (value) => {
+    setRates((prev) => ({ ...prev, day: value }));
+    setSpecialDays((prev) =>
+      prev.map((day) => {
+        if (!day.autoRate || !(day.multiplier > 0)) return day;
+        return { ...day, rate: rateFromBasicMultiplier(value, day.multiplier) };
+      })
+    );
+  };
+
   const { data: customers } = useGetCustomerOptionsQuery(
     { base, userType: customerType },
     { skip: Boolean(row) }
   );
-  const { data: jobTypes } = useRoleJobTypes(resolveDashboardRole(user), { skip: Boolean(row) });
+  const { data: jobTypes } = useRoleJobTypes(supplierRole, { skip: Boolean(row) });
 
   const [createRate, { isLoading: isCreating }] = useCreateAgreedRateMutation();
   const [updateRate, { isLoading: isUpdating }] = useUpdateAgreedRateMutation();
@@ -376,15 +401,18 @@ function RateFormDialog({ base, user, form, onClose }) {
   const handleSubmit = async () => {
     const body = { rates: numericRates, effectiveFrom: effectiveFrom || undefined };
     try {
-      if (isEdit) {
-        await updateRate({ base, id: row.id, ...body }).unwrap();
-      } else {
-        await createRate({ base, customer, jobType, ...body }).unwrap();
-      }
-      toast.success('Rate sent to the customer');
+      const response = isEdit
+        ? await updateRate({ base, id: row.id, ...body }).unwrap()
+        : await createRate({ base, customer, jobType, ...body }).unwrap();
+      toast.success(
+        pickApiToastMessage(
+          response,
+          isEdit ? 'Rate updated' : change ? 'Rate change proposed' : 'Rate sent to the customer'
+        )
+      );
       onClose();
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not save the rate.');
+      toast.error(handleApiError(err) || 'Could not save the rate.');
     }
   };
 
@@ -410,7 +438,7 @@ function RateFormDialog({ base, user, form, onClose }) {
                   setCustomer('');
                 }}
               >
-                {CUSTOMER_TYPE_OPTIONS.map((option) => (
+                {customerTypeOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
                   </MenuItem>
@@ -452,7 +480,11 @@ function RateFormDialog({ base, user, form, onClose }) {
                 key={slot.key}
                 label={`${slot.label} (£/h)`}
                 value={rates[slot.key]}
-                onChange={(e) => setRates((prev) => ({ ...prev, [slot.key]: e.target.value }))}
+                onChange={(e) =>
+                  slot.key === 'day'
+                    ? handleDayRateChange(e.target.value)
+                    : setRates((prev) => ({ ...prev, [slot.key]: e.target.value }))
+                }
                 inputProps={{ inputMode: 'decimal' }}
                 fullWidth
               />
@@ -462,8 +494,11 @@ function RateFormDialog({ base, user, form, onClose }) {
           <Stack spacing={1.5}>
             <div>
               <Typography variant="subtitle2">Special days</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Optional. Agree a separate hourly rate for particular days, e.g. Christmas Day.
+              <Typography variant="caption" color="text.secondary" component="div">
+                Pre-set from the day (basic) rate — edit any name, date or amount if needed.
+              </Typography>
+              <Typography variant="caption" color="text.secondary" component="div">
+                Premium payments run from midnight to midnight on the holiday.
               </Typography>
             </div>
 
@@ -495,8 +530,15 @@ function RateFormDialog({ base, user, form, onClose }) {
                 <TextField
                   label="Rate (£/h)"
                   value={day.rate}
-                  onChange={(e) => updateSpecialDay(day.key, { rate: e.target.value })}
+                  onChange={(e) =>
+                    updateSpecialDay(day.key, { rate: e.target.value, autoRate: false })
+                  }
                   inputProps={{ inputMode: 'decimal' }}
+                  helperText={
+                    day.multiplier
+                      ? formatMultiplierLabel(day.multiplier)
+                      : undefined
+                  }
                   sx={{ flex: 0.8 }}
                 />
                 <FormControlLabel
@@ -567,7 +609,6 @@ function RateFormDialog({ base, user, form, onClose }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function RequestReviewDialog({ base, row, onClose }) {
   const [note, setNote] = useState('');
@@ -575,11 +616,16 @@ function RequestReviewDialog({ base, row, onClose }) {
 
   const handleSubmit = async () => {
     try {
-      await respond({ base, id: row.id, action: 'review', note: note.trim() }).unwrap();
-      toast.success('Review requested');
+      const response = await respond({
+        base,
+        id: row.id,
+        action: 'review',
+        note: note.trim(),
+      }).unwrap();
+      toast.success(pickApiToastMessage(response, 'Review requested'));
       onClose();
     } catch (err) {
-      toast.error(err?.data?.message || 'Could not request a review.');
+      toast.error(handleApiError(err) || 'Could not request a review.');
     }
   };
 

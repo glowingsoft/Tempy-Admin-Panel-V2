@@ -9,24 +9,22 @@ import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
+import Alert from '@mui/material/Alert';
+
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { fCurrency } from 'src/utils/format-number';
+import { pickApiToastMessage } from 'src/store/handleApiError';
+import { RouterLink } from 'src/routes/components';
+import {
+  CONFIRM_BOOKING_PAYMENT_MESSAGE,
+} from 'src/sections/agency/payments/customer-mandate-notice';
 
 import { BidDetailsDialog } from './job-bid-details-dialog';
 import { BidTags, BidPrice, BidAvatar, BidRating, BidStatusLabel, BidSupplierTypeLabel } from './job-bid-shared';
 import { getBidId, isNurseBidder, getBidStatusMeta, getBidScheduleLabel, getBidSubmittedLabel, getBidSpecialitiesLabel } from './job-bid-utils';
 
-// ----------------------------------------------------------------------
-
-/**
- * What the employer can do with a bid in its current state.
- * - pending → accept / reject
- * - accepted → read-only. An agency / home care company bid then waits for the supplier to
- *   assign staff; the customer cannot see that pending booking yet.
- * - rejected / withdrawn / cancelled / deleted → read-only
- */
 export function getBidPermissions(bid, { hasChat = false } = {}) {
   const isAccepted = bid.status === 'accepted';
   const isClosed = bid.status === 'declined' || getBidStatusMeta(bid).closed;
@@ -49,17 +47,28 @@ const STATUS_ACCENT = {
   error: 'error.main',
 };
 
-// ----------------------------------------------------------------------
 
-/** Button row shared by the card and the details dialog. */
-function BidActionButtons({ permissions, fullWidth = false, busy = false, locked = false, acceptLoading = false, onAccept, onDecline, onChat, onViewDetails }) {
+function BidActionButtons({
+  permissions,
+  fullWidth = false,
+  busy = false,
+  locked = false,
+  acceptLoading = false,
+  paymentBlocked = false,
+  paymentHint = '',
+  onAccept,
+  onDecline,
+  onChat,
+  onViewDetails,
+}) {
   const { canAccept, canDecline, canChat, awaitingStaff } = permissions;
   const lockedHint = locked && !busy ? 'Another bid is being updated — please wait' : '';
+  const acceptHint = paymentBlocked ? paymentHint || CONFIRM_BOOKING_PAYMENT_MESSAGE : lockedHint;
   const buttonSx = { minHeight: 36, whiteSpace: 'nowrap', ...(fullWidth && { flex: { xs: 1, sm: 'none' } }) };
 
-  const withLockHint = (node) =>
-    lockedHint ? (
-      <Tooltip title={lockedHint}>
+  const withHint = (node, hint) =>
+    hint ? (
+      <Tooltip title={hint}>
         <Box component="span" sx={{ display: 'inline-flex', ...(fullWidth && { flex: { xs: 1, sm: 'none' } }) }}>
           {node}
         </Box>
@@ -100,15 +109,16 @@ function BidActionButtons({ permissions, fullWidth = false, busy = false, locked
       ) : null}
 
       {canDecline
-        ? withLockHint(
+        ? withHint(
           <Button size="small" variant="outlined" color="error" onClick={onDecline} disabled={locked} startIcon={<Iconify icon="eva:close-fill" width={16} />} sx={buttonSx}>
             Reject
-          </Button>
+          </Button>,
+          lockedHint
         )
         : null}
 
       {canAccept
-        ? withLockHint(
+        ? withHint(
           <LoadingButton
             size="small"
             variant="contained"
@@ -120,14 +130,14 @@ function BidActionButtons({ permissions, fullWidth = false, busy = false, locked
             sx={buttonSx}
           >
             Accept bid
-          </LoadingButton>
+          </LoadingButton>,
+          paymentBlocked ? acceptHint : lockedHint
         )
         : null}
     </Stack>
   );
 }
 
-// ----------------------------------------------------------------------
 
 function BidMetaLine({ icon, children, strong = false }) {
   return (
@@ -140,17 +150,25 @@ function BidMetaLine({ icon, children, strong = false }) {
   );
 }
 
-// ----------------------------------------------------------------------
 
-export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat, updatingBidId = null, showJob = true }) {
+export function BidCard({
+  bid,
+  viewMode = 'list',
+  onDecline,
+  onAccepted,
+  onChat,
+  updatingBidId = null,
+  showJob = true,
+  paymentBlocked = false,
+  paymentsPath = '',
+}) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [confirm, setConfirm] = useState(null); // 'accept' | 'decline' | null
+  const [confirm, setConfirm] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const bidId = getBidId(bid);
   const isList = viewMode === 'list';
   const basePermissions = getBidPermissions(bid, { hasChat: Boolean(onChat) });
-  // No handler → no button (e.g. admin viewing the account cannot accept or decline).
   const permissions = {
     ...basePermissions,
     canAccept: basePermissions.canAccept && typeof onAccepted === 'function',
@@ -163,6 +181,7 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
   const nurseBidder = isNurseBidder(bid);
   const busy = submitting || (Boolean(updatingBidId) && String(updatingBidId) === bidId);
   const locked = Boolean(updatingBidId) || submitting;
+  const paymentHint = CONFIRM_BOOKING_PAYMENT_MESSAGE;
 
   const closeConfirm = useCallback(() => {
     if (!submitting) setConfirm(null);
@@ -173,6 +192,10 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
       toast.error('Missing bid id');
       return;
     }
+    if (paymentBlocked) {
+      toast.error(paymentHint);
+      return;
+    }
     if (typeof onAccepted !== 'function') {
       toast.error('Accept handler missing');
       return;
@@ -180,21 +203,21 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
 
     setSubmitting(true);
     try {
-      await onAccepted(bidId);
-      toast.success(`Bid from ${bid.name || 'bidder'} accepted`);
+      const response = await onAccepted(bidId);
+      toast.success(
+        pickApiToastMessage(response, `Bid from ${bid.name || 'bidder'} accepted`)
+      );
       setConfirm(null);
       setDetailsOpen(false);
     } catch {
-      // Parent shows the API error toast; keep the dialog open to retry
     } finally {
       setSubmitting(false);
     }
-  }, [bid.name, bidId, onAccepted]);
+  }, [bid.name, bidId, onAccepted, paymentBlocked, paymentHint]);
 
   const handleConfirmDecline = useCallback(async () => {
     setSubmitting(true);
     try {
-      // Parent handles success / error feedback
       await onDecline?.(bid.id);
       setConfirm(null);
       setDetailsOpen(false);
@@ -210,13 +233,14 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
     busy,
     locked,
     acceptLoading: busy && confirm !== 'decline',
+    paymentBlocked,
+    paymentHint,
     onAccept: () => setConfirm('accept'),
     onDecline: () => setConfirm('decline'),
     onChat: () => onChat?.(bid),
   };
   const cardActions = <BidActionButtons {...actionHandlers} onViewDetails={openDetails} fullWidth />;
 
-  // ---- Card sections -------------------------------------------------
 
   const identity = (
     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
@@ -269,7 +293,6 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
     borderRadius: 2,
     cursor: 'pointer',
     transition: (theme) => theme.transitions.create(['box-shadow']),
-    // Status accent on the left edge
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -286,7 +309,6 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
     }),
   };
 
-  // Whole card opens details on click; keyboard users use the "View details" button
   const cardProps = {
     component: 'article',
     'aria-label': `Bid from ${bid.name}`,
@@ -363,7 +385,6 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
     </Card>
   );
 
-  // ---- Dialogs -------------------------------------------------------
 
   const confirmIsAccept = confirm === 'accept';
 
@@ -397,6 +418,20 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
                 {bid.name} will then assign one of their staff to the shift.
               </Typography>
             ) : null}
+            {confirmIsAccept && paymentBlocked ? (
+              <Alert
+                severity="warning"
+                action={
+                  paymentsPath ? (
+                    <Button component={RouterLink} href={paymentsPath} color="inherit" size="small">
+                      Set up payment
+                    </Button>
+                  ) : null
+                }
+              >
+                {paymentHint}
+              </Alert>
+            ) : null}
           </Stack>
         }
         action={
@@ -404,6 +439,7 @@ export function BidCard({ bid, viewMode = 'list', onDecline, onAccepted, onChat,
             variant="contained"
             color={confirmIsAccept ? 'primary' : 'error'}
             loading={submitting}
+            disabled={confirmIsAccept && paymentBlocked}
             onClick={confirmIsAccept ? handleConfirmAccept : handleConfirmDecline}
           >
             {confirmIsAccept ? 'Accept bid' : 'Reject bid'}

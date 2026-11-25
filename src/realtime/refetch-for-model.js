@@ -211,11 +211,13 @@ const MODEL_ALIASES = {
   payments: 'usersstripeaccounts',
   transaction: 'usersstripeaccounts',
   transactions: 'usersstripeaccounts',
-  payout: 'gocardlessmandate',
-  payouts: 'gocardlessmandate',
+  // Payouts must not refetch GET /gocardless/mandate (was spamming Network).
+  payout: 'adminpayout',
+  payouts: 'adminpayout',
   mandate: 'gocardlessmandate',
   mandates: 'gocardlessmandate',
   gocardless: 'gocardlessmandate',
+  gocardlessmandate: 'gocardlessmandate',
 
   earning: 'earnings',
   earnings: 'earnings',
@@ -332,7 +334,9 @@ function touchPayments() {
   touch(adminTransactionsApi, ['AdminTransaction', 'AdminPlatformFee']);
   touch(bookingPaymentsApi, ['BookingPayments']);
   touch(earningsApi, ['Earnings']);
-  touch(gocardlessApi, ['GoCardlessMandate', 'AdminPayout']);
+  // Admin payouts list only — do not invalidate GoCardlessMandate here.
+  // Wallet/payment/transaction socket noise was refetching GET /gocardless/mandate in a loop.
+  touch(gocardlessApi, ['AdminPayout']);
   touchDashboards();
 }
 
@@ -411,9 +415,13 @@ const MODEL_REFETCH = {
     touchSidebar();
   },
   usersstripeaccounts: touchPayments,
-  gocardlessmandate: () => {
-    touch(gocardlessApi, ['GoCardlessMandate', 'AdminPayout']);
+  adminpayout: () => {
+    touch(gocardlessApi, ['AdminPayout']);
     touchDashboards();
+  },
+  gocardlessmandate: () => {
+    // Only real mandate model events should refresh the customer DD status.
+    touch(gocardlessApi, ['GoCardlessMandate']);
   },
   usergoogleintegration: touchUsers,
   conversation: () => touch(conversationsApi, ['Conversation', 'ConversationMessage']),

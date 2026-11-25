@@ -87,9 +87,12 @@ export function CareHomeDashboardView() {
   const { user } = useSelector((state) => state.user);
   const scopeUserId = useScopedUserId();
   const displayName = user?.basicInfo?.name || 'Care Home';
-  const { isAllSites, activeBranchName } = useActiveBranch();
+  const { isAllSites, activeBranchId, activeBranchName } = useActiveBranch();
   const { data, isLoading, isError, error } = useGetCareHomeDashboardQuery(
-    { userId: scopeUserId },
+    {
+      userId: scopeUserId,
+      ...(!isAllSites && activeBranchId ? { branch: activeBranchId } : {}),
+    },
     { skip: !scopeUserId }
   );
   const dashboard = useMemo(

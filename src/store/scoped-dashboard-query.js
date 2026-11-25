@@ -1,12 +1,15 @@
-/** Shared query args helper so dashboard RTK cache keys differ per account. */
 export function buildScopedDashboardQuery(url, arg = {}) {
-  const userId = String(
-    (arg && typeof arg === 'object' ? arg.userId : arg) || ''
-  ).trim();
+  const source = arg && typeof arg === 'object' ? arg : { userId: arg };
+  const userId = String(source.userId || '').trim();
+  const branch = String(source.branch || source.branchId || '').trim();
+
+  const params = {};
+  if (userId) params.userId = userId;
+  if (branch && branch !== 'all') params.branch = branch;
 
   return {
     url,
     method: 'GET',
-    ...(userId ? { params: { userId } } : {}),
+    ...(Object.keys(params).length ? { params } : {}),
   };
 }

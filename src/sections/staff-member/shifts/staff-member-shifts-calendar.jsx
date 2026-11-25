@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   addMonths,
   eachDayOfInterval,
@@ -24,9 +24,9 @@ import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 
 import { Iconify } from 'src/components/iconify';
+import { toast } from 'src/components/snackbar';
 import { getJobDateParts, parseJobShiftDate } from 'src/components/jobs/job-date-filters';
 
-// ----------------------------------------------------------------------
 
 function jobsOnDay(jobs, day) {
   return jobs.filter((job) => {
@@ -79,11 +79,10 @@ function entryChipSx(job) {
 }
 
 const DAY_ADD_ACTIONS = [
-  { id: 'busy', label: 'Mark Busy', icon: 'eva:slash-fill' },
-  { id: 'on-call', label: 'On Call', icon: 'eva:plus-fill' },
-  { id: 'sleepover', label: 'Sleepover', icon: 'eva:plus-fill' },
-  { id: 'day-off', label: 'Day off', icon: 'eva:plus-fill' },
+  { id: 'busy', label: 'Mark as busy', icon: 'eva:slash-fill' },
+  { id: 'day-off', label: 'Day Off', icon: 'eva:plus-fill' },
   { id: 'add-leave', label: 'Add leave', icon: 'eva:plus-fill' },
+  { id: 'other', label: 'Other', icon: 'eva:edit-2-fill' },
 ];
 
 export function StaffMemberShiftsCalendar({
@@ -97,6 +96,7 @@ export function StaffMemberShiftsCalendar({
   adding = false,
 }) {
   const [dayMenu, setDayMenu] = useState(null);
+  const calendarRef = useRef(null);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
@@ -105,9 +105,6 @@ export function StaffMemberShiftsCalendar({
   }, [month]);
 
   const monthOptions = useMemo(() => buildMonthOptions(new Date()), []);
-  const selectedJobs = useMemo(() => jobsOnDay(jobs, selectedDay), [jobs, selectedDay]);
-  const selectedAccepted = selectedJobs.filter((job) => job.entryKind !== 'availability');
-  const selectedAvailability = selectedJobs.filter((job) => job.entryKind === 'availability');
   const monthKey = format(month, 'yyyy-MM');
 
   const openJob = (event, job) => {
@@ -122,7 +119,6 @@ export function StaffMemberShiftsCalendar({
     setDayMenu({ anchorEl: event.currentTarget, day });
   };
 
-  // Without `onAddOnDay` (admin viewing the account) the calendar is read-only: no add menu.
   const canAdd = typeof onAddOnDay === 'function';
 
   const handleDayClick = (event, day) => {
@@ -135,7 +131,7 @@ export function StaffMemberShiftsCalendar({
 
   return (
     <Stack spacing={2}>
-      <Card sx={{ p: 2.5, borderRadius: 2 }}>
+      <Card ref={calendarRef} className="staff-shifts-diary-print" sx={{ p: 2.5, borderRadius: 2 }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           alignItems={{ xs: 'stretch', sm: 'center' }}
@@ -144,7 +140,22 @@ export function StaffMemberShiftsCalendar({
           sx={{ mb: 2 }}
         >
           <Typography variant="h6">{format(month, 'MMMM yyyy')}</Typography>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Iconify icon="solar:printer-minimalistic-bold" width={16} />}
+              onClick={() => {
+                if (!calendarRef.current) {
+                  toast.error('Calendar not ready to export');
+                  return;
+                }
+                window.print();
+              }}
+              sx={{ textTransform: 'none' }}
+            >
+              Save as image or PDF
+            </Button>
             <TextField
               select
               size="small"
@@ -225,7 +236,7 @@ export function StaffMemberShiftsCalendar({
                     {format(day, 'd')}
                   </Typography>
                   {inMonth && canAdd ? (
-                    <Tooltip title="Mark Busy, On Call, Leave…" arrow>
+                    <Tooltip title="Mark as busy, Day Off, Add leave, Other" arrow>
                       <Box
                         className="day-plus"
                         component="button"
@@ -252,10 +263,11 @@ export function StaffMemberShiftsCalendar({
                 <Stack spacing={0.25} sx={{ mt: 0.25 }}>
                   {dayJobs.slice(0, 3).map((job) => {
                     const parts = getJobDateParts(job);
-                    // Availability tags: status only (no times). Jobs: show API times.
                     const label =
                       job.entryKind === 'availability'
-                        ? job.title
+                        ? job.notes
+                          ? `${job.title}: ${job.notes}`
+                          : job.title
                         : parts.time ||
                         [job.shiftStartTime, job.shiftEndTime].filter(Boolean).join('–') ||
                         job.title ||
@@ -306,142 +318,6 @@ export function StaffMemberShiftsCalendar({
           </MenuItem>
         ))}
       </Menu>
-
-      <Card sx={{ p: 2.5, borderRadius: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
-          {format(selectedDay, 'EEEE d MMMM yyyy')}
-          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            {selectedJobs.length
-              ? ` · ${selectedJobs.length} item${selectedJobs.length === 1 ? '' : 's'}`
-              : ''}
-          </Box>
-        </Typography>
-
-        <Stack
-          direction="row"
-          flexWrap="wrap"
-          spacing={0.75}
-          useFlexGap
-          sx={{ mb: 1.5, display: canAdd ? 'flex' : 'none' }}
-        >
-          {DAY_ADD_ACTIONS.map((action) => (
-            <Button
-              key={action.id}
-              size="small"
-              variant="outlined"
-              disabled={adding}
-              onClick={() => onAddOnDay?.(action.id, selectedDay)}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </Stack>
-
-        {!selectedJobs.length ? (
-          <Typography variant="body2" color="text.secondary">
-            Nothing on this date. Click the day (or +) to add Busy / Sleepover / Leave…
-          </Typography>
-        ) : (
-          <Stack spacing={1}>
-            {selectedAvailability.map((job) => (
-              <Stack
-                key={job.cardKey || job.id}
-                direction="row"
-                spacing={1.5}
-                alignItems="center"
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1.5,
-                  bgcolor: 'background.neutral',
-                }}
-              >
-                <Box
-                  sx={{
-                    minWidth: 72,
-                    py: 0.75,
-                    px: 0.75,
-                    borderRadius: 1,
-                    bgcolor: 'grey.300',
-                    color: 'text.primary',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Typography sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1.2 }}>
-                    {job.title}
-                  </Typography>
-                </Box>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="subtitle2" noWrap>
-                    {job.title}
-                  </Typography>
-                  {(job.shiftStartTime || job.shiftEndTime) && (
-                    <Typography variant="caption" color="text.secondary">
-                      {[job.shiftStartTime, job.shiftEndTime].filter(Boolean).join(' – ')}
-                    </Typography>
-                  )}
-                </Box>
-              </Stack>
-            ))}
-
-            {selectedAccepted.map((job) => {
-              const parts = getJobDateParts(job);
-              return (
-                <Stack
-                  key={job.cardKey || job.id}
-                  direction="row"
-                  spacing={1.5}
-                  alignItems="center"
-                  onClick={() => onJobClick?.(job)}
-                  sx={{
-                    p: 1.25,
-                    borderRadius: 1.5,
-                    bgcolor: 'background.neutral',
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      minWidth: 56,
-                      py: 0.5,
-                      px: 0.75,
-                      borderRadius: 1,
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, lineHeight: 1.1 }}>
-                      {parts.weekday}
-                    </Typography>
-                    <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>
-                      {parts.day}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700 }}>{parts.month}</Typography>
-                  </Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography variant="subtitle2" noWrap>
-                      {job.title || 'Job'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {parts.time ||
-                        [job.shiftStartTime, job.shiftEndTime].filter(Boolean).join(' – ')}
-                      {job.address ? ` · ${job.address}` : ''}
-                    </Typography>
-                  </Box>
-                  <Typography
-                    variant="caption"
-                    color="primary.main"
-                    sx={{ fontWeight: 700, flexShrink: 0 }}
-                  >
-                    Details
-                  </Typography>
-                </Stack>
-              );
-            })}
-          </Stack>
-        )}
-      </Card>
     </Stack>
   );
 }

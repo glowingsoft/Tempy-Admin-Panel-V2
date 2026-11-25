@@ -11,7 +11,6 @@ import { resolveDashboardRole } from 'src/auth/utils/role-module-redirect';
 import { getProfileUserId } from 'src/sections/account/account-profile-utils';
 import { isUsableCustomerMandate, useGetGoCardlessMandateQuery } from 'src/store/Reducer/gocardless-api';
 
-// ----------------------------------------------------------------------
 
 const PAYMENTS_PATH_BY_ROLE = {
   careHome: paths.dashboard.payments,
@@ -19,6 +18,12 @@ const PAYMENTS_PATH_BY_ROLE = {
   localAuthority: paths.dashboard.localAuthority.payments,
   user: paths.dashboard.individualHomeCare.payments,
 };
+
+export const POST_JOB_PAYMENT_MESSAGE =
+  'Set up a direct debit on Payments before posting a job.';
+
+export const CONFIRM_BOOKING_PAYMENT_MESSAGE =
+  'Set up a card or bank payment link on Payments before confirming a booking.';
 
 export function useCustomerMandateBlock(mode) {
   const sessionUser = useSelector((state) => state.user?.user);
@@ -31,35 +36,36 @@ export function useCustomerMandateBlock(mode) {
     skip: !paymentsPath,
   });
 
+  const usable = isUsableCustomerMandate(data);
+
   useEffect(() => {
-    if (!paymentsPath) return undefined;
+    if (!paymentsPath || usable) return undefined;
 
     const refresh = () => {
       if (document.visibilityState === 'visible') refetch();
     };
 
-    window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
-      window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [paymentsPath, refetch]);
-
-  const usable = isUsableCustomerMandate(data, userId);
+  }, [paymentsPath, refetch, usable]);
   const waiting = Boolean(paymentsPath) && Boolean(userId) && (isLoading || isUninitialized) && !data;
 
   return {
     paymentsPath,
-    blocked: Boolean(paymentsPath) && !usable,
+    blocked: Boolean(paymentsPath) && !usable && !waiting,
     showNotice: Boolean(paymentsPath) && !usable && !waiting,
   };
 }
 
-export function CustomerMandateNotice({ sx, mode }) {
+/** @param {'postJob' | 'confirm'} [variant] */
+export function CustomerMandateNotice({ sx, mode, variant = 'confirm' }) {
   const { showNotice, paymentsPath } = useCustomerMandateBlock(mode);
 
   if (!showNotice) return null;
+
+  const isPostJob = variant === 'postJob';
 
   return (
     <Alert
@@ -67,11 +73,13 @@ export function CustomerMandateNotice({ sx, mode }) {
       sx={sx}
       action={
         <Button component={RouterLink} href={paymentsPath} color="inherit" size="small">
-          Set up direct debit
+          {isPostJob ? 'Set up direct debit' : 'Set up payment'}
         </Button>
       }
     >
-      Posting a job is blocked until this direct debit can be used. Set it up on Payments first.
+      {isPostJob
+        ? 'Posting a job is blocked until this direct debit can be used. Set it up on Payments first.'
+        : 'You can request shifts now. Confirming a booking stays blocked until a card or bank payment link is set up on Payments.'}
     </Alert>
   );
 }

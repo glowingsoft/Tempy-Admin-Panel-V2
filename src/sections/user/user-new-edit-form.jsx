@@ -23,7 +23,6 @@ import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
-// ----------------------------------------------------------------------
 
 export const NewUserSchema = zod.object({
   avatarUrl: schemaHelper.file({
@@ -44,12 +43,10 @@ export const NewUserSchema = zod.object({
   city: zod.string().min(1, { message: 'City is required!' }),
   role: zod.string().min(1, { message: 'Role is required!' }),
   zipCode: zod.string().min(1, { message: 'Zip code is required!' }),
-  // Not required
   status: zod.string(),
   isVerified: zod.boolean(),
 });
 
-// ----------------------------------------------------------------------
 
 export function UserNewEditForm({ currentUser }) {
   const router = useRouter();
@@ -217,7 +214,7 @@ export function UserNewEditForm({ currentUser }) {
             >
               <Field.Text name="name" label="Full name" />
               <Field.Text name="email" label="Email address" />
-              <Field.Phone name="phoneNumber" label="Phone number" />
+              <Field.Phone name="phoneNumber" label="Phone number" country="GB" />
 
               <Field.CountrySelect
                 fullWidth

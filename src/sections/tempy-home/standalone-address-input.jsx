@@ -272,20 +272,22 @@ export async function fetchPhotonSuggestions(input) {
       adminArea: properties.state,
       country: properties.country,
     });
-    const parts = [
-      properties.name,
-      properties.housenumber,
-      properties.street,
-      city,
-      state,
-      country,
-    ].filter(Boolean);
+    const addressLine1 =
+      [properties.housenumber, properties.street].filter(Boolean).join(' ') ||
+      properties.name ||
+      '';
+    const addressLine2 = properties.district || properties.suburb || '';
+    const parts = [addressLine1, addressLine2, city, state, country, properties.postcode].filter(
+      Boolean
+    );
 
     return withQueryCity(
       {
         label: [...new Set(parts)].join(', '),
-        mainText: properties.name || parts[0] || '',
+        mainText: addressLine1 || parts[0] || '',
         secondaryText: parts.slice(1).join(', '),
+        addressLine1,
+        addressLine2,
         placeId: `ph-${properties.osm_id}`,
         latitude: Number.isFinite(lat) ? lat : null,
         longitude: Number.isFinite(lng) ? lng : null,
@@ -329,15 +331,24 @@ async function fetchNominatimSuggestions(input, countryRestriction = 'gb') {
       country: address.country,
     });
 
+    const addressLine1 =
+      [address.house_number, address.road || address.street].filter(Boolean).join(' ') ||
+      item.name ||
+      String(item.display_name || '').split(',')[0].trim() ||
+      '';
+    const addressLine2 = address.suburb || address.neighbourhood || address.quarter || '';
+
     return withQueryCity(
       {
         label: item.display_name,
-        mainText: item.name || item.display_name,
+        mainText: addressLine1,
         secondaryText: item.display_name,
+        addressLine1,
+        addressLine2,
         placeId: `osm-${item.place_id}`,
         latitude: Number(item.lat),
         longitude: Number(item.lon),
-        city: address.city || address.town || address.village || '',
+        city: address.city || address.town || address.village || address.municipality || '',
         state,
         country,
         postalCode: address.postcode || '',
@@ -459,8 +470,8 @@ function parseGoogleJsPlace(place, fallbackLabel) {
     ''
   );
   const city =
-    getComponent('locality') ||
     getComponent('postal_town') ||
+    getComponent('locality') ||
     getComponent('sublocality') ||
     deriveCityFromLabel(label) ||
     '';
@@ -471,8 +482,23 @@ function parseGoogleJsPlace(place, fallbackLabel) {
     country: getComponent('country'),
   });
 
+  const streetNumber = getComponent('street_number');
+  const route = getComponent('route');
+  const premise = getComponent('premise');
+  const subpremise = getComponent('subpremise');
+  const addressLine1 =
+    [streetNumber, route].filter(Boolean).join(' ') ||
+    premise ||
+    String(label).split(',')[0].trim() ||
+    '';
+  const addressLine2 = subpremise || '';
+
   return {
     label,
+    mainText: addressLine1,
+    name: addressLine1,
+    addressLine1,
+    addressLine2,
     latitude: location ? location.lat() : null,
     longitude: location ? location.lng() : null,
     city,
@@ -723,7 +749,7 @@ export function StandaloneAddressInput({
               startIcon={<Iconify icon="solar:routing-2-bold" width={16} />}
               onClick={handleDetectGps}
             >
-              Detect GPS
+              Find my location
             </LoadingButton>
           </Stack>
         ) : null}

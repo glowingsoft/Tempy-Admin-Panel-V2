@@ -56,10 +56,15 @@ export function useEmployerPostedJobs(
               ? homeCareCompany
               : careHome;
 
-  const jobs = useMemo(() => {
+  const rawJobs = useMemo(() => {
     const list = Array.isArray(active.data?.data) ? active.data.data : EMPTY;
-    return list.map(normalizePostedJobForSidebar).filter(Boolean);
+    return list;
   }, [active.data?.data]);
+
+  const jobs = useMemo(
+    () => rawJobs.map(normalizePostedJobForSidebar).filter(Boolean),
+    [rawJobs]
+  );
 
   const totalRaw = active.data?.meta?.totalRecords ?? active.data?.total_length;
   const apiHasTotal = totalRaw !== undefined && totalRaw !== null && totalRaw !== '';
@@ -73,6 +78,7 @@ export function useEmployerPostedJobs(
 
   return {
     jobs,
+    rawJobs,
     loading: Boolean(active.isLoading),
     loadingMore: Boolean(active.isFetching && jobs.length),
     hasMore,

@@ -9,7 +9,7 @@ import {
 } from 'src/sections/care-home/jobs/care-home-job-api-utils';
 import { mapCareHomeJobBidFromApi, keepJobBidsForStatus } from 'src/sections/care-home/jobs/care-home-job-bid-api-utils';
 import { mapCareHomeBookingCalendarFromApi } from 'src/sections/care-home/shifts/care-home-booking-calendar-api-utils';
-import { mapJobAlertFromApi, patchJobAlert } from 'src/sections/care-home/jobs/job-alert-utils';
+import { mapJobAlertMutationResponse, patchJobAlert } from 'src/sections/care-home/jobs/job-alert-utils';
 
 import { API_ROUTES } from '../apiRoutes';
 import { createCustomFetchBaseQuery } from '../baseQuery';
@@ -193,7 +193,7 @@ export const hospitalJobsApi = createApi({
         method: 'PUT',
         body,
       }),
-      transformResponse: (response) => mapJobAlertFromApi(response?.data ?? response),
+      transformResponse: (response) => mapJobAlertMutationResponse(response),
       async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
         try {
           const { data: alert } = await queryFulfilled;
@@ -208,7 +208,7 @@ export const hospitalJobsApi = createApi({
         url: API_ROUTES.HOSPITAL_JOB_ALERT(id),
         method: 'DELETE',
       }),
-      transformResponse: (response) => mapJobAlertFromApi(response?.data ?? response),
+      transformResponse: (response) => mapJobAlertMutationResponse(response),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         try {
           const { data: alert } = await queryFulfilled;
@@ -268,6 +268,19 @@ export const hospitalJobsApi = createApi({
       ],
     }),
 
+    cancelHospitalBooking: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.HOSPITAL_BOOKING_BY_ID(id),
+        method: 'PUT',
+        body: { status: 'cancel' },
+      }),
+      invalidatesTags: [
+        { type: 'HospitalJobBid', id: 'LIST' },
+        { type: 'HospitalJob', id: 'LIST' },
+        { type: 'HospitalBookingCalendar', id: 'LIST' },
+      ],
+    }),
+
     getHospitalBookingCalendar: builder.query({
       query: ({ latitude = 0.1, longitude = 0.1, startDate, endDate, branch = '' } = {}) => {
         const params = {
@@ -306,5 +319,6 @@ export const {
   useGetHospitalJobBidsQuery,
   useUpdateHospitalJobBidMutation,
   useCreateHospitalBookingMutation,
+  useCancelHospitalBookingMutation,
   useGetHospitalBookingCalendarQuery,
 } = hospitalJobsApi;

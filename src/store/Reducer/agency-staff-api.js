@@ -120,7 +120,8 @@ export const agencyStaffApi = createApi({
     importAgencyStaff: builder.mutation({
       query: (file) => {
         const formData = new FormData();
-        formData.append(IMPORT_FILE_FIELD, file);
+        const originalName = String(file?.name || '').trim() || 'staff-import.csv';
+        formData.append(IMPORT_FILE_FIELD, file, originalName);
 
         return {
           url: API_ROUTES.AGENCY_STAFF_IMPORT,

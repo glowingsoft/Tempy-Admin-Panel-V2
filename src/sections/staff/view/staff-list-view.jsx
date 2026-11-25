@@ -42,49 +42,15 @@ import { StaffTableToolbar } from '../staff-table-toolbar';
 import { StaffDetailsDialog } from '../staff-details-dialog';
 import { CARE_HOME_STAFF_TABLE_HEAD, STAFF_TABLE_SX } from '../staff-table-styles';
 
-// ----------------------------------------------------------------------
 
 const TABLE_HEAD = CARE_HOME_STAFF_TABLE_HEAD;
 const TABLE_SX = STAFF_TABLE_SX;
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
 
-// ----------------------------------------------------------------------
-
-function applyFilter({ inputData, filters }) {
-  const { name, status } = filters;
-
-  let data = inputData;
-
-  if (status && status !== 'all') {
-    data = data.filter((staff) => (staff.status || 'active') === status);
-  }
-
-  if (!name) return data;
-
-  const query = name.toLowerCase();
-
-  return data.filter(
-    (staff) =>
-      staff.name.toLowerCase().includes(query) ||
-      String(staff.id).toLowerCase().includes(query) ||
-      String(staff.email || '')
-        .toLowerCase()
-        .includes(query) ||
-      String(staff.role || staff.userType || '')
-        .toLowerCase()
-        .includes(query) ||
-      (Array.isArray(staff.specialities) ? staff.specialities : [staff.specialty])
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-  );
-}
-
-// ----------------------------------------------------------------------
 
 export function StaffListView() {
   const viewOnly = useViewOnly();
-  const table = useTable({ defaultDense: true });
+  const table = useTable({ defaultDense: true, defaultRowsPerPage: 10 });
   const viewDialog = useBoolean();
   const { user } = useSelector((state) => state.user);
   const accountKey = useMemo(() => resolveStaffAccountKey(user), [user]);
@@ -108,8 +74,9 @@ export function StaffListView() {
     refetch,
   } = useGetDashboardStaffQuery({
     accountKey,
-    page: 0,
-    limit: 100,
+    page: table.page,
+    limit: table.rowsPerPage,
+    keyword: filters.state.name.trim(),
     status: filters.state.status === 'all' ? '' : filters.state.status,
   });
 
@@ -129,6 +96,7 @@ export function StaffListView() {
       })),
     [data, favoritesEnabled, isFavoriteStaff]
   );
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? staffList.length;
 
   useEffect(() => {
     if (!isError || errorToastShown) return;
@@ -138,10 +106,7 @@ export function StaffListView() {
     setErrorToastShown(true);
   }, [error, errorToastShown, isError]);
 
-  const dataFiltered = applyFilter({
-    inputData: staffList,
-    filters: filters.state,
-  });
+  const dataFiltered = staffList;
 
   useEffect(() => {
     if (isLoading || isFetching) return;
@@ -233,14 +198,9 @@ export function StaffListView() {
                 <TableHeadCustom headLabel={TABLE_HEAD} rowCount={dataFiltered.length} />
 
                 <TableBody>
-                  {dataFiltered
-                    .slice(
-                      table.page * table.rowsPerPage,
-                      table.page * table.rowsPerPage + table.rowsPerPage
-                    )
-                    .map((row) => (
-                      <StaffTableRow key={row.id} row={row} onViewRow={handleViewRow} />
-                    ))}
+                  {dataFiltered.map((row) => (
+                    <StaffTableRow key={row.id} row={row} onViewRow={handleViewRow} />
+                  ))}
 
                   <TableEmptyRows
                     height={table.dense ? 56 : 56 + 20}
@@ -255,10 +215,11 @@ export function StaffListView() {
 
           <TablePaginationCustom
             page={table.page}
-            count={dataFiltered.length}
+            count={totalCount}
             rowsPerPage={table.rowsPerPage}
             onPageChange={table.onChangePage}
             onRowsPerPageChange={table.onChangeRowsPerPage}
+            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
           />
         </Card>
       </DashboardContent>

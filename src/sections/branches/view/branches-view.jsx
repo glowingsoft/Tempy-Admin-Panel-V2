@@ -920,8 +920,7 @@ export function BranchesView() {
         addressOnly={userMode}
         showComplianceFields={homeCareCompanyMode}
         hideImages={careHomeMode}
-        hideInsurance={careHomeMode}
-        hideState={careHomeMode}
+        stateLabel="County"
       />
 
       <ConfirmDialog

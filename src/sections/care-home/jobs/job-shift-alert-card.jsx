@@ -12,7 +12,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { PhoneInput } from 'src/components/phone-input';
 import { toast } from 'src/components/snackbar';
 
-import { handleApiError } from 'src/store/handleApiError';
+import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import {
   useClearUserJobAlertMutation,
   useUpdateUserJobAlertMutation,
@@ -43,7 +43,6 @@ import {
 } from './job-alert-utils';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
 function toForm(alert) {
   return {
@@ -115,7 +114,9 @@ export function JobShiftAlertCard({ mode, jobId, alert: rawAlert }) {
     try {
       const saved = await updateAlert({ id: jobId, ...buildJobAlertPayload(form) }).unwrap();
       setForm(toForm(saved));
-      toast.success(saved.enabled ? 'Shift alert saved' : 'Shift alert turned off');
+      toast.success(
+        pickApiToastMessage(saved, saved.enabled ? 'Shift alert saved' : 'Shift alert turned off')
+      );
     } catch (err) {
       toast.error(handleApiError(err) || 'Could not save shift alert');
     }
@@ -126,7 +127,7 @@ export function JobShiftAlertCard({ mode, jobId, alert: rawAlert }) {
       const cleared = await clearAlert(jobId).unwrap();
       setForm(toForm(cleared));
       setErrors({});
-      toast.success('Shift alert cleared');
+      toast.success(pickApiToastMessage(cleared, 'Shift alert cleared'));
     } catch (err) {
       toast.error(handleApiError(err) || 'Could not clear shift alert');
     }

@@ -15,22 +15,6 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { useSelector } from 'react-redux';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -49,6 +33,7 @@ import DialogContent from '@mui/material/DialogContent';
 import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import Tooltip from '@mui/material/Tooltip';
+import CircularProgress from '@mui/material/CircularProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 
@@ -71,6 +56,7 @@ import { paths } from 'src/routes/paths';
 import { EmptyContent } from 'src/components/empty-content';
 import {
   mapDashboardStaffToShiftTeams,
+  mergeShiftRosterTeams,
   resolveRosterAccountKey,
 } from 'src/sections/staff/company-roster-store';
 import { useGetDashboardStaffQuery } from 'src/store/Reducer/staff-api';
@@ -116,6 +102,7 @@ import {
   useCancelCareHomeBookingMutation,
 } from 'src/store/Reducer/care-home-jobs-api';
 import {
+  useCancelHospitalBookingMutation,
   useCreateHospitalJobMutation,
   useGetHospitalBookingCalendarQuery,
   useGetHospitalJobsQuery,
@@ -123,6 +110,7 @@ import {
   useUpdateHospitalJobMutation,
 } from 'src/store/Reducer/hospital-jobs-api';
 import {
+  useCancelUserBookingMutation,
   useCreateUserJobMutation,
   useGetUserBookingCalendarQuery,
   useGetUserJobsQuery,
@@ -130,6 +118,7 @@ import {
   useUpdateUserJobMutation,
 } from 'src/store/Reducer/user-jobs-api';
 import {
+  useCancelLocalAuthorityBookingMutation,
   useCreateLocalAuthorityJobMutation,
   useGetLocalAuthorityBookingCalendarQuery,
   useGetLocalAuthorityJobsQuery,
@@ -153,6 +142,8 @@ import {
   findBestTeamForJobType,
   validateJobDraft,
   jobToDraft,
+  normalizeJobStatus,
+  isEmployerJobCompleted,
 } from '../../jobs/care-home-job-utils';
 import {
   buildCareHomeJobPayload,
@@ -163,7 +154,9 @@ import {
   isJobCreateSoftError,
   mergeUserWithProfile,
   pickJobSuccessToast,
+  resolveDraftJobTypeForSubmit,
 } from '../../jobs/care-home-job-api-utils';
+import { useRoleJobTypeMutations } from 'src/sections/job-roles/use-role-job-type-mutations';
 import { fCurrency } from 'src/utils/format-number';
 import { pickApiReview, resolveJobReviewTarget, resolveReviewSubmitTarget } from 'src/sections/reviews/reviews-api-utils';
 import {
@@ -1290,21 +1283,106 @@ function buildJobGridShift(draft, staffId, schedule, scheduleIndex, allSchedules
     fromJob: true,
     jobId: String(draft.id || draft._id || '').trim() || undefined,
     receivingBids: normalizedSchedule.receivingBids !== false,
-    roleCode: getJobTypeRoleCode(draft.type, staffId),
+    roleCode: getJobTypeRoleCode(draft.type || draft.typeTitle, staffId),
     startTime: schedule.startTime,
     endTime: schedule.endTime,
     displayName: member?.name || 'Staff',
-    jobType: draft.type || '',
+    jobType: draft.type || draft.typeTitle || '',
     image: draft.image || '',
     gender: draft.gender || 'not_specified',
     description: draft.description || '',
     hasBreak: normalizedSchedule.breakIncluded,
     breakMins: normalizedSchedule.breakMins,
-    location: draft.address || '',
+    location: draft.address || draft.location?.fullAddress || '',
     scheduleIndex: scheduleIndex + 1,
     scheduleCount: allSchedules.length,
     jobSchedules: normalizedSchedules,
   };
+}
+
+function resolveOpenJobVacantStaffId(job, teamsList = []) {
+  const jobType = job?.type || job?.typeTitle || job?.name || '';
+  const team = findBestTeamForJobType(jobType, teamsList);
+  const pool = team?.staff?.length
+    ? team.staff
+    : teamsList.flatMap((entry) => entry.staff || []);
+  const vacant = pool.find((member) => member?.isVacant && member?.id != null);
+  return vacant?.id != null ? String(vacant.id) : '';
+}
+
+function scheduleLooksBooked(schedule = {}) {
+  if (String(schedule.bookingId || schedule.booking?._id || schedule.booking?.id || '').trim()) {
+    return true;
+  }
+  const status = String(schedule.status || '').toLowerCase();
+  return ['booked', 'accepted', 'assigned', 'completed', 'filled'].includes(status);
+}
+
+function shiftEntryDate(key, entry) {
+  const fromEntry = String(entry?.date || '').trim();
+  if (fromEntry) return fromEntry;
+  const match = String(key).match(/(\d{4}-\d{2}-\d{2})$/);
+  return match ? match[1] : '';
+}
+
+/**
+ * Overlay open (unbooked) posted jobs onto empty vacant cells only.
+ * Never overwrites calendar bookings, leave, or optimistic cells already on the grid.
+ */
+function mergeOpenPostedJobsIntoShifts(baseShifts, postedJobs = [], teamsList = [], dayKeys = []) {
+  const days = new Set((dayKeys || []).map(String).filter(Boolean));
+  if (!days.size || !Array.isArray(postedJobs) || !postedJobs.length) return baseShifts;
+
+  let changed = false;
+  const next = { ...baseShifts };
+
+  postedJobs.forEach((job) => {
+    const jobId = String(job?.id || job?._id || '').trim();
+    if (!jobId) return;
+    if (job.bookingId || job.hasAcceptedBid || job.isFilled) return;
+    try {
+      if (isEmployerJobCompleted(job)) return;
+    } catch {
+    }
+    const status = normalizeJobStatus(job?.apiStatus || job?.status);
+    if (['deleted', 'inactive', 'cancelled', 'canceled'].includes(status)) return;
+
+    const schedules = Array.isArray(job.schedules) ? job.schedules : [];
+    if (!schedules.length) return;
+
+    const staffId = resolveOpenJobVacantStaffId(job, teamsList);
+    if (!staffId) return;
+
+    schedules.forEach((schedule, index) => {
+      const date = String(schedule?.date || '').trim();
+      if (!date || !days.has(date)) return;
+      if (scheduleLooksBooked(schedule)) return;
+      if (schedule.receivingBids === false || schedule.isBiddingAllowed === false) return;
+
+      const alreadyOnGrid = Object.entries(next).some(([key, entry]) => {
+        if (String(entry?.jobId || '') !== jobId) return false;
+        return shiftEntryDate(key, entry) === date;
+      });
+      if (alreadyOnGrid) return;
+
+      const key = `${staffId}-${date}`;
+      if (next[key]) return;
+
+      const built = buildJobGridShift(job, staffId, schedule, index, schedules);
+      next[key] = {
+        ...built,
+        id: key,
+        staffId,
+        fromJob: true,
+        pendingOpenJob: true,
+        jobId,
+        receivingBids: true,
+      };
+      changed = true;
+    });
+  });
+
+  return changed ? next : baseShifts;
 }
 
 function getShiftRowHeight() {
@@ -1330,10 +1408,14 @@ function resolveShiftCard(shift, member, team = null) {
   if (shift.fromJob) {
     const rowLabel = team?.label || STAFF_TEAM_MAP[shift.staffId]?.label || '';
     const filled = isRotaShiftFilled(shift, member);
+    const fillColors = getShiftFillColors(filled);
+    if (!filled && (shift.pendingOpenJob || shift.receivingBids)) {
+      fillColors.label = 'Open request';
+    }
     return {
       type: 'jobShift',
       filled,
-      fillColors: getShiftFillColors(filled),
+      fillColors,
       roleCode: getShiftTypeLabel({
         teamLabel: rowLabel,
         jobType: shift.jobType,
@@ -1353,6 +1435,7 @@ function resolveShiftCard(shift, member, team = null) {
       scheduleIndex: shift.scheduleIndex,
       scheduleCount: shift.scheduleCount,
       jobSchedules: shift.jobSchedules || [],
+      pendingOpenJob: Boolean(shift.pendingOpenJob),
     };
   }
   const rowLabel = team?.label || STAFF_TEAM_MAP[shift.staffId]?.label || '';
@@ -2138,7 +2221,10 @@ function ShiftCell({
     boxShadow: (theme) =>
       isActive ? `inset 0 0 0 2px ${theme.palette.primary.main}` : 'none',
     '&:hover .empty-plus': {
-      color: 'text.secondary',
+      color: 'primary.main',
+      bgcolor: 'primary.lighter',
+      borderColor: 'primary.main',
+      transform: 'scale(1.06)',
     },
   };
 
@@ -2183,20 +2269,27 @@ function ShiftCell({
           />
         ) : canSelectEmpty || canRequestVacant ? (
           <Tooltip
-            title={canRequestVacant ? 'Request a shift for this date' : 'Click to book a shift'}
+            title={canRequestVacant ? 'Book a shift for this date' : 'Click to book a shift'}
             arrow
           >
             <Box
               className="empty-plus"
-              aria-label={canRequestVacant ? 'Request a shift' : 'Add on this day'}
+              aria-label={canRequestVacant ? 'Book a shift' : 'Book a shift on this day'}
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'text.disabled',
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                color: 'primary.main',
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                transition: 'transform 120ms ease, background-color 120ms ease, border-color 120ms ease',
               }}
             >
-              <Iconify icon="eva:plus-fill" width={14} />
+              <Iconify icon="eva:plus-fill" width={18} />
             </Box>
           </Tooltip>
         ) : null}
@@ -2516,31 +2609,6 @@ function TeamGroup({
   );
 }
 
-function SortableTeamGroup({ team, ...rest }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(team.id),
-  });
-
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.72 : 1,
-        zIndex: isDragging ? 2 : 'auto',
-        position: 'relative',
-      }}
-    >
-      <TeamGroup
-        team={team}
-        dragHandleProps={{ ...attributes, ...listeners }}
-        {...rest}
-      />
-    </Box>
-  );
-}
-
 
 function LeftSidebar({
   location,
@@ -2850,29 +2918,27 @@ function LeftSidebar({
       <Stack spacing={0.5} sx={{ p: 1.5, flexShrink: 0 }}>
         <Button
           fullWidth
-          size="small"
-          startIcon={<Iconify icon="eva:plus-fill" width={14} />}
+          variant="contained"
+          color="primary"
+          startIcon={<Iconify icon="eva:plus-fill" width={20} />}
           onClick={onAddJob}
           style={onAddJob ? undefined : { display: 'none' }}
           sx={{
-            justifyContent: 'flex-start',
-            fontSize: 11.5,
+            justifyContent: 'center',
+            fontSize: 14,
             fontWeight: 700,
-            color: 'primary.main',
-            border: '1px solid',
-            borderColor: '#81c784',
-            bgcolor: rotaSoftSuccessBg,
-            borderRadius: 1,
-            py: 0.65,
+            borderRadius: 1.5,
+            py: 1.15,
+            minHeight: 44,
             textTransform: 'none',
             flexShrink: 0,
-            boxShadow: 'inset 0 0 0 1px rgba(129, 199, 132, 0.35)',
+            boxShadow: (theme) => theme.customShadows?.z8 || theme.shadows[4],
             '&:hover': {
-              bgcolor: rotaSoftSuccess,
+              boxShadow: (theme) => theme.customShadows?.z12 || theme.shadows[8],
             },
           }}
         >
-          Book shift
+          Book a shift
         </Button>
       </Stack>
 
@@ -2887,43 +2953,6 @@ function LeftSidebar({
     </Box>
   );
 }
-
-function loadTeamOrder(storageKey) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTeamOrder(storageKey, order) {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(order.map(String)));
-  } catch {
-  }
-}
-
-function sortTeamsByOrder(teamsList = [], orderIds = []) {
-  if (!teamsList.length) return [];
-  if (!orderIds.length) return teamsList;
-
-  const byId = new Map(teamsList.map((team) => [String(team.id), team]));
-  const ordered = [];
-
-  orderIds.forEach((id) => {
-    const team = byId.get(String(id));
-    if (team) {
-      ordered.push(team);
-      byId.delete(String(id));
-    }
-  });
-
-  byId.forEach((team) => ordered.push(team));
-  return ordered;
-}
-
 
 export function ShiftsView({
   rotaConfig,
@@ -2973,9 +3002,15 @@ function ShiftsViewContent({
   const [calendarDayWeather, setCalendarDayWeather] = useState({});
   const [calendarSynced, setCalendarSynced] = useState(false);
   const rosterAccountKey = resolveRosterAccountKey(apiRole);
+  const ROSTER_STAFF_PAGE_SIZE = 200;
+  const [rosterStaffLimit, setRosterStaffLimit] = useState(ROSTER_STAFF_PAGE_SIZE);
+
+  useEffect(() => {
+    setRosterStaffLimit(ROSTER_STAFF_PAGE_SIZE);
+  }, [rosterAccountKey]);
 
   const dashboardStaffQuery = useGetDashboardStaffQuery(
-    { accountKey: rosterAccountKey, page: 0, limit: 200, status: 'active' },
+    { accountKey: rosterAccountKey, page: 0, limit: rosterStaffLimit, status: 'active' },
     {
       skip: !useCalendarApi,
       refetchOnMountOrArgChange: 60,
@@ -2983,14 +3018,33 @@ function ShiftsViewContent({
     }
   );
 
+  const rosterStaffList = dashboardStaffQuery.data?.data;
+  const rosterStaffCount = Array.isArray(rosterStaffList) ? rosterStaffList.length : 0;
+  const rosterStaffTotalRaw =
+    dashboardStaffQuery.data?.meta?.totalRecords ?? dashboardStaffQuery.data?.total_length;
+  const rosterStaffTotal =
+    rosterStaffTotalRaw !== undefined && rosterStaffTotalRaw !== null && rosterStaffTotalRaw !== ''
+      ? Number(rosterStaffTotalRaw) || 0
+      : null;
+  const rosterStaffHasMore =
+    rosterStaffTotal != null
+      ? rosterStaffCount < rosterStaffTotal
+      : rosterStaffCount >= rosterStaffLimit;
+  const rosterStaffLoadingMore =
+    Boolean(dashboardStaffQuery.isFetching) && rosterStaffCount > 0;
+
   const staffApiTeams = useMemo(
-    () => (useCalendarApi ? mapDashboardStaffToShiftTeams(dashboardStaffQuery.data?.data) : []),
-    [useCalendarApi, dashboardStaffQuery.data?.data]
+    () => (useCalendarApi ? mapDashboardStaffToShiftTeams(rosterStaffList) : []),
+    [useCalendarApi, rosterStaffList]
   );
+
+  const handleLoadMoreRosterStaff = useCallback(() => {
+    setRosterStaffLimit((prev) => prev + ROSTER_STAFF_PAGE_SIZE);
+  }, []);
 
   if (useCalendarApi) {
     const apiTeams = calendarSynced && Array.isArray(calendarTeams) ? calendarTeams : [];
-    TEAMS = calendarSynced ? (apiTeams.length > 0 ? apiTeams : staffApiTeams) : [];
+    TEAMS = calendarSynced ? mergeShiftRosterTeams(apiTeams, staffApiTeams) : [];
     const maps = deriveStaffMaps(TEAMS);
     ALL_STAFF = maps.allStaff;
     STAFF_TEAM_MAP = maps.staffTeamMap;
@@ -3008,6 +3062,7 @@ function ShiftsViewContent({
   const [postJobContext, setPostJobContext] = useState(null);
   const {
     jobs: postedJobs,
+    rawJobs: postedJobsRaw,
     loading: postedJobsLoading,
     loadingMore: postedJobsLoadingMore,
     hasMore: postedJobsHasMore,
@@ -3022,8 +3077,6 @@ function ShiftsViewContent({
   const [shifts, setShifts] = useState({});
   const [collapsed, setCollapsed] = useState({});
   const [location, setLocation] = useState(defaultLocationId || ALL_LOCATIONS_ID);
-  const teamOrderStorageKey = `tempy-shifts-team-order-${apiRole || 'careHome'}`;
-  const [teamOrderIds, setTeamOrderIds] = useState(() => loadTeamOrder(teamOrderStorageKey));
   const [cellActionMenu, setCellActionMenu] = useState(null);
   const [postJobIntent, setPostJobIntent] = useState('bookShift');
 
@@ -3188,7 +3241,11 @@ function ShiftsViewContent({
   const [createUserJob] = useCreateUserJobMutation();
   const [createLocalAuthorityJob] = useCreateLocalAuthorityJobMutation();
   const [updateCareHomeJob] = useUpdateCareHomeJobMutation();
-  const [cancelCareHomeBooking, { isLoading: isCancellingBooking }] = useCancelCareHomeBookingMutation();
+  const [cancelCareHomeBooking, careHomeCancelState] = useCancelCareHomeBookingMutation();
+  const [cancelHospitalBooking, hospitalCancelState] = useCancelHospitalBookingMutation();
+  const [cancelUserBooking, userCancelState] = useCancelUserBookingMutation();
+  const [cancelLocalAuthorityBooking, localAuthorityCancelState] =
+    useCancelLocalAuthorityBookingMutation();
   const [updateHospitalJob] = useUpdateHospitalJobMutation();
   const [updateUserJob] = useUpdateUserJobMutation();
   const [updateLocalAuthorityJob] = useUpdateLocalAuthorityJobMutation();
@@ -3200,6 +3257,7 @@ function ShiftsViewContent({
         : isLocalAuthorityApi
           ? createLocalAuthorityJob
           : createCareHomeJob;
+  const { create: createJobType } = useRoleJobTypeMutations(apiRole);
   const updateJob =
     isHospitalApi
       ? updateHospitalJob
@@ -3208,6 +3266,20 @@ function ShiftsViewContent({
         : isLocalAuthorityApi
           ? updateLocalAuthorityJob
           : updateCareHomeJob;
+  const cancelBooking = isHospitalApi
+    ? cancelHospitalBooking
+    : isUserApi
+      ? cancelUserBooking
+      : isLocalAuthorityApi
+        ? cancelLocalAuthorityBooking
+        : cancelCareHomeBooking;
+  const isCancellingBooking = isHospitalApi
+    ? hospitalCancelState.isLoading
+    : isUserApi
+      ? userCancelState.isLoading
+      : isLocalAuthorityApi
+        ? localAuthorityCancelState.isLoading
+        : careHomeCancelState.isLoading;
 
   const careHomeJobsQuery = useGetCareHomeJobsQuery(
     { page: 0, limit: 100 },
@@ -3343,8 +3415,10 @@ function ShiftsViewContent({
         throw new Error(validationError);
       }
 
+      const resolvedDraft = await resolveDraftJobTypeForSubmit(draft, createJobType);
+
       const branchId =
-        String(draft.branchId || '').trim() ||
+        String(resolvedDraft.branchId || '').trim() ||
         (location && location !== ALL_LOCATIONS_ID ? location : '') ||
         String(branches[0]?.id || '');
 
@@ -3353,7 +3427,7 @@ function ShiftsViewContent({
         branches.find((item) => String(item._id) === String(branchId)) ||
         null;
 
-      if (!draft.typeId) {
+      if (!resolvedDraft.typeId) {
         throw new Error('Please select a job type');
       }
       if (!branchId || !branch) {
@@ -3368,27 +3442,27 @@ function ShiftsViewContent({
       const directId =
         resolveDirectRequestTargetId(
           {
-            workerId: draft.workerId,
-            employeeId: draft.employeeId,
-            agencyId: draft.agencyId,
+            workerId: resolvedDraft.workerId,
+            employeeId: resolvedDraft.employeeId,
+            agencyId: resolvedDraft.agencyId,
             staffId: postJobContext?.staffId,
           },
           staff
         ) || '';
 
-      const schedules = (draft.schedules || []).map((entry) => ({
+      const schedules = (resolvedDraft.schedules || []).map((entry) => ({
         ...entry,
         receivingBids: directId ? false : entry.receivingBids,
       }));
 
       const body = buildCareHomeJobPayload(
         {
-          ...draft,
+          ...resolvedDraft,
           branchId,
           workerId: directId,
           employeeId: directId,
           schedules,
-          location: branch.location || draft.location,
+          location: branch.location || resolvedDraft.location,
         },
         branch,
         { isUser: isUserApi }
@@ -3420,11 +3494,10 @@ function ShiftsViewContent({
         allStaff.find((s) => !s.isVacant)?.id ||
         '';
       const { staffId: resolvedStaffId, teamMatched, team: matchedTeam } = resolveStaffIdForJobType(
-        draft.type || draft.typeTitle,
+        resolvedDraft.type || resolvedDraft.typeTitle,
         clickedStaffId,
         teams
       );
-      // Always pin the card to a visible rota row so Request staff is never invisible.
       const targetStaffId =
         resolvedStaffId ||
         clickedStaffId ||
@@ -3461,13 +3534,17 @@ function ShiftsViewContent({
           setShowStaffDetail(true);
         }
 
-        const draftJobId = createdJobId || String(draft.id || draft._id || '').trim();
+        const draftJobId = createdJobId || String(resolvedDraft.id || resolvedDraft._id || '').trim();
 
         setShifts((prev) => {
           const next = { ...prev };
           validSchedules.forEach((schedule, index) => {
             const built = buildJobGridShift(
-              { ...draft, id: draftJobId || `local-${schedule.date}-${targetStaffId}`, schedules: validSchedules },
+              {
+                ...resolvedDraft,
+                id: draftJobId || `local-${schedule.date}-${targetStaffId}`,
+                schedules: validSchedules,
+              },
               targetStaffId,
               schedule,
               index,
@@ -3480,8 +3557,9 @@ function ShiftsViewContent({
               id: key,
               staffId: targetStaffId,
               fromJob: true,
+              pendingOpenJob: !directId,
               jobId: draftJobId || built.jobId,
-              receivingBids: true,
+              receivingBids: !directId,
             };
           });
           return next;
@@ -3489,7 +3567,8 @@ function ShiftsViewContent({
 
         if (!teamMatched) {
           toast.warning(
-            `No "${draft.type || draft.typeTitle}" row on this rota — showing the request on ${targetMember?.name || 'the selected staff'
+            `No "${resolvedDraft.type || resolvedDraft.typeTitle}" row on this rota — showing the request on ${
+              targetMember?.name || 'the selected staff'
             } for that date.`
           );
         }
@@ -3497,13 +3576,17 @@ function ShiftsViewContent({
 
       if (directId) {
         const sentToAgency =
-          Boolean(draft.agencyId && directId === draft.agencyId) ||
+          Boolean(resolvedDraft.agencyId && directId === resolvedDraft.agencyId) ||
           Boolean(staff?.agencyId && directId === staff.agencyId);
         toast.success(
           pickJobSuccessToast(
             createdPayload,
             sentToAgency
-              ? `Direct request sent${draft.agencyName || staff?.agencyName ? ` to ${draft.agencyName || staff.agencyName}` : ''} — it will show on Agency → Find Jobs`
+              ? `Direct request sent${
+                  resolvedDraft.agencyName || staff?.agencyName
+                    ? ` to ${resolvedDraft.agencyName || staff.agencyName}`
+                    : ''
+                } — it will show on Agency → Find Jobs`
               : 'Request sent to worker (not an agency — will not appear on Agency Find Jobs)'
           )
         );
@@ -3512,6 +3595,7 @@ function ShiftsViewContent({
       }
 
       setPostJobContext(null);
+
     },
     [
       location,
@@ -3522,6 +3606,8 @@ function ShiftsViewContent({
       selectedStaff,
       resolveDirectRequestTargetId,
       createJob,
+      createJobType,
+      isUserApi,
     ]
   );
   const [shiftForm, setShiftForm] = useState({
@@ -3675,39 +3761,43 @@ function ShiftsViewContent({
       const apiShifts = calendarData.shifts || {};
       const next = { ...apiShifts };
 
-      // Staff ids actually rendered on the rota (calendar teams, else dashboard staff).
-      const visibleStaffIds = new Set();
-      const apiTeams = Array.isArray(calendarData.teams) ? calendarData.teams : [];
-      const rosterTeams = apiTeams.length > 0 ? apiTeams : staffApiTeams;
-      rosterTeams.forEach((team) => {
-        (team?.staff || []).forEach((member) => {
-          if (member?.id != null) visibleStaffIds.add(String(member.id));
-        });
-      });
 
-      // Job ids the calendar already drew on a *visible* row.
-      const apiJobIdsOnVisibleRows = new Set();
-      Object.entries(apiShifts).forEach(([key, shift]) => {
-        const jobId = String(shift?.jobId || '').trim();
-        if (!jobId) return;
-        const staffId = String(
-          shift?.staffId != null ? shift.staffId : String(key).replace(/-\d{4}-\d{2}-\d{2}$/, '')
-        );
-        if (visibleStaffIds.has(staffId)) apiJobIdsOnVisibleRows.add(jobId);
-      });
-
-      // Keep optimistic "from job" cards (e.g. Request staff) when the calendar
-      // omits them or places them on a role/row that is not on this rota.
       Object.entries(prev).forEach(([key, shift]) => {
-        if (!shift?.fromJob) return;
+        if (!shift?.fromJob && !shift?.pendingOpenJob) return;
         if (next[key]) return;
         const jobId = String(shift.jobId || '').trim();
-        if (jobId && apiJobIdsOnVisibleRows.has(jobId)) return;
+        const date = shiftEntryDate(key, shift);
+        const apiHasBookedSameJobDate =
+          Boolean(jobId) &&
+          Object.entries(next).some(([apiKey, entry]) => {
+            if (String(entry?.jobId || '') !== jobId) return false;
+            if (shiftEntryDate(apiKey, entry) !== date) return false;
+            return Boolean(entry?.bookingId) || !entry?.fromJob;
+          });
+        if (apiHasBookedSameJobDate) return;
         next[key] = shift;
       });
+
       return next;
     });
-  }, [useCalendarApi, calendarData, staffApiTeams]);
+  }, [useCalendarApi, calendarData]);
+
+  useEffect(() => {
+    if (!useCalendarApi || !postedJobsRaw?.length || !days?.length) return;
+    const dayKeys = days.map((day) => format(day, 'yyyy-MM-dd'));
+    const calendarRoster = Array.isArray(calendarTeams) ? calendarTeams : [];
+    const rosterTeams = calendarRoster.length > 0 ? calendarRoster : staffApiTeams;
+    setShifts((prev) => {
+      const merged = mergeOpenPostedJobsIntoShifts(prev, postedJobsRaw, rosterTeams, dayKeys);
+      if (merged === prev) return prev;
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(merged);
+      if (prevKeys.length === nextKeys.length && nextKeys.every((key) => merged[key] === prev[key])) {
+        return prev;
+      }
+      return merged;
+    });
+  }, [useCalendarApi, postedJobsRaw, days, calendarTeams, staffApiTeams]);
 
   useEffect(() => {
     if (!useCalendarApi || !isCalendarError) return;
@@ -3756,48 +3846,10 @@ function ShiftsViewContent({
 
   const rosterCtx = useMemo(() => ({ shifts, days }), [shifts, days]);
 
+
   const visibleTeams = useMemo(
-    () => sortTeamsByOrder(mapTeamsByRosterScope(teams, rosterScope, rosterCtx), teamOrderIds),
-    [teams, rosterScope, rosterCtx, teamOrderIds]
-  );
-
-  useEffect(() => {
-    if (!teams?.length) return;
-    setTeamOrderIds((prev) => {
-      const ids = teams.map((team) => String(team.id));
-      const next = [...prev.filter((id) => ids.includes(String(id)))];
-      ids.forEach((id) => {
-        if (!next.includes(id)) next.push(id);
-      });
-      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
-        return prev;
-      }
-      saveTeamOrder(teamOrderStorageKey, next);
-      return next;
-    });
-  }, [teams, teamOrderStorageKey]);
-
-  const teamSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const handleTeamDragEnd = useCallback(
-    (event) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-
-      setTeamOrderIds((prev) => {
-        const current = sortTeamsByOrder(visibleTeams, prev).map((team) => String(team.id));
-        const oldIndex = current.indexOf(String(active.id));
-        const newIndex = current.indexOf(String(over.id));
-        if (oldIndex < 0 || newIndex < 0) return prev;
-        const next = arrayMove(current, oldIndex, newIndex);
-        saveTeamOrder(teamOrderStorageKey, next);
-        return next;
-      });
-    },
-    [teamOrderStorageKey, visibleTeams]
+    () => mapTeamsByRosterScope(teams, rosterScope, rosterCtx),
+    [teams, rosterScope, rosterCtx]
   );
 
   const visibleStaffCount = useMemo(() => countRosterMembers(visibleTeams), [visibleTeams]);
@@ -4039,7 +4091,7 @@ function ShiftsViewContent({
 
   const refuseLocalRotaWrite = useCallback((actionLabel) => {
     toast.info(
-      `${actionLabel} is not saved on this rota. Use Book shift to post a job, or Cancel booking to remove a booked shift.`
+      `${actionLabel} is not saved on this rota. Use Book a shift to post a job, or Cancel booking to remove a booked shift.`
     );
   }, []);
 
@@ -4089,7 +4141,7 @@ function ShiftsViewContent({
       }
 
       toast.info(
-        'Use the shift menu to cancel a booking, or Book shift on an empty cell to post a job.'
+        'Use the shift menu to cancel a booking, or Book a shift on an empty cell to post a job.'
       );
     },
     [handleOpenPostJob, isLocked, isUserApi, location, locations, viewOnly]
@@ -4341,7 +4393,7 @@ function ShiftsViewContent({
       return;
     }
     try {
-      const response = await cancelCareHomeBooking(id).unwrap();
+      const response = await cancelBooking(id).unwrap();
       toast.success(
         pickApiToastMessage(
           response,
@@ -4383,7 +4435,7 @@ function ShiftsViewContent({
     } catch (error) {
       toast.error(handleApiError(error) || 'Could not cancel this booking.');
     }
-  }, [cancelBookingTarget, cancelCareHomeBooking, refetchCalendar]);
+  }, [cancelBookingTarget, cancelBooking, refetchCalendar]);
 
   const handleCloseReviewDialog = useCallback(() => {
     reviewDialog.onFalse();
@@ -4402,27 +4454,27 @@ function ShiftsViewContent({
 
       try {
         if (reviewJob.review?.id) {
-          await updateReview({
+          const response = await updateReview({
             id: reviewJob.review.id,
             rating,
             comment,
             reviewType: reviewJob.review.reviewType || target.reviewType,
             objectId: reviewJob.review.objectId || target.objectId,
           }).unwrap();
-          toast.success('Rating updated');
+          toast.success(pickApiToastMessage(response, 'Rating updated'));
         } else {
-          await createReview({
+          const response = await createReview({
             reviewType: target.reviewType,
             objectId: target.objectId,
             rating,
             comment,
           }).unwrap();
-          toast.success('Worker rated');
+          toast.success(pickApiToastMessage(response, 'Worker rated'));
         }
         handleCloseReviewDialog();
         refetchReviews?.();
       } catch (err) {
-        toast.error(err?.data?.message || err?.error || err?.message || 'Could not save rating');
+        toast.error(handleApiError(err) || 'Could not save rating');
       }
     },
     [createReview, handleCloseReviewDialog, refetchReviews, reviewJob, updateReview]
@@ -4508,7 +4560,13 @@ function ShiftsViewContent({
 
   return (
     <ShiftReviewLookupContext.Provider value={findShiftReview}>
-      <ShiftCancelBookingContext.Provider value={isCareHomeApi && !viewOnly ? handleOpenCancelBooking : null}>
+      <ShiftCancelBookingContext.Provider
+        value={
+          !viewOnly && (isCareHomeApi || isHospitalApi || isUserApi || isLocalAuthorityApi)
+            ? handleOpenCancelBooking
+            : null
+        }
+      >
         <DashboardContent
           disablePadding
           maxWidth={false}
@@ -4657,7 +4715,33 @@ function ShiftsViewContent({
                     <Typography sx={{ fontSize: 11, color: 'text.secondary', pl: 0.5, whiteSpace: 'nowrap' }}>
                       {visibleStaffCount} shown
                       {hiddenRosterCount > 0 ? ` · ${hiddenRosterCount} hidden` : ''}
+                      {rosterStaffTotal != null && rosterStaffTotal > visibleStaffCount
+                        ? ` · ${rosterStaffTotal} on staff list`
+                        : ''}
                     </Typography>
+                    {rosterStaffHasMore ? (
+                      <Button
+                        size="small"
+                        onClick={handleLoadMoreRosterStaff}
+                        disabled={rosterStaffLoadingMore}
+                        startIcon={
+                          rosterStaffLoadingMore ? (
+                            <CircularProgress size={12} color="inherit" />
+                          ) : (
+                            <Iconify icon="eva:arrow-downward-fill" width={14} />
+                          )
+                        }
+                        sx={{
+                          fontSize: 11.5,
+                          textTransform: 'none',
+                          minWidth: 'auto',
+                          px: 1.25,
+                          color: 'primary.main',
+                        }}
+                      >
+                        {rosterStaffLoadingMore ? 'Loading…' : 'Load more staff'}
+                      </Button>
+                    ) : null}
                   </Stack>
                 </Tooltip>
 
@@ -4751,7 +4835,7 @@ function ShiftsViewContent({
                         weatherType={apiWeather?.type || null}
                         dayWeather={apiWeather}
                         onClick={handleDateHeaderClick}
-                        clickHint="Request a shift for this date"
+                        clickHint="Book a shift for this date"
                       />
                     );
                   })}
@@ -4780,40 +4864,29 @@ function ShiftsViewContent({
                     />
                   </Box>
                 ) : (
-                  <DndContext
-                    sensors={teamSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTeamDragEnd}
-                  >
-                    <SortableContext
-                      items={visibleTeams.map((team) => String(team.id))}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {visibleTeams.map((team) => (
-                        <SortableTeamGroup
-                          key={team.id}
-                          team={team}
-                          days={days}
-                          shifts={shifts}
-                          selectedStaffId={showStaffDetail ? selectedStaff?.id : null}
-                          activeCell={activeCell}
-                          formPreview={formPreview}
-                          onCellClick={handleCellClick}
-                          onStaffSelect={handleStaffSelect}
-                          onStaffPick={handleCardStaffPick}
-                          onOpenDetails={handleOpenShiftDetails}
-                          onViewBids={handleViewBids}
-                          onIncreaseRate={viewOnly ? undefined : handleIncreaseRate}
-                          onRateWorker={viewOnly ? undefined : handleRateWorker}
-                          viewOnly={viewOnly}
-                          collapsed={!!collapsed[team.id]}
-                          onToggle={() => setCollapsed((p) => ({ ...p, [team.id]: !p[team.id] }))}
-                          staffColWidth={staffColWidth}
-                          dayColWidth={dayColWidth}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                  visibleTeams.map((team) => (
+                    <TeamGroup
+                      key={team.id}
+                      team={team}
+                      days={days}
+                      shifts={shifts}
+                      selectedStaffId={showStaffDetail ? selectedStaff?.id : null}
+                      activeCell={activeCell}
+                      formPreview={formPreview}
+                      onCellClick={handleCellClick}
+                      onStaffSelect={handleStaffSelect}
+                      onStaffPick={handleCardStaffPick}
+                      onOpenDetails={handleOpenShiftDetails}
+                      onViewBids={handleViewBids}
+                      onIncreaseRate={viewOnly ? undefined : handleIncreaseRate}
+                      onRateWorker={viewOnly ? undefined : handleRateWorker}
+                      viewOnly={viewOnly}
+                      collapsed={!!collapsed[team.id]}
+                      onToggle={() => setCollapsed((p) => ({ ...p, [team.id]: !p[team.id] }))}
+                      staffColWidth={staffColWidth}
+                      dayColWidth={dayColWidth}
+                    />
+                  ))
                 )}
 
                 <Box sx={{ flex: 1, minHeight: 32, bgcolor: rotaPaper }} />
@@ -4830,10 +4903,10 @@ function ShiftsViewContent({
           >
             <MenuItem onClick={handleCellBookShift}>
               <Iconify icon="solar:calendar-add-bold" width={18} sx={{ mr: 1 }} />
-              Book shift
+              Book a shift
             </MenuItem>
             <Tooltip
-              title="Day off / leave is not available for this role — there is no availability API. Use Book shift or Cancel booking."
+              title="Day off / leave is not available for this role — there is no availability API. Use Book a shift or Cancel booking."
               placement="right"
             >
               <span>

@@ -29,7 +29,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { rowInPage, TablePaginationCustom, useTable } from 'src/components/table';
+import { TablePaginationCustom, useTable } from 'src/components/table';
 
 import {
   useGetPermanentHiresQuery,
@@ -45,14 +45,8 @@ import { PermanentHireDetailsDialog } from '../relationship-details-dialogs';
 import { HIRE_STATUS, getRoleApiBase, getRelationshipSide } from '../supplier-relationship-utils';
 import { useViewOnly } from 'src/hooks/use-view-only';
 
-// ----------------------------------------------------------------------
 
-/**
- * Temp to permanent. A care home can request permanent status for agency or
- * home care company staff after the minimum shifts. There is no fee.
- */
 export function PermanentHiresView() {
-  // Admin viewing this account: hires can be viewed, not started or answered.
   const viewOnly = useViewOnly();
   const { user } = useSelector((state) => state.user);
   const isCareHome = getRelationshipSide(user) === 'customer';
@@ -61,15 +55,16 @@ export function PermanentHiresView() {
   const [hireOpen, setHireOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
 
+  const table = useTable({ defaultRowsPerPage: 10 });
   const { data: settings } = useGetPermanentHireSettingsQuery({ base }, { skip: !base });
-  const { data, isLoading, isError, error } = useGetPermanentHiresQuery({ base }, { skip: !base });
+  const { data, isLoading, isError, error } = useGetPermanentHiresQuery(
+    { base, page: table.page, limit: table.rowsPerPage },
+    { skip: !base }
+  );
   const [respond, { isLoading: isResponding }] = useRespondToPermanentHireMutation();
 
   const rows = data?.data || [];
-  const table = useTable({ defaultRowsPerPage: 10 });
-  const pageCount = Math.max(1, Math.ceil(rows.length / table.rowsPerPage));
-  const safePage = Math.min(table.page, pageCount - 1);
-  const pageRows = rowInPage(rows, safePage, table.rowsPerPage);
+  const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
 
   const handleAction = async (row, action) => {
     try {
@@ -85,13 +80,13 @@ export function PermanentHiresView() {
   return (
     <DashboardContent maxWidth={false}>
       <CustomBreadcrumbs
-        heading="Permanent hires"
+        heading="Hiring and Onboarding"
         links={[
           {
             name: 'Dashboard',
             href: getDashboardRootPath(user?.permission, user?.accountState?.accountType),
           },
-          { name: 'Permanent hires' },
+          { name: 'Hiring and Onboarding' },
         ]}
         action={
           isCareHome && !viewOnly && (
@@ -100,7 +95,7 @@ export function PermanentHiresView() {
               startIcon={<Iconify icon="mingcute:add-line" />}
               onClick={() => setHireOpen(true)}
             >
-              Hire permanently
+              Request staff member
             </Button>
           )
         }
@@ -108,14 +103,30 @@ export function PermanentHiresView() {
       />
 
       <Alert severity="info" sx={{ mb: 2.5 }}>
-        {isCareHome ? 'You can' : 'A care home can'} request permanent status for agency or home
-        care company staff after <strong>{settings?.minShifts ?? '—'}</strong> completed shifts.
-        The worker accepts or rejects. They can be permanent with only one customer at a time.
+        {isCareHome ? (
+          <>
+            You can request a worker to become your staff member after{' '}
+            <strong>{settings?.minShifts ?? 1}</strong> completed shift
+            {Number(settings?.minShifts) === 1 || settings?.minShifts == null ? '' : 's'}. They can
+            accept or reject. This works on an agreement that they complete{' '}
+            <strong>12 weeks</strong> of shifts with you through Tempy, and after this period they
+            become an employee of your company.
+          </>
+        ) : (
+          <>
+            A care home can request you to become their staff member after{' '}
+            <strong>{settings?.minShifts ?? 1}</strong> completed shift
+            {Number(settings?.minShifts) === 1 || settings?.minShifts == null ? '' : 's'}. You are
+            welcome to accept or reject this offer. This would work on an agreement that you
+            complete <strong>12 weeks</strong> of shifts with them through Tempy, and after this
+            period you will become an employee of this company.
+          </>
+        )}
       </Alert>
 
       {isError && (
         <Alert severity="error" sx={{ mb: 2.5 }}>
-          {handleApiError(error) || 'Could not load permanent hires.'}
+          {handleApiError(error) || 'Could not load hiring and onboarding requests.'}
         </Alert>
       )}
 
@@ -134,7 +145,7 @@ export function PermanentHiresView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pageRows.map((row) => {
+              {rows.map((row) => {
                 const status = HIRE_STATUS[row.status] || HIRE_STATUS.pending;
                 const isPending = row.status === 'pending';
 
@@ -200,7 +211,7 @@ export function PermanentHiresView() {
               {!isLoading && !rows.length && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 5, color: 'text.secondary' }}>
-                    No permanent hire requests yet
+                    No hiring and onboarding requests yet
                   </TableCell>
                 </TableRow>
               )}
@@ -208,8 +219,8 @@ export function PermanentHiresView() {
           </Table>
         </Scrollbar>
         <TablePaginationCustom
-          page={safePage}
-          count={rows.length}
+          page={table.page}
+          count={totalCount}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           onRowsPerPageChange={table.onChangeRowsPerPage}
@@ -225,7 +236,6 @@ export function PermanentHiresView() {
   );
 }
 
-// ----------------------------------------------------------------------
 
 function HireDialog({ base, settings, onClose }) {
   const [selectedId, setSelectedId] = useState('');
@@ -256,7 +266,7 @@ function HireDialog({ base, settings, onClose }) {
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Hire permanently</DialogTitle>
+      <DialogTitle>Request staff member</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField
@@ -266,7 +276,7 @@ function HireDialog({ base, settings, onClose }) {
             onChange={(e) => setSelectedId(e.target.value)}
             helperText={
               workers.length
-                ? `Staff need at least ${minShifts} completed shifts with you.`
+                ? `Staff need at least ${minShifts} completed shift${minShifts === 1 ? '' : 's'} with you.`
                 : 'No agency or home care company staff have completed enough shifts with you yet.'
             }
           >
@@ -279,9 +289,9 @@ function HireDialog({ base, settings, onClose }) {
 
           {selected && (
             <Alert severity="info">
-              {selected.worker.name} can accept or reject this request. Permanent status is a tag
-              with your organisation only, and they cannot be permanent with another customer at
-              the same time.
+              {selected.worker.name} can accept or reject this offer. This works on an agreement
+              that they complete 12 weeks of shifts with you through Tempy, and after this period
+              they become an employee of your company.
             </Alert>
           )}
         </Stack>

@@ -63,23 +63,33 @@ export function JobListFilterBar({ value = EMPTY_JOB_LIST_FILTERS, onChange, job
       />
 
       <FormControl size="small" sx={{ ...FIELD_SX, minWidth: { xs: 1, sm: 220 }, maxWidth: { sm: 320 } }}>
-        <InputLabel id="job-list-types-label">Job Types</InputLabel>
+        <InputLabel id="job-list-types-label" shrink>
+          Job Types
+        </InputLabel>
         <Select
           labelId="job-list-types-label"
           multiple
+          displayEmpty
+          notched
           label="Job Types"
           value={value.jobRoles}
           onChange={(e) => {
             const next = e.target.value;
             update({ jobRoles: typeof next === 'string' ? next.split(',') : next });
           }}
-          renderValue={(selected) => (
-            <Box sx={{ display: 'flex', gap: 0.5, overflow: 'hidden' }}>
-              {selected.map((id) => (
-                <Chip key={id} size="small" label={labelById.get(id) || 'Job type'} />
-              ))}
-            </Box>
-          )}
+          renderValue={(selected) => {
+            if (!selected?.length) return 'All';
+            if (selected.length === 1) {
+              return labelById.get(selected[0]) || '1 selected';
+            }
+            return (
+              <Box sx={{ display: 'flex', gap: 0.5, overflow: 'hidden' }}>
+                {selected.map((id) => (
+                  <Chip key={id} size="small" label={labelById.get(id) || 'Job type'} />
+                ))}
+              </Box>
+            );
+          }}
           MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
         >
           {jobTypeOptions.length ? (

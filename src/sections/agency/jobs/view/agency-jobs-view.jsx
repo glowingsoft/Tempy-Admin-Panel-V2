@@ -41,6 +41,7 @@ import {
 } from 'src/components/table';
 import {
   JOB_DATE_FILTERS,
+  compareJobsByShiftSoonest,
   compareJobsNewestFirst,
   matchesJobDateFilter,
 } from 'src/components/jobs/job-date-filters';
@@ -154,11 +155,6 @@ import { StaffMemberMissedCheckoutDialog } from 'src/sections/staff-member/jobs/
 import { hasStaffShiftEnded } from 'src/sections/staff-member/jobs/staff-member-job-utils';
 import { SupplierJobDetailsDialog } from '../supplier-job-details-dialog';
 import { getBrowserPosition } from 'src/sections/staff-member/jobs/staff-member-location';
-import {
-  buildStaffJobRoleFilters,
-  countStaffJobsByRole,
-  filterStaffJobsByRole,
-} from 'src/sections/staff-member/jobs/staff-member-job-filters';
 import { useGetSupplierJobRoleChoicesQuery } from 'src/store/Reducer/supplier-job-roles-api';
 import {
   EMPTY_JOB_LIST_FILTERS,
@@ -311,7 +307,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
   }, [tabs]);
   const [page, setPage] = useState(1);
   const [dateFilter, setDateFilter] = useState('all');
-  const [roleFilter, setRoleFilter] = useState('all');
   const [listFilters, setListFilters] = useState(EMPTY_JOB_LIST_FILTERS);
   const { viewMode: storedViewMode, setViewMode: persistViewMode } = usePersistedViewMode(
     isStaffMember
@@ -456,7 +451,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     () => (jobRoleChoices || []).map((item) => ({ id: item.id, label: item.label })),
     [jobRoleChoices]
   );
-  const staffRoleFilters = useMemo(() => buildStaffJobRoleFilters(jobRoleChoices || []), [jobRoleChoices]);
 
   const agencyJobsQuery = useGetAgencyJobsQuery(jobsQueryArgs, {
     skip: !useAgencyApis,
@@ -1034,11 +1028,11 @@ export function AgencyJobsView({ mode = 'agency' }) {
     const nurseBookings = nurseBookingsQuery.data?.data || [];
     let list = tabJobs;
 
-    if (isStaffMember) {
-      list = filterStaffJobsByRole(list, roleFilter, staffRoleFilters);
-    }
-
-    list = (listFilters.sort ? [...list] : [...list].sort(compareJobsNewestFirst))
+    list = (
+      listFilters.sort
+        ? [...list]
+        : [...list].sort(isStaffMember ? compareJobsByShiftSoonest : compareJobsNewestFirst)
+    )
       .map((listedJob) => {
         let job = listedJob;
         const bid = findAgencyBidForJobCard(bidsByShiftId, {
@@ -1111,16 +1105,9 @@ export function AgencyJobsView({ mode = 'agency' }) {
     isStaffMember,
     listFilters.sort,
     nurseBookingsQuery.data?.data,
-    roleFilter,
-    staffRoleFilters,
     tabJobs,
     tabs.value,
   ]);
-
-  const staffRoleCounts = useMemo(() => {
-    if (!isStaffMember) return {};
-    return countStaffJobsByRole(tabJobs, staffRoleFilters);
-  }, [isStaffMember, staffRoleFilters, tabJobs]);
 
   useEffect(() => {
     if (jobsLoading || jobsFetching) return;
@@ -1182,7 +1169,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
 
   useEffect(() => {
     setPage(1);
-  }, [tabs.value, dateFilter, roleFilter, listFilters]);
+  }, [tabs.value, dateFilter, listFilters]);
 
   const handleChangePage = useCallback((event, newPage) => {
     setPage(newPage);
@@ -1202,28 +1189,17 @@ export function AgencyJobsView({ mode = 'agency' }) {
     }
   }, []);
 
-  const handleRoleFilterChange = useCallback((nextFilter) => {
-    if (nextFilter) {
-      setRoleFilter(nextFilter);
-      setPage(1);
-    }
-  }, []);
-
   const handleListFiltersChange = useCallback((next) => {
     setListFilters(next);
     setPage(1);
   }, []);
 
   const hasActiveFilters =
-    tabs.value !== 'all' ||
-    dateFilter !== 'all' ||
-    hasJobListFilters(listFilters) ||
-    (isStaffMember && roleFilter !== 'all');
+    tabs.value !== 'all' || dateFilter !== 'all' || hasJobListFilters(listFilters);
 
   const handleClearFilters = useCallback(() => {
     tabs.setValue('all');
     setDateFilter('all');
-    setRoleFilter('all');
     setListFilters(EMPTY_JOB_LIST_FILTERS);
     setPage(1);
   }, [tabs]);
@@ -1694,7 +1670,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     async (job) => {
       if (isStaffMember) return;
 
-      // Agency / HCC: one Assign path only — booking modal (API). Never open the full grid.
       if (canAssignViaModal) {
         await openAssignModal(job);
         return;
@@ -1723,7 +1698,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     async (job) => {
       if (isStaffMember) return;
 
-      // Same API surface as Assign: reassign → modal; already assigned → job details (not incomplete grid).
       if (canAssignViaModal) {
         await openAssignModal(job, { allowAssignedDetails: true });
         return;
@@ -1977,7 +1951,7 @@ export function AgencyJobsView({ mode = 'agency' }) {
       } catch (error) {
         const raw = handleApiError(error) || 'Check-in failed. Please try again.';
         const message = /outside allowed radius/i.test(String(raw))
-          ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Detect GPS again.'
+          ? 'Location outside allowed radius — your GPS is not close enough to the job site. Move nearer to the shift address (or ask the poster to fix the job map pin), then Find my location again.'
           : raw;
         const blockingId = String(error?.data?.data?.bookingId || '').trim();
         if (blockingId) {
@@ -2191,7 +2165,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
     if (saved) setCareDetailsTick((n) => n + 1);
   }, []);
 
-  // Full Assign grid only for roles without the booking modal (agency/HCC always use the modal).
   if (jobDetail && !isStaffMember && !canAssignViaModal) {
     return (
       <AgencyAssignStaffView
@@ -2349,51 +2322,6 @@ export function AgencyJobsView({ mode = 'agency' }) {
         jobTypeOptions={jobTypeOptions}
         sx={{ mb: 2.5 }}
       />
-
-      {isStaffMember ? (
-        <Stack spacing={1.5} sx={{ mb: 2.5 }}>
-          <Stack direction="row" flexWrap="wrap" gap={1}>
-            {staffRoleFilters.map((filter) => {
-              const isSelected = roleFilter === filter.value;
-
-              return (
-                <Button
-                  key={filter.value}
-                  size="small"
-                  variant={isSelected ? 'contained' : 'outlined'}
-                  color={isSelected ? 'secondary' : 'inherit'}
-                  onClick={() => handleRoleFilterChange(filter.value)}
-                  sx={{
-                    borderRadius: 5,
-                    px: 1.5,
-                    py: 0.75,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: 'divider',
-                    ...(!isSelected && {
-                      bgcolor: 'background.paper',
-                      color: 'text.primary',
-                    }),
-                  }}
-                >
-                  {filter.label}
-                  <Chip
-                    size="small"
-                    label={staffRoleCounts[filter.value] || 0}
-                    sx={{
-                      ml: 1,
-                      height: 20,
-                      fontSize: 11,
-                      bgcolor: isSelected ? 'secondary.contrastText' : 'action.hover',
-                      color: isSelected ? 'secondary.main' : 'text.secondary',
-                    }}
-                  />
-                </Button>
-              );
-            })}
-          </Stack>
-        </Stack>
-      ) : null}
 
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2.5 }}>
         {JOB_DATE_FILTERS.map((filter) => {

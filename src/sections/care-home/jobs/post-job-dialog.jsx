@@ -14,7 +14,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
 import { toast } from 'src/components/snackbar';
-import { CustomerMandateNotice, useCustomerMandateBlock } from 'src/sections/agency/payments/customer-mandate-notice';
+import {
+  CustomerMandateNotice,
+  POST_JOB_PAYMENT_MESSAGE,
+  useCustomerMandateBlock,
+} from 'src/sections/agency/payments/customer-mandate-notice';
 
 import { JobDraftForm } from './care-home-job-form';
 import { JobCareDetailsFields } from './job-care-details-fields';
@@ -29,10 +33,13 @@ import {
   validateJobDraft,
 } from './care-home-job-utils';
 import { useLastJobContactDetails } from './use-last-job-contact';
+import { useCompanyPaysBreaks } from './company-break-settings';
 
 
-function buildOpenDraft({ editingJob, initialDraft }) {
+function buildOpenDraft({ editingJob, initialDraft, breakPaid = true }) {
   if (editingJob) return jobToDraft(editingJob);
+
+  const defaultSchedule = createDefaultSchedule(new Date(), { breakPaid });
 
   if (initialDraft) {
     return {
@@ -47,11 +54,11 @@ function buildOpenDraft({ editingJob, initialDraft }) {
       gender: String(initialDraft.gender || '').trim(),
       schedules: initialDraft.schedules?.length
         ? initialDraft.schedules.map((entry) => ({ ...entry }))
-        : [{ ...createDefaultSchedule() }],
+        : [{ ...defaultSchedule }],
     };
   }
 
-  return { ...EMPTY_JOB_DRAFT, schedules: [{ ...createDefaultSchedule() }] };
+  return { ...EMPTY_JOB_DRAFT, schedules: [{ ...defaultSchedule }] };
 }
 
 export function PostJobDialog({
@@ -66,6 +73,7 @@ export function PostJobDialog({
   intent = 'job',
 }) {
   const { blocked: mandateBlocked } = useCustomerMandateBlock(mode);
+  const { paysBreaks } = useCompanyPaysBreaks();
   const [draft, setDraft] = useState(EMPTY_JOB_DRAFT);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -76,10 +84,12 @@ export function PostJobDialog({
 
   const isBookShift = intent === 'bookShift' && !editingJob;
   const isRequest = intent === 'request' && !editingJob;
+  // Client: Book a shift / request must stay open without DD. Post job (Jobs) still requires DD.
+  const requirePaymentForPost = !editingJob && !isBookShift && !isRequest && mandateBlocked;
   const dialogTitle = editingJob
     ? 'Edit job'
     : isBookShift
-      ? 'Book shift'
+      ? 'Book a shift'
       : isRequest
         ? 'Request staff'
         : 'Add job';
@@ -88,7 +98,7 @@ export function PostJobDialog({
     : draft.requestFromAgency || isRequest
       ? 'Send request'
       : isBookShift
-        ? 'Book shift'
+        ? 'Book a shift'
         : 'Add job';
 
   useEffect(() => {
@@ -96,7 +106,7 @@ export function PostJobDialog({
       contactAppliedRef.current = false;
     }
     if (open && !wasOpenRef.current) {
-      const next = buildOpenDraft({ editingJob, initialDraft });
+      const next = buildOpenDraft({ editingJob, initialDraft, breakPaid: paysBreaks });
       setDraft(editingJob ? next : mergeEmptyJobContact(next, lastContact));
       setStep(1);
       setFormError('');
@@ -104,7 +114,7 @@ export function PostJobDialog({
       contactAppliedRef.current = Boolean(!editingJob && lastContact);
     }
     wasOpenRef.current = open;
-  }, [open, editingJob, initialDraft, lastContact]);
+  }, [open, editingJob, initialDraft, lastContact, paysBreaks]);
 
   useEffect(() => {
     if (!open || editingJob || !lastContact || contactAppliedRef.current) return;
@@ -128,10 +138,9 @@ export function PostJobDialog({
   }, []);
 
   const handleNextStep = useCallback(() => {
-    if (!editingJob && mandateBlocked) {
-      const message = 'Set up a direct debit on Payments before posting a job.';
-      setFormError(message);
-      toast.error(message);
+    if (requirePaymentForPost) {
+      setFormError(POST_JOB_PAYMENT_MESSAGE);
+      toast.error(POST_JOB_PAYMENT_MESSAGE);
       return;
     }
     const error = validateJobDraft(draft);
@@ -142,13 +151,12 @@ export function PostJobDialog({
     }
     setFormError('');
     setStep(2);
-  }, [draft, editingJob, mandateBlocked]);
+  }, [draft, requirePaymentForPost]);
 
   const handleSubmit = useCallback(async () => {
-    if (!editingJob && mandateBlocked) {
-      const message = 'Set up a direct debit on Payments before posting a job.';
-      setFormError(message);
-      toast.error(message);
+    if (requirePaymentForPost) {
+      setFormError(POST_JOB_PAYMENT_MESSAGE);
+      toast.error(POST_JOB_PAYMENT_MESSAGE);
       return;
     }
     const error = validateJobDraft(draft);
@@ -159,14 +167,12 @@ export function PostJobDialog({
       return;
     }
 
-    if (!editingJob) {
-      const careError = validateCareDetails(draft);
-      if (careError) {
-        setFormError(careError);
-        toast.error(careError);
-        setStep(2);
-        return;
-      }
+    const careError = validateCareDetails(draft);
+    if (careError) {
+      setFormError(careError);
+      toast.error(careError);
+      setStep(2);
+      return;
     }
 
     setSubmitting(true);
@@ -189,7 +195,7 @@ export function PostJobDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [draft, editingJob, mandateBlocked, onClose, onSubmit]);
+  }, [draft, onClose, onSubmit, requirePaymentForPost]);
 
   return (
     <Dialog
@@ -213,11 +219,9 @@ export function PostJobDialog({
     >
       <DialogTitle>
         {dialogTitle}
-        {!editingJob ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
-            Step {step} of 2 — {step === 1 ? 'Job details' : 'Care details'}
-          </Typography>
-        ) : null}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 400 }}>
+          Step {step} of 2 — {step === 1 ? 'Job details' : 'Care details'}
+        </Typography>
       </DialogTitle>
 
       <DialogContent
@@ -236,7 +240,9 @@ export function PostJobDialog({
       >
         {step === 1 ? (
           <>
-            {!editingJob ? <CustomerMandateNotice mode={mode} sx={{ mb: 2 }} /> : null}
+            {!editingJob && !isBookShift && !isRequest ? (
+              <CustomerMandateNotice mode={mode} variant="postJob" sx={{ mb: 2 }} />
+            ) : null}
             {editingJob && (
               <FormControl fullWidth size="small" sx={{ mb: 2.5 }}>
                 <InputLabel id="job-edit-status-label" shrink>
@@ -298,7 +304,7 @@ export function PostJobDialog({
               type="button"
               variant="contained"
               color="primary"
-              disabled={!editingJob && mandateBlocked}
+              disabled={requirePaymentForPost}
               onClick={handleNextStep}
             >
               Next — Care details
@@ -309,7 +315,7 @@ export function PostJobDialog({
               variant="contained"
               color="primary"
               loading={submitting}
-              disabled={!editingJob && mandateBlocked}
+              disabled={requirePaymentForPost}
               onClick={handleSubmit}
             >
               {submitLabel}

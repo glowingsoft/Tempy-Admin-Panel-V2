@@ -555,7 +555,6 @@ export function buildJobScheduleTimeOptions(stepMinutes = 15) {
 
 export const JOB_SCHEDULE_TIME_OPTIONS = buildJobScheduleTimeOptions(15);
 
-/** Minutes between start and end on the same day. Null when the range is missing or invalid. */
 export function getScheduleDurationMinutes(startTime, endTime) {
   const start = String(startTime || '').trim();
   const end = String(endTime || '').trim();
@@ -569,7 +568,6 @@ export function getScheduleDurationMinutes(startTime, endTime) {
   return endMinutes - startMinutes;
 }
 
-/** Break must be shorter than the shift. Returns an error message, or ''. */
 export function getScheduleBreakError(entry) {
   if (!entry || entry.breakIncluded === false) return '';
   const duration = getScheduleDurationMinutes(entry.startTime, entry.endTime);
@@ -582,21 +580,25 @@ export function getScheduleBreakError(entry) {
   return '';
 }
 
-/** Ensure a free-typed HH:mm still appears in the select list. */
 export function withJobScheduleTimeOption(options = JOB_SCHEDULE_TIME_OPTIONS, timeValue = '') {
   const value = String(timeValue || '').trim();
   if (!value || options.includes(value)) return options;
   return [...options, value].sort();
 }
 
-export function createDefaultSchedule(from = new Date()) {
+/**
+ * @param {Date} [from]
+ * @param {{ breakPaid?: boolean }} [options] — company default for paid vs unpaid
+ */
+export function createDefaultSchedule(from = new Date(), options = {}) {
+  const breakPaid = options.breakPaid !== false;
   return {
     id: createScheduleId(),
     date: getMinJobScheduleDate(from),
     startTime: '09:00',
     endTime: '17:00',
     breakIncluded: true,
-    breakPaid: true,
+    breakPaid,
     breakMins: 30,
     receivingBids: true,
   };
@@ -639,7 +641,6 @@ export const JOB_CONTACT_FIELDS = [
   'emergencyRelation',
 ];
 
-/** Contact and emergency fields from a saved job, or null when none were set. */
 export function pickJobContactDetails(job) {
   if (!job) return null;
 
@@ -654,7 +655,6 @@ export function pickJobContactDetails(job) {
   return hasAny ? contact : null;
 }
 
-/** Fill only contact fields the draft has not already set. */
 export function mergeEmptyJobContact(draft, contact) {
   if (!contact) return draft;
 
@@ -667,11 +667,22 @@ export function mergeEmptyJobContact(draft, contact) {
   return next;
 }
 
+export const OTHER_JOB_TYPE_ID = '__other__';
+
+export function isOtherJobTypeSelected(draft) {
+  return String(draft?.typeId || '').trim() === OTHER_JOB_TYPE_ID;
+}
+
+export function getCustomJobRoleLabel(draft) {
+  return String(draft?.customRole || draft?.typeTitle || draft?.type || draft?.name || '').trim();
+}
+
 export const EMPTY_JOB_DRAFT = {
   name: '',
   type: '',
   typeId: '',
   typeTitle: '',
+  customRole: '',
   branchId: '',
   address: '',
   schedules: [createDefaultSchedule()],
@@ -717,6 +728,7 @@ export function jobToDraft(job) {
     type: job.typeTitle || job.type || '',
     typeId: job.typeId || '',
     typeTitle: job.typeTitle || '',
+    customRole: '',
     branchId: job.branchId || '',
     address: job.address || '',
     location: job.location || null,
@@ -904,13 +916,15 @@ export function validateJobDraft(draft, now = new Date()) {
   if (!GENDER_OPTIONS.some((option) => option.value === draft.gender)) {
     return 'Please select gender';
   }
-  if (!draft.typeId && !draft.type) return 'Please select a job type';
+  if (isOtherJobTypeSelected(draft)) {
+    if (!getCustomJobRoleLabel(draft)) {
+      return 'Please enter your specific role';
+    }
+  } else if (!draft.typeId && !draft.type) {
+    return 'Please select a job type';
+  }
   if (!draft.branchId) {
     return 'Please select a location';
-  }
-
-  if (!draft.id && !String(draft.image || '').trim()) {
-    return 'Please add a job image';
   }
 
   if (!draft.schedules?.length) return 'Please add at least one date and time';

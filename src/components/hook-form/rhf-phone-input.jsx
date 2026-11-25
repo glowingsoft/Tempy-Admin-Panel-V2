@@ -1,10 +1,10 @@
 import { Controller, useFormContext } from 'react-hook-form';
 
 import { PhoneInput } from '../phone-input';
+import { DEFAULT_PHONE_COUNTRY } from '../phone-input/utils';
 
-// ----------------------------------------------------------------------
 
-export function RHFPhoneInput({ name, helperText, ...other }) {
+export function RHFPhoneInput({ name, helperText, country = DEFAULT_PHONE_COUNTRY, ...other }) {
   const { control, setValue } = useFormContext();
 
   return (
@@ -15,6 +15,7 @@ export function RHFPhoneInput({ name, helperText, ...other }) {
         <PhoneInput
           {...field}
           fullWidth
+          country={country}
           value={field.value}
           onChange={(newValue) => setValue(name, newValue || '', { shouldValidate: true })}
           error={!!error}

@@ -234,7 +234,7 @@ export function StaffFormDialog({ open, onClose, currentStaff, onSubmit, isNeste
                 <Field.StandaloneAddress
                   name="locationSearch"
                   label="Location"
-                  helperText="Search a place or tap Detect GPS for latitude & longitude"
+                  helperText="Search a place or tap Find my location for latitude & longitude"
                 />
               </Box>
               <Field.Text name="city" label="City" />

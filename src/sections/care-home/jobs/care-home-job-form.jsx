@@ -52,14 +52,18 @@ import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 
 import {
   GENDER_OPTIONS,
+  OTHER_JOB_TYPE_ID,
   createDefaultSchedule,
   findBestJobTypeOption,
+  getCustomJobRoleLabel,
   getMinJobScheduleDate,
   getScheduleBreakError,
   getScheduleDurationMinutes,
+  isOtherJobTypeSelected,
   isPastJobScheduleDate,
   jobTypeMatchesAnyTeam,
 } from './care-home-job-utils';
+import { useCompanyPaysBreaks } from './company-break-settings';
 const OUTLINED_LABEL_SX = {
   px: 0.5,
   bgcolor: 'background.paper',
@@ -183,7 +187,6 @@ const TIME_PICKER_LAYOUT_SX = {
   },
 };
 
-/** Digital time lists — 00–59 mins, compact + polished popup. */
 function JobScheduleTimeField({ label, value, onChange, disabled, error, helperText, minTime }) {
   const minValue = hhmmToDayjs(minTime);
 
@@ -233,7 +236,12 @@ function resolveBreakMode(entry) {
   return entry?.breakPaid === false ? 'unpaid' : 'paid';
 }
 
-export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
+export function JobSchedulesEditor({
+  schedules,
+  onChange,
+  lockTimes = false,
+  defaultBreakPaid = true,
+}) {
   const minScheduleDate = useMemo(() => getMinJobScheduleDate(), []);
 
   const handleScheduleChange = (scheduleId, field, value) => {
@@ -257,7 +265,7 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
   };
 
   const handleAddSchedule = () => {
-    onChange([...schedules, createDefaultSchedule()]);
+    onChange([...schedules, createDefaultSchedule(new Date(), { breakPaid: defaultBreakPaid })]);
   };
 
   const handleRemoveSchedule = (scheduleId) => {
@@ -382,7 +390,7 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                           return {
                             ...schedule,
                             breakIncluded: false,
-                            breakPaid: true,
+                            breakPaid: defaultBreakPaid,
                             breakMins: 0,
                           };
                         }
@@ -398,9 +406,9 @@ export function JobSchedulesEditor({ schedules, onChange, lockTimes = false }) {
                   InputLabelProps={{ shrink: true }}
                   sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper' } }}
                 >
-                  <MenuItem value="none">No break</MenuItem>
                   <MenuItem value="paid">Paid break</MenuItem>
                   <MenuItem value="unpaid">Unpaid break</MenuItem>
+                  <MenuItem value="none">No break</MenuItem>
                 </TextField>
 
                 {entry.breakIncluded !== false && Number(entry.breakMins) > 0 ? (
@@ -459,6 +467,7 @@ export function JobDraftForm({
   calendarTeamLabels = null,
   typeFieldLabel = 'Type',
 }) {
+  const { paysBreaks: defaultBreakPaid } = useCompanyPaysBreaks();
   const isHospital = mode === 'hospital';
   const isUser = mode === 'user';
   const isLocalAuthority = mode === 'localAuthority';
@@ -561,9 +570,12 @@ export function JobDraftForm({
   const rateAndTimesLocked = Boolean(draft.id) && draft.canEditRateAndShiftTimes === false;
 
   const selectedTypeId = draft.typeId || '';
-  const typeSelectValue = jobTypes.some((opt) => String(opt.id) === String(selectedTypeId))
-    ? selectedTypeId
-    : '';
+  const otherRoleSelected = isOtherJobTypeSelected(draft);
+  const typeSelectValue = otherRoleSelected
+    ? OTHER_JOB_TYPE_ID
+    : jobTypes.some((opt) => String(opt.id) === String(selectedTypeId))
+      ? selectedTypeId
+      : '';
   const selectedBranchId = draft.branchId || '';
   const branchSelectValue = branches.some((item) => String(item.id) === String(selectedBranchId))
     ? selectedBranchId
@@ -678,6 +690,16 @@ export function JobDraftForm({
                 displayEmpty
                 onChange={(e) => {
                   const nextId = e.target.value;
+                  if (nextId === OTHER_JOB_TYPE_ID) {
+                    handleFieldChange({
+                      typeId: OTHER_JOB_TYPE_ID,
+                      type: '',
+                      typeTitle: '',
+                      name: '',
+                      customRole: '',
+                    });
+                    return;
+                  }
                   const selected = jobTypes.find((item) => item.id === nextId);
                   const typeName = selected?.title || selected?.name || selected?.label || '';
                   handleFieldChange({
@@ -685,6 +707,7 @@ export function JobDraftForm({
                     type: typeName,
                     typeTitle: typeName,
                     name: typeName,
+                    customRole: '',
                   });
                 }}
                 MenuProps={{
@@ -717,6 +740,11 @@ export function JobDraftForm({
                     </Box>
                   </MenuItem>
                 ))}
+                <MenuItem value={OTHER_JOB_TYPE_ID}>
+                  <Typography variant="body2" fontWeight={600}>
+                    Other
+                  </Typography>
+                </MenuItem>
               </Select>
               {typesError && (
                 <FormHelperText>Could not load job types. Please retry.</FormHelperText>
@@ -724,14 +752,35 @@ export function JobDraftForm({
               {!typesLoading && !typesError && !jobTypes.length && (
                 <FormHelperText>
                   {teamLabels?.length
-                    ? 'No roles match this site. Add a matching job type, or post from Add Job.'
-                    : 'No active job types found.'}
+                    ? 'No roles match this site. Choose Other to enter a role, or add a job type.'
+                    : 'No active job types found. Choose Other to enter a role.'}
                 </FormHelperText>
               )}
               {!typesLoading && !typesError && jobTypes.length > 0 && teamLabels?.length ? (
                 <FormHelperText>Roles for this site</FormHelperText>
               ) : null}
             </FormControl>
+
+            {otherRoleSelected ? (
+              <TextField
+                fullWidth
+                size="small"
+                label="Specific role"
+                placeholder="e.g. Night supervisor, physiotherapist"
+                value={getCustomJobRoleLabel(draft)}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  handleFieldChange({
+                    typeId: OTHER_JOB_TYPE_ID,
+                    customRole: next,
+                    type: next,
+                    typeTitle: next,
+                    name: next,
+                  });
+                }}
+                InputLabelProps={{ shrink: true }}
+              />
+            ) : null}
 
             <FormControl fullWidth size="small" required error={branchesError} sx={{ overflow: 'visible' }}>
               <InputLabel id="job-draft-branch-label" shrink sx={OUTLINED_LABEL_SX}>
@@ -840,6 +889,7 @@ export function JobDraftForm({
               schedules={draft.schedules}
               onChange={onSchedulesChange}
               lockTimes={rateAndTimesLocked}
+              defaultBreakPaid={defaultBreakPaid}
             />
           </Stack>
         </Grid>
@@ -847,7 +897,7 @@ export function JobDraftForm({
         <Grid item xs={12} md={6}>
           <Stack spacing={2.5}>
             <JobImageUpload
-              required={!draft.id}
+              required={false}
               value={draft.image || ''}
               onChange={(value) => handleFieldChange('image', value)}
             />
@@ -888,12 +938,12 @@ export function JobDraftForm({
 
             <FormControl fullWidth size="small" sx={{ overflow: 'visible' }}>
               <InputLabel id="job-draft-gender-label" shrink sx={OUTLINED_LABEL_SX}>
-                Gender (Dependent/Care recipient)
+                Gender (preference if applicable)
               </InputLabel>
               <Select
                 labelId="job-draft-gender-label"
                 value={draft.gender || ''}
-                label="Gender (Dependent/Care recipient)"
+                label="Gender (preference if applicable)"
                 displayEmpty
                 notched
                 onChange={(e) => handleFieldChange('gender', e.target.value)}

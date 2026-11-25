@@ -88,7 +88,6 @@ import { ROLE_TO_API_USER_TYPE } from './auth-api-utils';
 
 const BUSINESS_TYPES = SUPPLIER_BUSINESS_TYPE_OPTIONS;
 
-/** Demo signup: skip API and walk through OTP → documents for client preview */
 const DEMO_SIGNUP_FLOW = false;
 const DEMO_SIGNUP_OTP = '123456';
 
@@ -232,7 +231,6 @@ export const SignUpSchema = zod
         });
       }
 
-      // Gender required for individual home care (customer); optional for nurses (supplier)
       if (isIndividualHomeCareSignupRole(data.role) && !data.gender?.trim()) {
         ctx.addIssue({
           code: zod.ZodIssueCode.custom,
@@ -275,7 +273,6 @@ export const SignUpSchema = zod
         });
       }
 
-      // Business type is agency-only (not home care company)
       if (data.role === 'agency' && !data.businessType) {
         ctx.addIssue({
           code: zod.ZodIssueCode.custom,
@@ -479,7 +476,6 @@ export function JwtSignUpView() {
         const exists = parseEmailExistsResponse(response);
 
         if (exists === true) {
-          // Prefer backend message when present; otherwise let register API return the error text
           const message =
             (typeof response?.message === 'string' && response.message.trim()) ||
             (typeof response?.data?.message === 'string' && response.data.message.trim()) ||
@@ -492,10 +488,8 @@ export function JwtSignUpView() {
           }
         }
 
-        // exists === false/null, or exists without message → register validates duplicates
         return true;
       } catch {
-        // Don't block signup if check API fails — register will still catch duplicates
         return true;
       }
     },
@@ -1007,7 +1001,7 @@ export function JwtSignUpView() {
       {renderConfirmPasswordField}
 
       <Grid xs={12} sm={6}>
-        <Field.Phone name="phoneNumber" label="Phone Number" />
+        <Field.Phone name="phoneNumber" label="Phone Number" country="GB" />
       </Grid>
     </>
   );

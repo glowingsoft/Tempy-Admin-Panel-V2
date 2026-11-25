@@ -202,7 +202,10 @@ function toDateKey(value) {
 function formatPostedAt(value) {
   if (!value) return '';
   try {
-    return fToNow(value) || '';
+    const relative = fToNow(value) || '';
+    if (!relative) return '';
+    if (/^posted\b/i.test(relative)) return relative;
+    return `Posted ${relative}`;
   } catch {
     return '';
   }
