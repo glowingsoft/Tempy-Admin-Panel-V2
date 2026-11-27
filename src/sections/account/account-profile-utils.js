@@ -100,6 +100,7 @@ export function mapUserProfileFromApi(raw = {}) {
     zipCode: postalCode,
     about: raw.about || data.about || raw.bio || data.bio || '',
     bio: raw.bio || data.bio || raw.about || data.about || '',
+    paysBreaks: typeof raw.paysBreaks === 'boolean' ? raw.paysBreaks : data.paysBreaks,
     instructions: raw.instructions || raw.notes || data.instructions || '',
     images: Array.isArray(raw.images) ? raw.images : [],
     validationDocument: Array.isArray(raw.validationDocument) ? raw.validationDocument : [],
@@ -115,9 +116,13 @@ export function buildUpdateProfilePayload(data) {
 
   const addressLine1 = String(data.addressLine1 || data.address || '').trim();
   const addressLine2 = String(data.addressLine2 || '').trim();
+  const city = String(data.city || '').trim();
+  const state = String(data.state || '').trim();
+  const postalCode = String(data.zipCode || data.postalCode || '').trim();
   const fullAddress =
-    String(data.fullAddress || '').trim() ||
-    [addressLine1, addressLine2].filter(Boolean).join(', ');
+    [addressLine1, addressLine2, city, state, postalCode, countryValue]
+      .filter(Boolean)
+      .join(', ') || String(data.fullAddress || '').trim();
 
   const payload = {
     profileIcon: getFileName(data.photoURL) || getFileName(data.profileIcon) || 'default.png',
@@ -128,14 +133,18 @@ export function buildUpdateProfilePayload(data) {
       addressLine1,
       addressLine2,
       country: countryValue,
-      city: String(data.city || '').trim(),
-      state: String(data.state || '').trim(),
-      postalCode: String(data.zipCode || data.postalCode || '').trim(),
+      city,
+      state,
+      postalCode,
     },
   };
 
   if (data.phoneNumber?.trim?.() || (typeof data.phoneNumber === 'string' && data.phoneNumber.trim())) {
     payload.phoneNumber = parsePhoneForApi(data.phoneNumber);
+  }
+
+  if (typeof data.paysBreaks === 'boolean') {
+    payload.paysBreaks = data.paysBreaks;
   }
 
   return payload;

@@ -20,6 +20,8 @@ export const navDataLocalAuthority = [
           { title: 'Job Bids', countKey: 'jobBids', path: paths.dashboard.localAuthority.jobs.bids },
         ],
       },
+      { title: 'Agreed rates', path: paths.dashboard.localAuthority.agreedRates, icon: NAV_ICONS.jobTypes },
+      { title: 'Contracts', path: paths.dashboard.localAuthority.contracts, icon: NAV_ICONS.contract },
       { title: 'Chat', countKey: 'chat', path: paths.dashboard.localAuthority.messages, icon: NAV_ICONS.chat },
       { title: 'Compliance', path: paths.dashboard.localAuthority.compliance, icon: NAV_ICONS.lock },
       { title: 'Payments', path: paths.dashboard.localAuthority.payments, icon: NAV_ICONS.banking },

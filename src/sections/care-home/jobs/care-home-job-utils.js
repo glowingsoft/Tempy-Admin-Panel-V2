@@ -728,7 +728,7 @@ export function jobToDraft(job) {
     type: job.typeTitle || job.type || '',
     typeId: job.typeId || '',
     typeTitle: job.typeTitle || '',
-    customRole: '',
+    customRole: String(job.customRole || '').trim(),
     branchId: job.branchId || '',
     address: job.address || '',
     location: job.location || null,
@@ -917,8 +917,12 @@ export function validateJobDraft(draft, now = new Date()) {
     return 'Please select gender';
   }
   if (isOtherJobTypeSelected(draft)) {
-    if (!getCustomJobRoleLabel(draft)) {
+    const customRole = getCustomJobRoleLabel(draft);
+    if (!customRole) {
       return 'Please enter your specific role';
+    }
+    if (customRole.length > 100) {
+      return 'Specific role must be 100 characters or fewer';
     }
   } else if (!draft.typeId && !draft.type) {
     return 'Please select a job type';

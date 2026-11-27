@@ -48,7 +48,7 @@ import {
   CONTRACT_STATUS,
   getRoleApiBase,
   getRelationshipSide,
-  CUSTOMER_TYPE_OPTIONS,
+  CONTRACT_CUSTOMER_TYPE_OPTIONS,
 } from '../supplier-relationship-utils';
 import { RowActionButton } from '../row-action-button';
 import { useViewOnly } from 'src/hooks/use-view-only';
@@ -262,7 +262,7 @@ function UploadContractDialog({ base, open, onClose }) {
               setCustomer('');
             }}
           >
-            {CUSTOMER_TYPE_OPTIONS.map((option) => (
+            {CONTRACT_CUSTOMER_TYPE_OPTIONS.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.label}
               </MenuItem>

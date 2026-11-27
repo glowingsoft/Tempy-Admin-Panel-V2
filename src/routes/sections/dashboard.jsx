@@ -31,6 +31,7 @@ import {
   LocalAuthorityCreatedJobsPage,
   LocalAuthorityCreatedJobDetailsPage,
   LocalAuthorityJobBidsPage,
+  LocalAuthorityAgreedRatesPage,
   IndividualHomeCareShiftsPage,
   IndividualHomeCareStaffPage,
   IndividualHomeCareMessagesPage,
@@ -257,6 +258,8 @@ export const dashboardRoutes = [
           { path: 'jobs/created', element: <LocalAuthorityCreatedJobsPage /> },
           { path: 'jobs/created/:id', element: <LocalAuthorityCreatedJobDetailsPage /> },
           { path: 'jobs/bids', element: <LocalAuthorityJobBidsPage /> },
+          { path: 'agreed-rates', element: <LocalAuthorityAgreedRatesPage /> },
+          { path: 'contracts', element: <ContractsPage /> },
         ],
       },
       {

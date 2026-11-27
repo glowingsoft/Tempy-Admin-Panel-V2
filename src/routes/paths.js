@@ -166,6 +166,8 @@ export const paths = {
       privacyPolicy: `${ROOTS.DASHBOARD}/local-authority/privacy-policy`,
       contactUs: `${ROOTS.DASHBOARD}/local-authority/contact-us`,
       branches: `${ROOTS.DASHBOARD}/local-authority/branches`,
+      agreedRates: `${ROOTS.DASHBOARD}/local-authority/agreed-rates`,
+      contracts: `${ROOTS.DASHBOARD}/local-authority/contracts`,
       jobs: {
         post: `${ROOTS.DASHBOARD}/local-authority/jobs/post`,
         created: `${ROOTS.DASHBOARD}/local-authority/jobs/created`,

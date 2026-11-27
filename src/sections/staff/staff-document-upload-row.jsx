@@ -13,7 +13,11 @@ import { varAlpha } from 'src/theme/styles';
 
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
-import { useUploadAwsFileMutation } from 'src/store/Reducer/upload-api';
+import {
+  formatOversizedUploadMessage,
+  partitionUploadFilesBySize,
+  useUploadAwsFileMutation,
+} from 'src/store/Reducer/upload-api';
 
 const DOCUMENT_ICONS = {
   'Government-issued ID': 'solar:card-bold-duotone',
@@ -88,20 +92,29 @@ export function StaffDocumentUploadRow({
     async (acceptedFiles) => {
       if (!acceptedFiles.length) return;
 
+      const { accepted, oversized } = partitionUploadFilesBySize(acceptedFiles);
+      if (oversized.length) {
+        toast.error(formatOversizedUploadMessage(oversized));
+      }
+      if (!accepted.length) return;
+
       setUploading(true);
       try {
         const nextFiles = [];
-        for (const file of acceptedFiles) {
-          const originalName = String(file?.name || '').trim() || 'file';
+        for (const file of accepted) {
+          const localName = String(file?.name || '').trim() || 'file';
           const result = await uploadAwsFile(file).unwrap();
-          const url = result?.fileUrl || result?.file || '';
+          // Backend: originalName → name, file (key, may include "/") → url.
+          const url = result?.file || result?.url || result?.fileUrl || '';
+          const nameFromApi = String(result?.name || result?.originalName || localName).trim();
           if (url) {
             nextFiles.push({
-              fileUrl: url,
+              file: result?.file || url,
+              fileUrl: result?.fileUrl || url,
               url,
-              name: originalName,
-              originalName,
-              fileName: originalName,
+              name: nameFromApi,
+              originalName: nameFromApi,
+              fileName: nameFromApi,
             });
           }
         }
@@ -109,9 +122,14 @@ export function StaffDocumentUploadRow({
           setValue(name, [...uploadedFiles, ...nextFiles], { shouldValidate: true });
         }
       } catch (err) {
-        toast.error(
-          err?.data?.message || err?.error || err?.message || 'Could not upload document.'
-        );
+        const oversizedFromApi = err?.data?.oversizedFiles || err?.data?.data?.oversizedFiles;
+        if (Array.isArray(oversizedFromApi) && oversizedFromApi.length) {
+          toast.error(formatOversizedUploadMessage(oversizedFromApi));
+        } else {
+          toast.error(
+            err?.data?.message || err?.error || err?.message || 'Could not upload document.'
+          );
+        }
       } finally {
         setUploading(false);
       }

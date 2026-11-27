@@ -15,6 +15,7 @@ import { getUserIdentityIds } from 'src/components/shifts/self-only-rota';
 import { ModuleLoading } from 'src/components/loading-screen';
 import {
   buildAgencyAvailabilityPayload,
+  isAvailabilityAllDay,
 } from 'src/sections/agency/shifts/agency-availability-api-utils';
 import { AvailabilityTimeRangeDialog } from 'src/sections/agency/shifts/availability-time-range-dialog';
 import Alert from '@mui/material/Alert';
@@ -29,7 +30,7 @@ import { useScopedUserId, useIsImpersonating } from 'src/hooks/use-scoped-user-i
 import { useViewOnly } from 'src/hooks/use-view-only';
 import {
   useCreateNurseAvailabilityMutation,
-  useGetNurseAvailabilityQuery,
+  useGetNurseAvailabilityCalendarQuery,
 } from 'src/store/Reducer/nurse-availability-api';
 import { useGetNurseBookingsQuery } from 'src/store/Reducer/nurse-bookings-api';
 
@@ -203,10 +204,8 @@ export function StaffMemberShiftsView() {
     { skip: !scopeUserId, refetchOnMountOrArgChange: 60, refetchOnFocus: false }
   );
 
-  const availabilityQuery = useGetNurseAvailabilityQuery(
+  const availabilityQuery = useGetNurseAvailabilityCalendarQuery(
     {
-      page: 0,
-      limit: 500,
       startDate: bookingRange.startDate,
       endDate: bookingRange.endDate,
       ...(scopeUserId
@@ -281,23 +280,23 @@ export function StaffMemberShiftsView() {
               ? 'other'
               : '';
     if (!status) return;
-    const savedNote = String(note || '').trim();
+    const savedNote = String(note || '').trim().slice(0, 500);
     if (kind === 'other' && !savedNote) {
       toast.error('Please add a description');
       return;
     }
-    if (kind === 'busy' && !savedNote) {
-      toast.error('Please add a note');
-      return;
-    }
+
+    const allDay = isAvailabilityAllDay(startTime, endTime);
+    const saveStartTime = allDay ? '00:00' : startTime;
+    const saveEndTime = allDay ? '00:00' : endTime;
 
     setAvailTimeSubmitting(true);
     try {
       const body = buildAgencyAvailabilityPayload({
         status,
         date,
-        startTime,
-        endTime,
+        startTime: saveStartTime,
+        endTime: saveEndTime,
         staffId,
         notes: savedNote,
       });

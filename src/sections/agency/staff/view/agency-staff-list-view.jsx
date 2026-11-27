@@ -270,12 +270,16 @@ export function AgencyStaffListView() {
         filters.setState({ name: '', status: 'all' });
         table.onResetPage();
 
+        // 207 / partial responses can report success with imported === 0.
         if (summary.hasExplicitCounts && (summary.imported ?? 0) === 0) {
           const detail =
             summary.errors[0] ||
             summary.message ||
             'No staff were created. Check the CSV columns match the downloaded template.';
           toast.error(detail);
+          if (summary.errors.length > 1) {
+            toast.warning(`${summary.errors.length} row errors — first: ${summary.errors[0]}`);
+          }
           return false;
         }
 
@@ -283,7 +287,8 @@ export function AgencyStaffListView() {
           const failedBit =
             summary.failed > 0 ? ` · ${summary.failed} failed` : '';
           toast.success(
-            summary.message || `Imported ${summary.imported} staff${failedBit}`
+            summary.message ||
+              `Imported ${summary.imported} staff${failedBit}. Imported staff stay Pending until they accept.`
           );
         } else {
           toast.success(
@@ -295,7 +300,11 @@ export function AgencyStaffListView() {
         }
 
         if (summary.errors.length && (summary.imported ?? 0) > 0) {
-          toast.warning(summary.errors[0]);
+          toast.warning(
+            summary.errors.length === 1
+              ? summary.errors[0]
+              : `${summary.failed ?? summary.errors.length} failed — ${summary.errors[0]}`
+          );
         }
 
         importDialog.onFalse();

@@ -251,7 +251,10 @@ export function AccountGeneral() {
         }
 
         const payload = {
-          ...buildUpdateProfilePayload(profileData),
+          ...buildUpdateProfilePayload({
+            ...profileData,
+            ...(canConfigureBreaks ? { paysBreaks } : {}),
+          }),
           ...(staffProfile
             ? {
                 bio: String(personalSummary || '').trim(),
@@ -285,6 +288,7 @@ export function AccountGeneral() {
             location: updated.location || payload.location,
             phoneNumber: updated.phoneNumber || payload.phoneNumber || user?.phoneNumber,
             email: updated.email || user?.email,
+            ...(typeof payload.paysBreaks === 'boolean' ? { paysBreaks: payload.paysBreaks } : {}),
           })
         );
 
@@ -432,8 +436,8 @@ export function AccountGeneral() {
                   Breaks
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Standard for new shift requests. You can still change paid / unpaid / no break on
-                  each shift.
+                  Saved on your profile and used to pre-fill new shift requests. You can still change
+                  paid / unpaid / no break on each shift.
                 </Typography>
                 <FormControlLabel
                   control={
@@ -449,7 +453,7 @@ export function AccountGeneral() {
                       }}
                     />
                   }
-                  label="Company pays breaks by default"
+                  label="We pay breaks"
                 />
               </Card>
             ) : null}

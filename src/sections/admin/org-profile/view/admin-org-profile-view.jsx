@@ -83,6 +83,12 @@ function asDisplayText(value) {
   return text === '[object Object]' ? '' : text;
 }
 
+/** Other-user GET /users/:id may omit email/phone/bank/docs/home address. */
+function asPrivateDisplayText(value) {
+  const text = asDisplayText(value);
+  return text || 'Not shared';
+}
+
 function formatMetric(value, { money = false } = {}) {
   if (value == null || value === '') return '—';
   if (typeof value === 'object') return '—';
@@ -228,9 +234,9 @@ export function AdminOrgProfileView() {
         fromUsersApi.registrationNumber || merged.registrationNumber
       ),
       type: asDisplayText(fromUsersApi.type || merged.type),
-      email: asDisplayText(fromUsersApi.email || apiUser?.email || stateRow?.email),
-      phone: asDisplayText(fromUsersApi.phone || apiUser?.phone || stateRow?.phone),
-      location: asDisplayText(fromUsersApi.location || apiUser?.location || stateRow?.location),
+      email: asPrivateDisplayText(fromUsersApi.email || apiUser?.email || stateRow?.email),
+      phone: asPrivateDisplayText(fromUsersApi.phone || apiUser?.phone || stateRow?.phone),
+      location: asPrivateDisplayText(fromUsersApi.location || apiUser?.location || stateRow?.location),
       city: asDisplayText(fromUsersApi.city || merged.city),
       country: asDisplayText(fromUsersApi.country || merged.country),
       avatarUrl: asDisplayText(fromUsersApi.avatarUrl || apiUser?.avatarUrl || stateRow?.avatarUrl),

@@ -42,6 +42,7 @@ import { useRoleJobTypes } from 'src/sections/job-roles/use-role-job-types';
 import { handleApiError, pickApiToastMessage } from 'src/store/handleApiError';
 import {
   useGetAgreedRatesQuery,
+  useGetContractsQuery,
   useCreateAgreedRateMutation,
   useUpdateAgreedRateMutation,
   useGetCustomerOptionsQuery,
@@ -129,12 +130,29 @@ export function SupplierAgreedRatesView() {
     { base, page: table.page, limit: table.rowsPerPage },
     { skip: !base }
   );
+  const { data: contractsData } = useGetContractsQuery(
+    { base, page: 0, limit: 200 },
+    { skip: !base || isSupplier }
+  );
   const [respond, { isLoading: isResponding }] = useRespondToAgreedRateMutation();
 
   const rows = data?.data || [];
   const totalCount = data?.meta?.totalRecords ?? data?.total_length ?? rows.length;
+  const signedSupplierIds = new Set(
+    (contractsData?.data || [])
+      .filter((contract) => contract.status === 'signed')
+      .map((contract) => String(contract.supplier?.id || ''))
+      .filter(Boolean)
+  );
 
   const handleAction = async (row, action) => {
+    if (action === 'accept' && !isSupplier) {
+      const supplierId = String(row?.supplier?.id || '');
+      if (supplierId && !signedSupplierIds.has(supplierId)) {
+        toast.error('A signed contract with this supplier is needed before you can accept rates.');
+        return;
+      }
+    }
     const fallback =
       action === 'withdraw'
         ? 'Rate withdrawn'

@@ -918,6 +918,7 @@ export function BranchesView() {
         submitting={apiBusy}
         entityLabel={entityLabel}
         addressOnly={userMode}
+        hideInsurance={userMode}
         showComplianceFields={homeCareCompanyMode}
         hideImages={careHomeMode}
         stateLabel="County"

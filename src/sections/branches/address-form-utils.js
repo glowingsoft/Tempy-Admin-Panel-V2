@@ -64,7 +64,7 @@ export function extractAddressLine1(fullAddress) {
   return raw.split(',')[0].trim();
 }
 
-/** Build stored fullAddress with required line 1 first. */
+/** Build stored fullAddress from structured lines (always refresh when lines change). */
 export function composeLocationFullAddress({
   addressLine1 = '',
   addressLine2 = '',
@@ -77,16 +77,13 @@ export function composeLocationFullAddress({
   const line1 = String(addressLine1 || '').trim();
   const line2 = String(addressLine2 || '').trim();
   const lookup = String(fullAddress || '').trim();
-  if (line1 && lookup) {
-    if (lookup.toLowerCase().startsWith(line1.toLowerCase())) return lookup;
-    return [line1, line2, lookup].filter(Boolean).join(', ');
-  }
-  if (line1) {
-    return [line1, line2, city, state, postalCode, country]
-      .map((part) => String(part || '').trim())
-      .filter(Boolean)
-      .join(', ');
-  }
+  const composed = [line1, line2, city, state, postalCode, country]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(', ');
+
+  // Prefer composed from structured fields so edits to line2/city/post update fullAddress.
+  if (composed) return composed;
   return lookup;
 }
 

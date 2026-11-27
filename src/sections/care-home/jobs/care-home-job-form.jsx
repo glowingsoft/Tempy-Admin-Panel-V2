@@ -769,7 +769,7 @@ export function JobDraftForm({
                 placeholder="e.g. Night supervisor, physiotherapist"
                 value={getCustomJobRoleLabel(draft)}
                 onChange={(event) => {
-                  const next = event.target.value;
+                  const next = String(event.target.value || '').slice(0, 100);
                   handleFieldChange({
                     typeId: OTHER_JOB_TYPE_ID,
                     customRole: next,
@@ -778,6 +778,8 @@ export function JobDraftForm({
                     name: next,
                   });
                 }}
+                inputProps={{ maxLength: 100 }}
+                helperText={`${getCustomJobRoleLabel(draft).length}/100`}
                 InputLabelProps={{ shrink: true }}
               />
             ) : null}

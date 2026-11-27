@@ -221,18 +221,52 @@ function toCount(value) {
   return null;
 }
 
-function collectImportErrors(source) {
+function collectImportErrorRows(source) {
   if (!source) return [];
-  if (typeof source === 'string' && source.trim()) return [source.trim()];
+  if (typeof source === 'string' && source.trim()) {
+    return [{ row: null, email: '', name: '', message: source.trim() }];
+  }
   if (!Array.isArray(source)) return [];
 
   return source
     .map((item) => {
-      if (typeof item === 'string') return item.trim();
-      if (!item || typeof item !== 'object') return '';
-      return String(item.message || item.msg || item.error || item.reason || '').trim();
+      if (typeof item === 'string') {
+        const message = item.trim();
+        return message ? { row: null, email: '', name: '', message } : null;
+      }
+      if (!item || typeof item !== 'object') return null;
+      const message = String(item.message || item.msg || item.error || item.reason || '').trim();
+      if (!message) return null;
+      const rowRaw = item.row ?? item.rowNumber ?? item.line ?? item.index;
+      const row =
+        typeof rowRaw === 'number' && Number.isFinite(rowRaw)
+          ? rowRaw
+          : rowRaw != null && String(rowRaw).trim() !== '' && Number.isFinite(Number(rowRaw))
+            ? Number(rowRaw)
+            : null;
+      return {
+        row,
+        email: String(item.email || item.Email || '').trim(),
+        name: String(item.name || item.Name || item.fullName || '').trim(),
+        message,
+      };
     })
     .filter(Boolean);
+}
+
+function formatImportErrorRow(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error.trim();
+  const bits = [];
+  if (error.row != null) bits.push(`Row ${error.row}`);
+  if (error.name) bits.push(error.name);
+  if (error.email) bits.push(error.email);
+  const where = bits.length ? `${bits.join(' · ')}: ` : '';
+  return `${where}${error.message || ''}`.trim();
+}
+
+function collectImportErrors(source) {
+  return collectImportErrorRows(source).map(formatImportErrorRow).filter(Boolean);
 }
 
 /**
@@ -287,13 +321,19 @@ export function summarizeStaffImportResponse(response) {
     imported = root.data.length;
   }
 
-  const errors = [
-    ...collectImportErrors(data.errors),
-    ...collectImportErrors(data.failedRows),
-    ...collectImportErrors(data.failures),
-    ...collectImportErrors(nestedResult?.errors),
-    ...collectImportErrors(root.errors),
+  const errorRows = [
+    ...collectImportErrorRows(data.errors),
+    ...collectImportErrorRows(data.failedRows),
+    ...collectImportErrorRows(data.failures),
+    ...collectImportErrorRows(nestedResult?.errors),
+    ...collectImportErrorRows(root.errors),
   ];
+
+  const errors = errorRows.map(formatImportErrorRow).filter(Boolean);
+
+  if (failed == null && errorRows.length) {
+    failed = errorRows.length;
+  }
 
   const message = String(root.message || data.message || '').trim();
 
@@ -301,6 +341,7 @@ export function summarizeStaffImportResponse(response) {
     imported,
     failed,
     errors,
+    errorRows,
     message,
     hasExplicitCounts: imported != null || failed != null,
   };

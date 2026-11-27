@@ -60,6 +60,49 @@ function toHHMM(value) {
   return '';
 }
 
+/** Backend diary calendar max span (inclusive). */
+export const AVAILABILITY_CALENDAR_MAX_DAYS = 92;
+
+export function normalizeAvailabilityTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+}
+
+/** 00:00–00:00 (backend all-day) or legacy 00:00–23:59. */
+export function isAvailabilityAllDay(startTime, endTime) {
+  const start = normalizeAvailabilityTime(startTime);
+  const end = normalizeAvailabilityTime(endTime);
+  return start === '00:00' && (end === '00:00' || end === '23:59');
+}
+
+/**
+ * Clamp an inclusive date range to at most `maxDays` calendar days.
+ * Returns { startDate, endDate } as yyyy-MM-dd (or empty strings if invalid).
+ */
+export function clampAvailabilityCalendarRange(startDate, endDate, maxDays = AVAILABILITY_CALENDAR_MAX_DAYS) {
+  const startKey = String(startDate || '').trim().slice(0, 10);
+  const endKey = String(endDate || '').trim().slice(0, 10);
+  if (!startKey) return { startDate: '', endDate: '' };
+
+  const start = parse(startKey, 'yyyy-MM-dd', new Date());
+  if (!isValid(start)) return { startDate: startKey, endDate: endKey || startKey };
+
+  let end = endKey ? parse(endKey, 'yyyy-MM-dd', new Date()) : start;
+  if (!isValid(end) || end < start) end = start;
+
+  const limit = Math.max(1, Number(maxDays) || AVAILABILITY_CALENDAR_MAX_DAYS);
+  const maxEnd = addDays(start, limit - 1);
+  if (end > maxEnd) end = maxEnd;
+
+  return {
+    startDate: format(start, 'yyyy-MM-dd'),
+    endDate: format(end, 'yyyy-MM-dd'),
+  };
+}
+
 export function toAgencyAvailabilityIso(dateStr, timeStr = '00:00') {
   const dateKey = String(dateStr || '').trim();
   const timeKey = String(timeStr || '00:00').trim() || '00:00';
@@ -83,8 +126,19 @@ export function resolveAvailabilityDateTimes({
   startDateTime,
   endDateTime,
 } = {}) {
-  const startIso = startDateTime || toAgencyAvailabilityIso(date, startTime);
-  let endIso = endDateTime || toAgencyAvailabilityIso(date, endTime);
+  const startKey = normalizeAvailabilityTime(startTime) || '09:00';
+  const endKey = normalizeAvailabilityTime(endTime) || '18:00';
+
+  // Backend all-day convention: 00:00–00:00. Keep same calendar day (do not overnight-bump).
+  if (!startDateTime && !endDateTime && isAvailabilityAllDay(startKey, endKey)) {
+    return {
+      startDateTime: toAgencyAvailabilityIso(date, '00:00'),
+      endDateTime: toAgencyAvailabilityIso(date, '00:00'),
+    };
+  }
+
+  const startIso = startDateTime || toAgencyAvailabilityIso(date, startKey);
+  let endIso = endDateTime || toAgencyAvailabilityIso(date, endKey);
 
   const startMs = Date.parse(startIso);
   const endMs = Date.parse(endIso);
@@ -92,7 +146,7 @@ export function resolveAvailabilityDateTimes({
     const dateKey = String(date || toDateKey(startIso) || '').trim();
     if (dateKey) {
       const nextDay = format(addDays(parse(dateKey, 'yyyy-MM-dd', new Date()), 1), 'yyyy-MM-dd');
-      endIso = toAgencyAvailabilityIso(nextDay, endTime || toHHMM(endDateTime) || '07:00');
+      endIso = toAgencyAvailabilityIso(nextDay, endKey || toHHMM(endDateTime) || '07:00');
     } else {
       endIso = new Date(startMs + 60 * 60 * 1000).toISOString();
     }
@@ -148,10 +202,16 @@ export function buildAgencyAvailabilityPayload({
   notes = '',
 } = {}) {
   const resolvedStatus = resolveAgencyAvailabilityStatus({ kind: status }) || 'available';
+  const startKey = normalizeAvailabilityTime(startTime) || '09:00';
+  const endKey = normalizeAvailabilityTime(endTime) || '18:00';
+  // Prefer backend all-day convention 00:00–00:00 over legacy 00:00–23:59.
+  const normalizedStart = isAvailabilityAllDay(startKey, endKey) ? '00:00' : startKey;
+  const normalizedEnd = isAvailabilityAllDay(startKey, endKey) ? '00:00' : endKey;
+
   const times = resolveAvailabilityDateTimes({
     date,
-    startTime,
-    endTime,
+    startTime: normalizedStart,
+    endTime: normalizedEnd,
     startDateTime,
     endDateTime,
   });
@@ -175,7 +235,7 @@ export function buildAgencyAvailabilityPayload({
     body.jobType = jobType;
   }
 
-  const note = String(notes || '').trim();
+  const note = String(notes || '').trim().slice(0, 500);
   if (note) {
     body.notes = note;
     body.note = note;
@@ -251,15 +311,20 @@ export function mapAgencyAvailabilityFromApi(item = {}) {
   const isOnCall = status === 'oncall' || Boolean(item.onCall);
   const isSleepover = status === 'sleepover' || Boolean(item.sleepover);
   const isBlock = isLeave || isDayOff || isBusy || isOther;
+  const resolvedStart = isBlock ? startTime || '00:00' : startTime;
+  const resolvedEnd = isBlock
+    ? endTime || (isAvailabilityAllDay(startTime, endTime) || !endTime ? '00:00' : endTime)
+    : endTime;
+  const allDay = Boolean(item.allDay) || isAvailabilityAllDay(resolvedStart, resolvedEnd);
 
   return {
-    id: id || `${staffId || 'row'}-${date}-${startTime}`,
+    id: id || `${staffId || 'row'}-${date}-${resolvedStart}`,
     apiId: id,
     staffId,
     staffName,
     date,
-    startTime: isBlock ? startTime || '00:00' : startTime,
-    endTime: isBlock ? endTime || '23:59' : endTime,
+    startTime: resolvedStart,
+    endTime: allDay ? '00:00' : resolvedEnd,
     startDateTime,
     endDateTime,
     location,
@@ -273,11 +338,135 @@ export function mapAgencyAvailabilityFromApi(item = {}) {
     other: isOther,
     onCall: isOnCall,
     sleepover: isSleepover,
+    allDay,
     blocksAutoAccept: isBlock,
     apiStatus: status,
     displayLabel: item.title || item.leaveTitle || item.status || statusRaw,
     raw: item,
   };
+}
+
+/** Normalize list/calendar availability payloads into mapped rows. */
+export function transformAvailabilityListResponse(response) {
+  const raw = response?.data;
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.docs)
+      ? raw.docs
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray(raw?.results)
+          ? raw.results
+          : Array.isArray(raw?.entries)
+            ? raw.entries
+            : Array.isArray(response)
+              ? response
+              : [];
+  const data = list
+    .map(mapAgencyAvailabilityFromApi)
+    .filter((item) => item.id && item.apiStatus !== 'deleted' && item.apiStatus !== 'delete');
+
+  return {
+    data,
+    meta: response?.meta || raw?.meta || {},
+    message: response?.message || '',
+    total_length: response?.meta?.totalRecords ?? raw?.totalRecords ?? data.length,
+  };
+}
+
+export function mapAvailabilityRuleFromApi(item = {}) {
+  const id = pickId(item._id, item.id);
+  const type = String(item.type || item.status || item.kind || '').trim();
+  const days = Array.isArray(item.days)
+    ? item.days
+    : Array.isArray(item.weekDays)
+      ? item.weekDays
+      : [];
+  const excludedDates = Array.isArray(item.excludedDates)
+    ? item.excludedDates.map((value) => toDateKey(value) || String(value || '').slice(0, 10)).filter(Boolean)
+    : [];
+  const startTime = normalizeAvailabilityTime(item.startTime) || '00:00';
+  const endTime = normalizeAvailabilityTime(item.endTime) || '00:00';
+
+  return {
+    id,
+    apiId: id,
+    type,
+    days,
+    startTime,
+    endTime,
+    startDate: toDateKey(item.startDate) || String(item.startDate || '').slice(0, 10),
+    endDate: toDateKey(item.endDate) || String(item.endDate || '').slice(0, 10),
+    excludedDates,
+    note: String(item.note || item.notes || '').trim(),
+    staffId: pickId(item.user, item.staff, item.worker, item.staffId, item.workerId) || '',
+    allDay: isAvailabilityAllDay(startTime, endTime),
+    raw: item,
+  };
+}
+
+export function transformAvailabilityRulesResponse(response) {
+  const raw = response?.data;
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.docs)
+      ? raw.docs
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray(raw?.results)
+          ? raw.results
+          : Array.isArray(response)
+            ? response
+            : [];
+  const data = list.map(mapAvailabilityRuleFromApi).filter((item) => item.id);
+
+  return {
+    data,
+    meta: response?.meta || raw?.meta || {},
+    message: response?.message || '',
+    total_length: response?.meta?.totalRecords ?? raw?.totalRecords ?? data.length,
+  };
+}
+
+export function buildAvailabilityRulePayload({
+  type = 'busy',
+  days = [],
+  startTime = '00:00',
+  endTime = '00:00',
+  startDate = '',
+  endDate = '',
+  excludedDates = [],
+  note = '',
+  staffId = '',
+} = {}) {
+  const startKey = normalizeAvailabilityTime(startTime) || '00:00';
+  const endKey = normalizeAvailabilityTime(endTime) || '00:00';
+  const allDay = isAvailabilityAllDay(startKey, endKey);
+
+  /** @type {Record<string, unknown>} */
+  const body = {
+    type: resolveAgencyAvailabilityStatus({ kind: type }) || type,
+    days: Array.isArray(days) ? days : [],
+    startTime: allDay ? '00:00' : startKey,
+    endTime: allDay ? '00:00' : endKey,
+    startDate: String(startDate || '').trim().slice(0, 10),
+    endDate: String(endDate || '').trim().slice(0, 10),
+    excludedDates: (Array.isArray(excludedDates) ? excludedDates : [])
+      .map((value) => toDateKey(value) || String(value || '').slice(0, 10))
+      .filter(Boolean),
+  };
+
+  const trimmedNote = String(note || '').trim().slice(0, 500);
+  if (trimmedNote) body.note = trimmedNote;
+
+  const staff = String(staffId || '').trim();
+  if (staff && isMongoObjectId(staff)) {
+    body.user = staff;
+    body.staff = staff;
+    body.worker = staff;
+  }
+
+  return body;
 }
 
 function expandAvailabilityEntry(entry, { maxDays = 62 } = {}) {

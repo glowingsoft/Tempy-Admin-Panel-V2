@@ -233,7 +233,10 @@ export function BranchDetailsView() {
     .filter((part, partIndex, list) => list.indexOf(part) === partIndex)
     .join(' · ');
   const images = Array.isArray(branch?.images) ? branch.images : [];
-  const certifications = uniqueFiles(branch?.certifications || [], branch?.cqcCertificate);
+  const certifications = uniqueFiles(
+    branch?.careDocuments || branch?.certifications || [],
+    branch?.cqcCertificate
+  );
   const insuranceDocuments = uniqueFiles(branch?.insuranceCertificates || [], branch?.insuranceCertificate);
   const profileIconUrl = resolveProfileAssetUrl(branch?.profileIcon || images[0]);
 

@@ -109,6 +109,9 @@ export async function resolveDraftJobTypeForSubmit(draft, createJobType) {
   if (!title) {
     throw new Error('Please enter your specific role');
   }
+  if (title.length > 100) {
+    throw new Error('Specific role must be 100 characters or fewer');
+  }
   if (typeof createJobType !== 'function') {
     throw new Error('Could not save the custom role. Please try again.');
   }
@@ -399,6 +402,7 @@ export function mapCareHomeJobFromApi(item = {}) {
     raw: item,
     typeId,
     typeTitle,
+    customRole: String(item.customRole || '').trim(),
     branchId,
     description: String(item.description || '').trim(),
     status: normalizeJobStatus(item.status),

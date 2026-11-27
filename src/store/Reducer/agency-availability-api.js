@@ -1,7 +1,12 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { mapCareHomeJobTypeFromApi } from 'src/sections/care-home/jobs/care-home-job-api-utils';
-import { mapAgencyAvailabilityFromApi } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import {
+  buildAvailabilityRulePayload,
+  clampAvailabilityCalendarRange,
+  transformAvailabilityListResponse,
+  transformAvailabilityRulesResponse,
+} from 'src/sections/agency/shifts/agency-availability-api-utils';
 import { mapAgencyBookingCalendarFromApi } from 'src/sections/agency/shifts/agency-booking-calendar-api-utils';
 
 import { API_ROUTES } from '../apiRoutes';
@@ -11,12 +16,20 @@ import { createCustomFetchBaseQuery } from '../baseQuery';
  * Agency shifts:
  * - GET /web/agency/booking/calender → rota grid (teams + shifts + weather)
  * - GET/POST /web/agency/availability + PUT/DELETE :id → leave/busy/shift CRUD
+ * - GET /web/agency/availability/calendar → diary (one-offs + repeating rules; max 92 days)
+ * - GET/POST /web/agency/availability/rules + PUT/DELETE :id → repeating availability
  * - GET /web/agency/job/type → Add Shift job types
  */
 export const agencyAvailabilityApi = createApi({
   reducerPath: 'agencyAvailabilityApi',
   baseQuery: createCustomFetchBaseQuery(),
-  tagTypes: ['AgencyAvailability', 'AgencyJobType', 'AgencyBookingCalendar'],
+  tagTypes: [
+    'AgencyAvailability',
+    'AgencyAvailabilityCalendar',
+    'AgencyAvailabilityRules',
+    'AgencyJobType',
+    'AgencyBookingCalendar',
+  ],
 
   endpoints: (builder) => ({
     /**
@@ -67,30 +80,7 @@ export const agencyAvailabilityApi = createApi({
           params,
         };
       },
-      transformResponse: (response) => {
-        const raw = response?.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.docs)
-            ? raw.docs
-            : Array.isArray(raw?.items)
-              ? raw.items
-              : Array.isArray(raw?.results)
-                ? raw.results
-                : Array.isArray(response)
-                  ? response
-                  : [];
-        const data = list
-          .map(mapAgencyAvailabilityFromApi)
-          .filter((item) => item.id && item.apiStatus !== 'deleted' && item.apiStatus !== 'delete');
-
-        return {
-          data,
-          meta: response?.meta || raw?.meta || {},
-          message: response?.message || '',
-          total_length: response?.meta?.totalRecords ?? raw?.totalRecords ?? data.length,
-        };
-      },
+      transformResponse: (response) => transformAvailabilityListResponse(response),
       providesTags: (result) =>
         result?.data?.length
           ? [
@@ -98,6 +88,99 @@ export const agencyAvailabilityApi = createApi({
               { type: 'AgencyAvailability', id: 'LIST' },
             ]
           : [{ type: 'AgencyAvailability', id: 'LIST' }],
+    }),
+
+    /**
+     * GET /web/agency/availability/calendar
+     * Includes one-offs + expanded repeating rules. Range clamped to max 92 days.
+     */
+    getAgencyAvailabilityCalendar: builder.query({
+      query: ({ startDate = '', endDate = '', userId = '' } = {}) => {
+        const range = clampAvailabilityCalendarRange(startDate, endDate);
+        const params = {
+          startDate: range.startDate,
+          endDate: range.endDate,
+        };
+        if (userId) params.userId = String(userId).trim();
+
+        return {
+          url: API_ROUTES.AGENCY_AVAILABILITY_CALENDAR,
+          method: 'GET',
+          params,
+        };
+      },
+      transformResponse: (response) => transformAvailabilityListResponse(response),
+      providesTags: [{ type: 'AgencyAvailabilityCalendar', id: 'LIST' }],
+    }),
+
+    /** GET /web/agency/availability/rules */
+    getAgencyAvailabilityRules: builder.query({
+      query: ({ page = 0, limit = 200, userId = '' } = {}) => {
+        const params = {
+          page: page + 1,
+          limit,
+        };
+        if (userId) params.userId = String(userId).trim();
+
+        return {
+          url: API_ROUTES.AGENCY_AVAILABILITY_RULES,
+          method: 'GET',
+          params,
+        };
+      },
+      transformResponse: (response) => transformAvailabilityRulesResponse(response),
+      providesTags: (result) =>
+        result?.data?.length
+          ? [
+              ...result.data.map((item) => ({ type: 'AgencyAvailabilityRules', id: item.id })),
+              { type: 'AgencyAvailabilityRules', id: 'LIST' },
+            ]
+          : [{ type: 'AgencyAvailabilityRules', id: 'LIST' }],
+    }),
+
+    /** POST /web/agency/availability/rules */
+    createAgencyAvailabilityRule: builder.mutation({
+      query: (payload = {}) => ({
+        url: API_ROUTES.AGENCY_AVAILABILITY_RULES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: buildAvailabilityRulePayload(payload),
+      }),
+      invalidatesTags: [
+        { type: 'AgencyAvailabilityRules', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
+        { type: 'AgencyAvailability', id: 'LIST' },
+      ],
+    }),
+
+    /** PUT /web/agency/availability/rules/:id */
+    updateAgencyAvailabilityRule: builder.mutation({
+      query: ({ id, ...payload } = {}) => ({
+        url: API_ROUTES.AGENCY_AVAILABILITY_RULES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: buildAvailabilityRulePayload(payload),
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'AgencyAvailabilityRules', id },
+        { type: 'AgencyAvailabilityRules', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
+        { type: 'AgencyAvailability', id: 'LIST' },
+      ],
+    }),
+
+    /** DELETE /web/agency/availability/rules/:id */
+    deleteAgencyAvailabilityRule: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.AGENCY_AVAILABILITY_RULES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'AgencyAvailabilityRules', id },
+        { type: 'AgencyAvailabilityRules', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
+        { type: 'AgencyAvailability', id: 'LIST' },
+      ],
     }),
 
     /** GET /web/agency/job/type */
@@ -175,6 +258,7 @@ export const agencyAvailabilityApi = createApi({
       },
       invalidatesTags: [
         { type: 'AgencyAvailability', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
         { type: 'AgencyBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -207,6 +291,7 @@ export const agencyAvailabilityApi = createApi({
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'AgencyAvailability', id },
         { type: 'AgencyAvailability', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
         { type: 'AgencyBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -220,6 +305,7 @@ export const agencyAvailabilityApi = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'AgencyAvailability', id },
         { type: 'AgencyAvailability', id: 'LIST' },
+        { type: 'AgencyAvailabilityCalendar', id: 'LIST' },
         { type: 'AgencyBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -259,6 +345,11 @@ export const agencyAvailabilityApi = createApi({
 export const {
   useGetAgencyBookingCalendarQuery,
   useGetAgencyAvailabilityQuery,
+  useGetAgencyAvailabilityCalendarQuery,
+  useGetAgencyAvailabilityRulesQuery,
+  useCreateAgencyAvailabilityRuleMutation,
+  useUpdateAgencyAvailabilityRuleMutation,
+  useDeleteAgencyAvailabilityRuleMutation,
   useGetAgencyJobTypesQuery,
   useCreateAgencyAvailabilityMutation,
   useUpdateAgencyAvailabilityMutation,

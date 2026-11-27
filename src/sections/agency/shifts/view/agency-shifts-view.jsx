@@ -85,6 +85,7 @@ import {
   buildAgencyAvailabilityPayload,
   availabilityListToShiftMap,
   flattenTeamsStaff,
+  isAvailabilityAllDay,
   mapAgencyBranchesToLocations,
 } from 'src/sections/agency/shifts/agency-availability-api-utils';
 import { AvailabilityTimeRangeDialog } from 'src/sections/agency/shifts/availability-time-range-dialog';
@@ -102,7 +103,7 @@ import {
   useCreateAgencyAvailabilityMutation,
   useCreateAgencyBookingMutation,
   useDeleteAgencyAvailabilityMutation,
-  useGetAgencyAvailabilityQuery,
+  useGetAgencyAvailabilityCalendarQuery,
   useGetAgencyBookingCalendarQuery,
   useUpdateAgencyAvailabilityMutation,
 } from 'src/store/Reducer/agency-availability-api';
@@ -113,7 +114,7 @@ import {
   useCancelHomeCareCompanyBookingMutation,
   useCreateHomeCareCompanyAvailabilityMutation,
   useDeleteHomeCareCompanyAvailabilityMutation,
-  useGetHomeCareCompanyAvailabilityQuery,
+  useGetHomeCareCompanyAvailabilityCalendarQuery,
   useGetHomeCareCompanyBookingCalendarQuery,
   useUpdateHomeCareCompanyAvailabilityMutation,
 } from 'src/store/Reducer/home-care-company-availability-api';
@@ -121,7 +122,7 @@ import { useGetNurseBranchesQuery } from 'src/store/Reducer/nurse-branches-api';
 import {
   useCreateNurseAvailabilityMutation,
   useDeleteNurseAvailabilityMutation,
-  useGetNurseAvailabilityQuery,
+  useGetNurseAvailabilityCalendarQuery,
   useGetNurseBookingCalendarQuery,
   useUpdateNurseAvailabilityMutation,
 } from 'src/store/Reducer/nurse-availability-api';
@@ -1836,7 +1837,7 @@ function ShiftCell({
         onContextMenu={handleContextMenu}
         sx={{ ...cellSx, alignItems: 'center' }}
       >
-        <Tooltip title="Click to mark Busy, On Call, Leave…" arrow>
+        <Tooltip title="Click to mark Busy, Leave, Other…" arrow>
           <Box
             className="empty-plus"
             aria-label="Add on this day"
@@ -2880,29 +2881,28 @@ export function AgencyShiftsView({
         ? hccCalendarQuery
         : agencyCalendarQuery;
 
+  // Diary overlay: /availability/calendar includes repeating rules (old list does not).
   const availabilityQueryArgs = useMemo(() => {
     if (!calendarRange?.startDate || !calendarRange?.endDate) return null;
     return {
-      page: 0,
-      limit: 500,
       startDate: calendarRange.startDate,
       endDate: calendarRange.endDate,
     };
   }, [calendarRange]);
 
-  const agencyAvailabilityListQuery = useGetAgencyAvailabilityQuery(availabilityQueryArgs, {
+  const agencyAvailabilityListQuery = useGetAgencyAvailabilityCalendarQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isAgencyApi,
     refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: true,
   });
-  const hccAvailabilityListQuery = useGetHomeCareCompanyAvailabilityQuery(availabilityQueryArgs, {
+  const hccAvailabilityListQuery = useGetHomeCareCompanyAvailabilityCalendarQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isHomeCareCompanyApi,
     refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
     refetchOnReconnect: true,
   });
-  const nurseAvailabilityListQuery = useGetNurseAvailabilityQuery(availabilityQueryArgs, {
+  const nurseAvailabilityListQuery = useGetNurseAvailabilityCalendarQuery(availabilityQueryArgs, {
     skip: !useCalendarApi || !availabilityQueryArgs || !isNurseApi,
     refetchOnMountOrArgChange: 60,
     refetchOnFocus: false,
@@ -3859,21 +3859,20 @@ export function AgencyShiftsView({
         return;
       }
 
-      const isAllDay = startTime === '00:00' && endTime === '23:59';
+      const isAllDay = isAvailabilityAllDay(startTime, endTime);
       if (isAllDay && getTimedDayShifts(shifts, staff.id, targetDate).length > 0) {
         toast.warning('This day already has a timed shift — choose part of the day instead');
         return;
       }
 
-      const savedNote = String(noteFromDialog || '').trim();
+      const savedNote = String(noteFromDialog || '').trim().slice(0, 500);
       if (kind === 'other' && !savedNote) {
         toast.error('Please add a description');
         return;
       }
-      if (kind === 'busy' && !savedNote) {
-        toast.error('Please add a note');
-        return;
-      }
+
+      const saveStartTime = isAllDay ? '00:00' : startTime;
+      const saveEndTime = isAllDay ? '00:00' : endTime;
       const flagsByKind = {
         busy: { busy: true, blocksAutoAccept: true },
         'day-off': { dayOff: true, blocksAutoAccept: true },
@@ -3897,8 +3896,8 @@ export function AgencyShiftsView({
           const body = buildAgencyAvailabilityPayload({
             status: kind,
             date: targetDate,
-            startTime,
-            endTime,
+            startTime: saveStartTime,
+            endTime: saveEndTime,
             staffId: apiStaffId,
             notes: savedNote,
           });
@@ -3923,8 +3922,8 @@ export function AgencyShiftsView({
                     ? 'other'
                     : 'busy',
             note: savedNote,
-            startTime,
-            endTime,
+            startTime: saveStartTime,
+            endTime: saveEndTime,
           });
         }
 
@@ -3933,12 +3932,13 @@ export function AgencyShiftsView({
           return writeDayShifts(prev, staff.id, targetDate, [
             ...existing,
             {
-              id: apiId || `${staff.id}-${targetDate}-${kind}-${startTime}`,
+              id: apiId || `${staff.id}-${targetDate}-${kind}-${saveStartTime}`,
               apiId: apiId || undefined,
               staffId: staff.id,
               date: targetDate,
-              startTime,
-              endTime,
+              startTime: saveStartTime,
+              endTime: saveEndTime,
+              allDay: isAllDay,
               note: savedNote,
               notes: savedNote,
               ...flags,

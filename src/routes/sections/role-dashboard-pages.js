@@ -200,6 +200,13 @@ export const LocalAuthorityJobBidsPage = createRolePage({
   View: LocalAuthorityJobBidsView,
 });
 
+export const LocalAuthorityAgreedRatesPage = createRolePage({
+  title: 'Agreed rates',
+  allowedPermission: 5,
+  allowedAccountType: 'local_authority',
+  View: SupplierAgreedRatesView,
+});
+
 export const IndividualHomeCareShiftsPage = createRolePage({
   title: 'Shifts',
   allowedPermission: 6,

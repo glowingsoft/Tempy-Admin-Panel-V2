@@ -9,6 +9,8 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import LoadingButton from '@mui/lab/LoadingButton';
 
+import { isAvailabilityAllDay, normalizeAvailabilityTime } from './agency-availability-api-utils';
+
 const TITLE_BY_KIND = {
   busy: 'Mark as busy',
   'day-off': 'Day Off',
@@ -16,18 +18,13 @@ const TITLE_BY_KIND = {
   other: 'Other',
 };
 
-function normalizeTime(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const match = raw.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return '';
-  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
-}
+const NOTE_MAX_LENGTH = 500;
 
 function defaultTimesForKind(kind) {
   if (kind === 'add-leave') return { startTime: '09:00', endTime: '18:00' };
   if (kind === 'busy' || kind === 'other') return { startTime: '00:00', endTime: '12:00' };
-  return { startTime: '00:00', endTime: '23:59' };
+  // Day Off / default: backend all-day convention 00:00–00:00
+  return { startTime: '00:00', endTime: '00:00' };
 }
 
 export function AvailabilityTimeRangeDialog({
@@ -39,7 +36,7 @@ export function AvailabilityTimeRangeDialog({
   staffName = '',
   dateLabel = '',
 }) {
-  const noteRequired = kind === 'other' || kind === 'busy';
+  const noteRequired = kind === 'other';
   const defaults = defaultTimesForKind(kind);
 
   const [startTime, setStartTime] = useState(defaults.startTime);
@@ -54,19 +51,30 @@ export function AvailabilityTimeRangeDialog({
     setNote('');
   }, [open, kind]);
 
-  const resolvedStart = normalizeTime(startTime);
-  const resolvedEnd = normalizeTime(endTime);
+  const resolvedStart = normalizeAvailabilityTime(startTime);
+  const resolvedEnd = normalizeAvailabilityTime(endTime);
   const noteText = String(note || '').trim();
+  const allDay = isAvailabilityAllDay(resolvedStart, resolvedEnd);
   const canSave = Boolean(resolvedStart && resolvedEnd && (!noteRequired || noteText));
+
+  const endHelperText = (() => {
+    if (!resolvedStart || !resolvedEnd) return ' ';
+    if (allDay) return 'All day (00:00 – 00:00)';
+    if (resolvedEnd <= resolvedStart) return 'Ends next day';
+    return ' ';
+  })();
 
   const handleSave = async () => {
     if (!canSave) return;
+    const saveStart = allDay ? '00:00' : resolvedStart;
+    const saveEnd = allDay ? '00:00' : resolvedEnd;
     await onSubmit?.({
       kind,
-      startTime: resolvedStart,
-      endTime: resolvedEnd,
-      overnight: resolvedEnd <= resolvedStart,
-      note: noteText,
+      startTime: saveStart,
+      endTime: saveEnd,
+      overnight: !allDay && resolvedEnd <= resolvedStart,
+      allDay,
+      note: noteText.slice(0, NOTE_MAX_LENGTH),
     });
   };
 
@@ -95,11 +103,7 @@ export function AvailabilityTimeRangeDialog({
               InputLabelProps={{ shrink: true }}
               fullWidth
               disabled={submitting}
-              helperText={
-                resolvedStart && resolvedEnd && resolvedEnd <= resolvedStart
-                  ? 'Ends next day'
-                  : ' '
-              }
+              helperText={endHelperText}
             />
           </Stack>
 
@@ -109,11 +113,11 @@ export function AvailabilityTimeRangeDialog({
               kind === 'other'
                 ? 'Add description'
                 : kind === 'busy'
-                  ? 'Busy doing what?'
+                  ? 'Busy doing what? (optional)'
                   : 'Note (optional)'
             }
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => setNote(event.target.value.slice(0, NOTE_MAX_LENGTH))}
             fullWidth
             size="small"
             multiline
@@ -121,6 +125,8 @@ export function AvailabilityTimeRangeDialog({
             required={noteRequired}
             disabled={submitting}
             error={noteRequired && open && !noteText}
+            inputProps={{ maxLength: NOTE_MAX_LENGTH }}
+            helperText={`${note.length}/${NOTE_MAX_LENGTH}`}
           />
         </Stack>
       </DialogContent>

@@ -5,10 +5,10 @@ export const WEEKLY_UNAVAILABILITY_RULES = [
   {
     id: 'tuesdays',
     label: 'Tuesdays',
-    helper: 'All day',
+    helper: 'All day (00:00 – 00:00)',
     status: 'dayOff',
     startTime: '00:00',
-    endTime: '23:59',
+    endTime: '00:00',
     matchesDay: (jsDay) => jsDay === 2,
   },
   {
@@ -23,10 +23,10 @@ export const WEEKLY_UNAVAILABILITY_RULES = [
   {
     id: 'weekends',
     label: 'Weekends',
-    helper: 'Saturday & Sunday, all day',
+    helper: 'Saturday & Sunday, all day (00:00 – 00:00)',
     status: 'dayOff',
     startTime: '00:00',
-    endTime: '23:59',
+    endTime: '00:00',
     matchesDay: (jsDay) => jsDay === 0 || jsDay === 6,
   },
 ];

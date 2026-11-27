@@ -1,7 +1,12 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import { mapCareHomeJobTypeFromApi } from 'src/sections/care-home/jobs/care-home-job-api-utils';
-import { mapAgencyAvailabilityFromApi } from 'src/sections/agency/shifts/agency-availability-api-utils';
+import {
+  buildAvailabilityRulePayload,
+  clampAvailabilityCalendarRange,
+  transformAvailabilityListResponse,
+  transformAvailabilityRulesResponse,
+} from 'src/sections/agency/shifts/agency-availability-api-utils';
 import { mapAgencyBookingCalendarFromApi } from 'src/sections/agency/shifts/agency-booking-calendar-api-utils';
 
 import { API_ROUTES } from '../apiRoutes';
@@ -11,6 +16,8 @@ import { createCustomFetchBaseQuery } from '../baseQuery';
  * Nurse (staff member) shifts — routes match nurse login (`/web/nurse/...`):
  * - GET /web/nurse/booking/calender
  * - GET/POST /web/nurse/availability + PUT/DELETE :id
+ * - GET /web/nurse/availability/calendar → diary (max 92 days)
+ * - GET/POST /web/nurse/availability/rules + PUT/DELETE :id
  * - GET /web/nurse/job/type
  */
 export const nurseAvailabilityApi = createApi({
@@ -18,6 +25,8 @@ export const nurseAvailabilityApi = createApi({
   baseQuery: createCustomFetchBaseQuery(),
   tagTypes: [
     'NurseAvailability',
+    'NurseAvailabilityCalendar',
+    'NurseAvailabilityRules',
     'NurseJobType',
     'NurseBookingCalendar',
   ],
@@ -83,21 +92,8 @@ export const nurseAvailabilityApi = createApi({
         };
       },
       transformResponse: (response, _meta, arg) => {
-        const raw = response?.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.docs)
-            ? raw.docs
-            : Array.isArray(raw?.items)
-              ? raw.items
-              : Array.isArray(raw?.results)
-                ? raw.results
-                : Array.isArray(response)
-                  ? response
-                  : [];
-        let data = list
-          .map(mapAgencyAvailabilityFromApi)
-          .filter((item) => item.id && item.apiStatus !== 'deleted' && item.apiStatus !== 'delete');
+        const transformed = transformAvailabilityListResponse(response);
+        let data = transformed.data;
 
         const scopeUserId = String(arg?.userId || '').trim();
         if (scopeUserId && arg?.requireOwner) {
@@ -110,10 +106,9 @@ export const nurseAvailabilityApi = createApi({
         }
 
         return {
+          ...transformed,
           data,
-          meta: response?.meta || raw?.meta || {},
-          message: response?.message || '',
-          total_length: scopeUserId ? data.length : (response?.meta?.totalRecords ?? raw?.totalRecords ?? data.length),
+          total_length: scopeUserId ? data.length : transformed.total_length,
         };
       },
       providesTags: (result) =>
@@ -126,6 +121,117 @@ export const nurseAvailabilityApi = createApi({
               { type: 'NurseAvailability', id: 'LIST' },
             ]
           : [{ type: 'NurseAvailability', id: 'LIST' }],
+    }),
+
+    /**
+     * GET /web/nurse/availability/calendar
+     * Includes one-offs + expanded repeating rules. Range clamped to max 92 days.
+     */
+    getNurseAvailabilityCalendar: builder.query({
+      query: ({ startDate = '', endDate = '', userId = '' } = {}) => {
+        const range = clampAvailabilityCalendarRange(startDate, endDate);
+        const params = {
+          startDate: range.startDate,
+          endDate: range.endDate,
+        };
+        if (userId) params.userId = String(userId).trim();
+
+        return {
+          url: API_ROUTES.NURSE_AVAILABILITY_CALENDAR,
+          method: 'GET',
+          params,
+        };
+      },
+      transformResponse: (response, _meta, arg) => {
+        const transformed = transformAvailabilityListResponse(response);
+        let data = transformed.data;
+
+        const scopeUserId = String(arg?.userId || '').trim();
+        if (scopeUserId && arg?.requireOwner) {
+          data = data.filter((item) => String(item.staffId || '').trim() === scopeUserId);
+        } else if (scopeUserId) {
+          const owned = data.filter((item) => String(item.staffId || '').trim() === scopeUserId);
+          const anyHasOwner = data.some((item) => String(item.staffId || '').trim());
+          if (anyHasOwner) data = owned;
+        }
+
+        return {
+          ...transformed,
+          data,
+          total_length: scopeUserId ? data.length : transformed.total_length,
+        };
+      },
+      providesTags: [{ type: 'NurseAvailabilityCalendar', id: 'LIST' }],
+    }),
+
+    /** GET /web/nurse/availability/rules */
+    getNurseAvailabilityRules: builder.query({
+      query: ({ page = 0, limit = 200, userId = '' } = {}) => {
+        const params = {
+          page: page + 1,
+          limit,
+        };
+        if (userId) params.userId = String(userId).trim();
+
+        return {
+          url: API_ROUTES.NURSE_AVAILABILITY_RULES,
+          method: 'GET',
+          params,
+        };
+      },
+      transformResponse: (response) => transformAvailabilityRulesResponse(response),
+      providesTags: (result) =>
+        result?.data?.length
+          ? [
+              ...result.data.map((item) => ({ type: 'NurseAvailabilityRules', id: item.id })),
+              { type: 'NurseAvailabilityRules', id: 'LIST' },
+            ]
+          : [{ type: 'NurseAvailabilityRules', id: 'LIST' }],
+    }),
+
+    /** POST /web/nurse/availability/rules */
+    createNurseAvailabilityRule: builder.mutation({
+      query: (payload = {}) => ({
+        url: API_ROUTES.NURSE_AVAILABILITY_RULES,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: buildAvailabilityRulePayload(payload),
+      }),
+      invalidatesTags: [
+        { type: 'NurseAvailabilityRules', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
+        { type: 'NurseAvailability', id: 'LIST' },
+      ],
+    }),
+
+    /** PUT /web/nurse/availability/rules/:id */
+    updateNurseAvailabilityRule: builder.mutation({
+      query: ({ id, ...payload } = {}) => ({
+        url: API_ROUTES.NURSE_AVAILABILITY_RULES_BY_ID(id),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: buildAvailabilityRulePayload(payload),
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'NurseAvailabilityRules', id },
+        { type: 'NurseAvailabilityRules', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
+        { type: 'NurseAvailability', id: 'LIST' },
+      ],
+    }),
+
+    /** DELETE /web/nurse/availability/rules/:id */
+    deleteNurseAvailabilityRule: builder.mutation({
+      query: (id) => ({
+        url: API_ROUTES.NURSE_AVAILABILITY_RULES_BY_ID(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'NurseAvailabilityRules', id },
+        { type: 'NurseAvailabilityRules', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
+        { type: 'NurseAvailability', id: 'LIST' },
+      ],
     }),
 
     /** GET /web/nurse/job/type */
@@ -202,6 +308,7 @@ export const nurseAvailabilityApi = createApi({
       },
       invalidatesTags: [
         { type: 'NurseAvailability', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
         { type: 'NurseBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -234,6 +341,7 @@ export const nurseAvailabilityApi = createApi({
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'NurseAvailability', id },
         { type: 'NurseAvailability', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
         { type: 'NurseBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -263,6 +371,7 @@ export const nurseAvailabilityApi = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'NurseAvailability', id },
         { type: 'NurseAvailability', id: 'LIST' },
+        { type: 'NurseAvailabilityCalendar', id: 'LIST' },
         { type: 'NurseBookingCalendar', id: 'LIST' },
       ],
     }),
@@ -272,6 +381,11 @@ export const nurseAvailabilityApi = createApi({
 export const {
   useGetNurseBookingCalendarQuery,
   useGetNurseAvailabilityQuery,
+  useGetNurseAvailabilityCalendarQuery,
+  useGetNurseAvailabilityRulesQuery,
+  useCreateNurseAvailabilityRuleMutation,
+  useUpdateNurseAvailabilityRuleMutation,
+  useDeleteNurseAvailabilityRuleMutation,
   useGetNurseJobTypesQuery,
   useCreateNurseAvailabilityMutation,
   useUpdateNurseAvailabilityMutation,

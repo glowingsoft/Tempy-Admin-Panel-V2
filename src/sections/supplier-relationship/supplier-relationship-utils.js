@@ -11,7 +11,11 @@ export const CUSTOMER_ROLES = ['careHome', 'user', 'localAuthority'];
 export const CUSTOMER_TYPE_OPTIONS = [
   { value: 'careHome', label: 'Care home' },
   { value: 'user', label: 'Individual' },
+  { value: 'localAuthority', label: 'Local authority' },
 ];
+
+/** Contract upload customer types (includes LA for agency / nurse suppliers). */
+export const CONTRACT_CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPE_OPTIONS;
 
 export const HOME_CARE_COMPANY_CUSTOMER_TYPE_OPTIONS = [
   { value: 'localAuthority', label: 'Local authority' },
@@ -29,6 +33,8 @@ const ROLE_API_PREFIX = {
   nurse: 'nurse',
   careHome: 'care-home',
   user: 'user',
+  localAuthority: 'local-authority',
+  hospital: 'hospital',
 };
 
 export function getRoleApiBase(user) {

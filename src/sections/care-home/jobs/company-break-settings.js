@@ -12,7 +12,17 @@ function storageKey(userId) {
   return `${STORAGE_PREFIX}${String(userId || '').trim() || 'session'}`;
 }
 
-export function getCompanyPaysBreaks(userId) {
+function readProfilePaysBreaks(user) {
+  if (!user || typeof user !== 'object') return null;
+  if (typeof user.paysBreaks === 'boolean') return user.paysBreaks;
+  const nested = user.raw || user.profile || user.accountState || {};
+  if (typeof nested.paysBreaks === 'boolean') return nested.paysBreaks;
+  return null;
+}
+
+export function getCompanyPaysBreaks(userId, user) {
+  const fromProfile = readProfilePaysBreaks(user);
+  if (fromProfile != null) return fromProfile;
   try {
     const raw = localStorage.getItem(storageKey(userId));
     if (raw === null || raw === undefined || raw === '') return true;
@@ -26,6 +36,7 @@ export function setCompanyPaysBreaks(userId, paysBreaks) {
   try {
     localStorage.setItem(storageKey(userId), paysBreaks ? '1' : '0');
   } catch {
+    // ignore quota / private mode
   }
 }
 
@@ -35,11 +46,13 @@ export function useCompanyPaysBreaks() {
   const role = resolveDashboardRole(sessionUser);
   const canConfigure = BREAK_SETTINGS_ROLES.has(role);
 
-  const [paysBreaks, setPaysBreaksState] = useState(() => getCompanyPaysBreaks(userId));
+  const [paysBreaks, setPaysBreaksState] = useState(() =>
+    getCompanyPaysBreaks(userId, sessionUser)
+  );
 
   useEffect(() => {
-    setPaysBreaksState(getCompanyPaysBreaks(userId));
-  }, [userId]);
+    setPaysBreaksState(getCompanyPaysBreaks(userId, sessionUser));
+  }, [userId, sessionUser]);
 
   const setPaysBreaks = useCallback(
     (next) => {

@@ -70,20 +70,35 @@ export function normalizeUploadDocuments(value) {
     .map((item) => {
       if (typeof item === 'string') {
         const url = item.trim();
-        return url ? { fileUrl: url, name: url.split('/').pop() || url } : null;
+        return url ? { fileUrl: url, url, name: url.split('/').pop() || url } : null;
       }
       if (item && typeof item === 'object') {
-        const fileUrl = String(item.fileUrl || item.url || item.preview || '').trim();
+        const fileUrl = String(
+          item.fileUrl || item.url || item.file || item.preview || ''
+        ).trim();
         const name = String(
           item.originalName || item.fileName || item.name || ''
         ).trim();
         if (!fileUrl && !name) return null;
         return {
           fileUrl: fileUrl || name,
+          url: fileUrl || name,
           name: name || fileUrl.split('/').pop() || 'file',
         };
       }
       return null;
+    })
+    .filter(Boolean);
+}
+
+/** Backend careDocuments contract: [{ name, url }]. */
+export function normalizeCareDocuments(value) {
+  return normalizeUploadDocuments(value)
+    .map((doc) => {
+      const url = String(doc.url || doc.fileUrl || '').trim();
+      const name = String(doc.name || '').trim() || url.split('/').pop() || 'file';
+      if (!url) return null;
+      return { name, url };
     })
     .filter(Boolean);
 }
@@ -126,14 +141,15 @@ function toApiDate(value) {
  */
 export function buildBranchProfilePayload(data = {}) {
   const images = normalizeUploadUrls(data.images);
-  const certificationDocs = normalizeUploadDocuments(data.certifications);
-  // Keep original upload names for display (client: document naming).
-  const certifications = certificationDocs.length
-    ? certificationDocs
-    : normalizeUploadUrls(data.certifications).map((url) => ({
-        fileUrl: url,
-        name: String(url).split('/').pop() || 'file',
-      }));
+  const careDocuments = normalizeCareDocuments(
+    data.careDocuments?.length ? data.careDocuments : data.certifications
+  );
+  // Keep UI-friendly shape for older readers; API also gets careDocuments [{ name, url }].
+  const certifications = careDocuments.map((doc) => ({
+    fileUrl: doc.url,
+    url: doc.url,
+    name: doc.name,
+  }));
   const insuranceCertificates = normalizeUploadUrls(data.insuranceCertificates);
 
   const profileIcon = firstUploadUrl(data.profileIcon, images);
@@ -160,6 +176,7 @@ export function buildBranchProfilePayload(data = {}) {
     ...(website ? { website } : {}),
     images,
     certifications,
+    careDocuments,
     cqcRegistered: Boolean(data.cqcRegistered),
     cqcRating: String(data.cqcRating || '').trim(),
     insuranceCertificates,
@@ -240,12 +257,22 @@ export function mapAgencyBranchFromApi(item) {
     bio: item?.bio || profile.bio || '',
     website: String(item?.website || profile.website || location.website || '').trim(),
     images: asStringList(item?.images || profile.images),
+    careDocuments: normalizeCareDocuments(
+      item?.careDocuments || profile.careDocuments || item?.certifications || profile.certifications || []
+    ),
     certifications: (() => {
-      const raw = item?.certifications || profile.certifications || cqcCertificate || [];
+      const raw =
+        item?.careDocuments ||
+        profile.careDocuments ||
+        item?.certifications ||
+        profile.certifications ||
+        cqcCertificate ||
+        [];
       const docs = normalizeUploadDocuments(raw);
       if (docs.length) return docs;
       return asStringList(raw).map((url) => ({
         fileUrl: url,
+        url,
         name: String(url).split('/').pop() || 'file',
       }));
     })(),
